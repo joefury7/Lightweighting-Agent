@@ -2076,7 +2076,8 @@ function generateNXCode(pocketCount, finalMass) {
     '                best_node = (nx, ny)',
     '        return best_node',
     '',
-    '    # Whiffletree Hub centers (snapped to layout intersections)'
+    '    # Whiffletree Hub centers (snapped to layout intersections)',
+    '    hubs_list = []'
   ];
 
   if (state.supportType === '9point') {
