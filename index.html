@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Siemens NX Optical Mirror Lightweighting CAD Studio</title>
+  <!-- Google Fonts & Font Awesome Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header Navbar -->
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-logo">
+          <i class="fa-solid fa-microchip"></i>
+        </div>
+        <div class="brand-text">
+          <h1>NX Mirror CAD Studio</h1>
+          <span class="badge">CAD Model Generator</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-api-key" class="btn btn-secondary" style="border-color: rgba(0, 242, 254, 0.4); color: #00f2fe;">
+          <i class="fa-solid fa-key"></i> Gemini API Key
+        </button>
+        <button id="btn-export-py" class="btn btn-primary">
+          <i class="fa-solid fa-file-code"></i> Download NX Python Script (.py)
+        </button>
+        <button id="btn-copy-code" class="btn btn-secondary">
+          <i class="fa-solid fa-copy"></i> Copy Code
+        </button>
+      </div>
+    </header>
+
+    <!-- Gemini API Key Modal -->
+    <div id="api-key-modal" class="modal-overlay" style="display: none;">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3><i class="fa-solid fa-key"></i> Gemini API Settings</h3>
+          <button id="btn-close-modal" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <p class="import-desc">Enter your Google Gemini API key to enable autonomous AI lightweighting function calling & real-time FEA analysis loop.</p>
+          <div class="form-group">
+            <label for="inp-gemini-key">Gemini API Key</label>
+            <input type="password" id="inp-gemini-key" placeholder="AIzaSy..." class="modal-input">
+          </div>
+          <div class="form-group">
+            <label for="sel-agent-model">AI Agent Model</label>
+            <select id="sel-agent-model" class="modal-select">
+              <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fastest / Recommended)</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro (Deep Reasoning)</option>
+            </select>
+          </div>
+          <div id="api-key-status" class="import-status" style="display: none;"></div>
+        </div>
+        <div class="modal-footer">
+          <button id="btn-save-api-key" class="btn btn-accent btn-block">
+            <i class="fa-solid fa-floppy-disk"></i> Save Key & Activate AI Agent
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <main class="workspace">
+      <!-- Left Sidebar: Parameters & Controls -->
+      <aside class="sidebar-controls">
+        <!-- 0. Import Existing Mirror -->
+        <div class="panel-card import-card">
+          <h2><i class="fa-solid fa-file-import"></i> Import Existing Mirror</h2>
+          <p class="import-desc">Paste inspection JSON from an analyzed .prt file to auto-populate all parameters.</p>
+          <div class="form-group">
+            <label for="inp-import-json">Inspection Data (JSON)</label>
+            <textarea id="inp-import-json" class="import-textarea" rows="4" placeholder='{ "diameter": 1400, "radius_of_curvature": 5000, ... }'></textarea>
+          </div>
+          <button id="btn-import" class="btn btn-import btn-block">
+            <i class="fa-solid fa-file-import"></i> Import & Populate Parameters
+          </button>
+          <div id="import-status" class="import-status" style="display: none;"></div>
+        </div>
+
+        <!-- 1. Mirror Geometry Inputs -->
+        <div class="panel-card">
+          <h2><i class="fa-solid fa-sliders"></i> Mirror Geometry</h2>
+          <div class="form-group">
+            <label for="inp-diameter">Mirror Outer Diameter D (mm)</label>
+            <input type="text" id="inp-diameter" value="1400">
+          </div>
+          <div class="form-group">
+            <label for="inp-radius-curv">Radius of Curvature R_curv (mm)</label>
+            <input type="text" id="inp-radius-curv" value="5000">
+            <span class="hint" id="txt-focal-length">Focal length f = 2500 mm | Edge Sag = 49.0 mm</span>
+          </div>
+          <div class="form-group">
+            <label for="inp-conic-constant">Conic Constant k (Paraboloid = -1)</label>
+            <input type="text" id="inp-conic-constant" value="-1.0">
+          </div>
+          <div class="form-group">
+            <label for="inp-central-hole">Central Support Hole Dia D_c (mm)</label>
+            <input type="text" id="inp-central-hole" value="200">
+          </div>
+          <div class="form-group">
+            <label for="inp-depth">Total Blank Depth H (mm)</label>
+            <input type="text" id="inp-depth" value="90">
+            <span class="hint" id="txt-edge-thickness">Edge Thickness (Final Rim) = 41.0 mm</span>
+          </div>
+        </div>
+
+        <!-- 2. Material & Pattern Inputs -->
+        <div class="panel-card">
+          <h2><i class="fa-solid fa-atom"></i> Material & Support Configuration</h2>
+          <div class="form-group">
+            <label for="sel-material">Preset Material</label>
+            <select id="sel-material">
+              <option value="zerodur" selected>Zerodur Glass-Ceramic (2530 kg/m³)</option>
+              <option value="ule">ULE Titanium Silicate (2210 kg/m³)</option>
+              <option value="sic">Silicon Carbide SiC (3160 kg/m³)</option>
+              <option value="fused_silica">Fused Silica (2200 kg/m³)</option>
+              <option value="al6061">Aluminum 6061-T6 (2700 kg/m³)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="inp-density">Density rho (kg/m³)</label>
+            <input type="text" id="inp-density" value="2530">
+          </div>
+          <div class="form-group">
+            <label>Lightweighting Pattern</label>
+            <div class="toggle-switch-group pattern-grid">
+              <button class="toggle-btn active" data-pattern="hexagonal">
+                <i class="fa-solid fa-cube"></i> Hexagonal
+                <span class="pattern-ref">GMT</span>
+              </button>
+              <button class="toggle-btn" data-pattern="isogrid">
+                <i class="fa-solid fa-play rotate-90"></i> Isogrid
+                <span class="pattern-ref">JWST</span>
+              </button>
+              <button class="toggle-btn" data-pattern="square">
+                <i class="fa-solid fa-border-all"></i> Square Waffle
+                <span class="pattern-ref">Hubble</span>
+              </button>
+              <button class="toggle-btn" data-pattern="radial">
+                <i class="fa-solid fa-bullseye"></i> Radial + Ring
+                <span class="pattern-ref">Satellite</span>
+              </button>
+              <button class="toggle-btn" data-pattern="hex_radial">
+                <i class="fa-solid fa-circle-nodes"></i> Hex + Radial
+                <span class="pattern-ref">Hybrid</span>
+              </button>
+              <button class="toggle-btn" data-pattern="iso_radial">
+                <i class="fa-solid fa-play rotate-90"></i> Iso + Radial
+                <span class="pattern-ref">Hybrid</span>
+              </button>
+              <button class="toggle-btn" data-pattern="double_arch">
+                <i class="fa-solid fa-archway"></i> Double Arch
+                <span class="pattern-ref">>85% Saved</span>
+              </button>
+              <button class="toggle-btn" data-pattern="sandwich_isogrid">
+                <i class="fa-solid fa-layer-group"></i> Sandwich Iso
+                <span class="pattern-ref">Closed Back</span>
+              </button>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Support Whiffletree System</label>
+            <div class="toggle-switch-group">
+              <button class="toggle-btn" data-support="9point">
+                <i class="fa-solid fa-circle-nodes"></i> 9-Point Support
+              </button>
+              <button class="toggle-btn active" data-support="18point">
+                <i class="fa-solid fa-network-wired"></i> 18-Point Whiffletree
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Engine 1: Yoder Opto-Mechanical Deterministic Solver -->
+        <div class="panel-card highlight-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2><i class="fa-solid fa-calculator"></i> Target Weight Solver</h2>
+            <span class="badge" style="background: rgba(0, 242, 254, 0.15); color: #00f2fe; font-size: 0.65rem;">Engine 1: Offline Physics</span>
+          </div>
+          <p class="import-desc" style="margin-top: 0.25rem;">Deterministic Yoder Vol 2 closed-form physics solver (Quilting &lambda;/20, Flexural Rigidity, Frequency).</p>
+          <div class="form-group">
+            <label for="inp-target-mass">Target Final Mass (kg)</label>
+            <input type="text" id="inp-target-mass" value="100">
+          </div>
+          <button id="btn-auto-solve" class="btn btn-accent btn-block">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> ⚡ Execute Yoder Physics Solver (Engine 1)
+          </button>
+        </div>
+
+        <!-- 4. Solved Layout Outputs -->
+        <div class="panel-card output-card">
+          <h2><i class="fa-solid fa-square-check"></i> Solved Layout Outputs</h2>
+          <div class="form-group">
+            <label for="inp-faceplate">Solved Faceplate Thickness t_f (mm)</label>
+            <input type="text" id="inp-faceplate" value="15.0">
+          </div>
+          <div class="form-group">
+            <label for="inp-pocket-depth">Solved Pocket Depth (mm)</label>
+            <input type="text" id="inp-pocket-depth" value="75.0" readonly style="background: rgba(0,0,0,0.25); color: var(--text-muted); cursor: not-allowed;">
+          </div>
+          <div class="form-group">
+            <label for="inp-cell-size">Solved Cell Grid Size (mm)</label>
+            <input type="text" id="inp-cell-size" value="150">
+          </div>
+          <div class="form-group">
+            <label for="inp-rib-thick">Solved Rib Width t_w (mm)</label>
+            <input type="text" id="inp-rib-thick" value="6.0">
+          </div>
+          <span class="hint-safe" id="txt-face-safety"><i class="fa-solid fa-shield-check"></i> Robust faceplate - safe from breakthrough</span>
+        </div>
+
+        <!-- 5. Engine 2: Real-Time Autonomous AI Agent & NASTRAN FEA Studio -->
+        <div class="panel-card agent-studio-card">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h2><i class="fa-solid fa-brain"></i> Real-Time AI Agent Studio</h2>
+            <span class="badge" style="background: rgba(255, 145, 0, 0.15); color: #ff9100; font-size: 0.65rem;">Engine 2: LLM + NASTRAN</span>
+          </div>
+          <p class="import-desc" style="margin-top: 0.25rem;">Autonomous Gemini LLM function-calling loop with Simcenter NASTRAN FEA 3D stress solver.</p>
+          <div class="form-group">
+            <label for="inp-agent-goal">Agent Prompt / Design Goal</label>
+            <textarea id="inp-agent-goal" class="import-textarea" rows="3" placeholder="e.g. Optimize test26.prt lightweighting for <90 kg mass while keeping quilting < 10nm and run FEA stress analysis."></textarea>
+          </div>
+          <div class="agent-quick-actions">
+            <button class="chip-btn" data-goal="Optimize lightweighting for target mass < 90 kg and run FEA analysis"><i class="fa-solid fa-bolt"></i> Auto-Optimize & FEA</button>
+            <button class="chip-btn" data-goal="Query Yoder Vol 2 rules for Double-Arch lightweighting"><i class="fa-solid fa-book"></i> Yoder RAG Query</button>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="btn-run-agent" class="btn btn-accent btn-block" style="background: linear-gradient(135deg, #00f2fe 0%, #4facfe 100%); flex: 1;">
+              <i class="fa-solid fa-robot"></i> 🤖 Run AI Agent Loop
+            </button>
+            <button id="btn-run-fea-direct" class="btn btn-secondary" style="border-color: rgba(255, 145, 0, 0.5); color: #ff9100; padding: 0.5rem 0.75rem;" title="Run Direct NASTRAN FEA Simulation">
+              <i class="fa-solid fa-microchip"></i> FEA
+            </button>
+          </div>
+
+          <!-- Streamed Agent Output Feed -->
+          <div id="agent-log-container" class="agent-log-container" style="display: none;">
+            <div class="agent-log-header">
+              <span><i class="fa-solid fa-terminal"></i> AI Thought & Action Stream</span>
+              <span id="agent-status-badge" class="badge-running">Active</span>
+            </div>
+            <div id="agent-log-feed" class="agent-log-feed"></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Main: Interactive Visualizer & Analytics -->
+      <section class="main-display">
+        <!-- Analytics Top Bar -->
+        <div class="metrics-grid">
+          <div class="metric-card">
+            <span class="metric-label">Solid Blank Mass</span>
+            <span class="metric-value" id="val-solid-mass">445.9 kg</span>
+            <span class="metric-sub" id="val-solid-material">Zerodur Glass-Ceramic</span>
+          </div>
+          <div class="metric-card active-metric">
+            <span class="metric-label">Lightweight Mass</span>
+            <span class="metric-value" id="val-final-mass">99.9 kg</span>
+            <span class="metric-sub" id="val-mass-reduction">77.6% Weight Reduction</span>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Polishing Quilting Deflection</span>
+            <span class="metric-value" id="val-quilting-deflection">4.6 nm</span>
+            <div class="metric-limit-box">
+              <span class="limit-tag">Limit: ≤ 31.6 nm (λ/20)</span>
+              <span class="status-tag status-safe" id="val-quilting-status">✅ SAFE (λ/137)</span>
+            </div>
+          </div>
+          <div class="metric-card">
+            <span class="metric-label">Fundamental Frequency f_n</span>
+            <span class="metric-value" id="val-fundamental-freq">708 Hz</span>
+            <div class="metric-limit-box">
+              <span class="limit-tag">Limit: ≥ 200 Hz</span>
+              <span class="status-tag status-safe" id="val-frequency-status">✅ SAFE (Pass)</span>
+            </div>
+          </div>
+          <div class="metric-card" id="metric-fea-card">
+            <span class="metric-label">NASTRAN FEA Peak Stress</span>
+            <span class="metric-value" id="val-fea-stress">3.42 MPa</span>
+            <div class="metric-limit-box">
+              <span class="limit-tag">Limit: ≤ 47.0 MPa (SF ≥ 5.0)</span>
+              <span class="status-tag status-safe" id="val-fea-disp">✅ SAFE (SF 68.7 | 0.85μm)</span>
+            </div>
+          </div>
+          <div class="metric-card" id="metric-import" style="display: none;">
+            <span class="metric-label">Imported Source</span>
+            <span class="metric-value" id="val-import-source" style="font-size: 1rem;">—</span>
+            <span class="metric-sub" id="val-import-status">No file imported</span>
+          </div>
+        </div>
+        <!-- 2D / 3D Canvas Preview -->
+        <div class="canvas-card">
+          <div class="canvas-header">
+            <h3><i class="fa-solid fa-eye"></i> Structural Layout & CAD Preview</h3>
+            <div class="canvas-legend">
+              <span class="legend-item"><span class="dot dot-rim"></span> Outer Rim</span>
+              <span class="legend-item"><span class="dot dot-pocket"></span> <span id="legend-pattern-name">Pocket Grid</span></span>
+              <span class="legend-item"><span class="dot dot-hub"></span> Whiffletree Support Pads</span>
+            </div>
+          </div>
+          <div class="canvas-body">
+            <canvas id="mirror-canvas" width="600" height="600"></canvas>
+          </div>
+        </div>
+
+        <!-- Code Viewer & Generator -->
+        <div class="code-card">
+          <div class="code-header">
+            <div class="code-title">
+              <i class="fa-brands fa-python"></i>
+              <span>Generated Siemens NX Open Python Journal Script</span>
+            </div>
+            <span class="code-tag">NX Open Journal Script (.py)</span>
+          </div>
+          <div class="code-body">
+            <pre><code id="code-output"># Loading script...</code></pre>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Unsafe Target Weight Decision Modal -->
+  <div id="unsafe-target-modal" class="modal-overlay" style="display: none;">
+    <div class="modal-card warning-modal-card" style="max-width: 600px;">
+      <div class="modal-header">
+        <h3 style="font-size: 1.1rem; color: #ff9100;"><i class="fa-solid fa-triangle-exclamation"></i> Target Weight Safety Boundary Warning</h3>
+        <button id="btn-close-unsafe-modal" class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="font-size: 0.88rem; color: var(--text-muted);">
+        <p style="margin-bottom: 1rem;">The requested target mass of <strong id="lbl-target-mass-val" style="color: #00f2fe;">40 kg</strong> violates optical faceplate breakthrough and rib buckling safety boundaries.</p>
+
+        <div class="safety-comparison-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+          <div class="option-box option-safe" style="background: rgba(0, 230, 118, 0.05); border: 1px solid rgba(0, 230, 118, 0.3); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <h4 style="color: #00e676; font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-shield-check"></i> Option 1: Max Safe Weight</h4>
+              <div style="font-size: 1.5rem; font-weight: 700; color: #00e676; margin-bottom: 0.5rem;" id="lbl-safe-mass-val">77.6 kg</div>
+              <ul style="list-style: none; padding: 0; font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.3rem;">
+                <li>• Faceplate t_f: <strong id="lbl-safe-fp" style="color:#fff;">10.0</strong> mm (Safe)</li>
+                <li>• Cell Grid Size: <strong id="lbl-safe-cs" style="color:#fff;">220</strong> mm</li>
+                <li>• Rib Width t_w: <strong id="lbl-safe-rt" style="color:#fff;">4.0</strong> mm</li>
+              </ul>
+            </div>
+            <button id="btn-proceed-safe" class="btn btn-primary btn-block" style="margin-top: 1rem; font-size: 0.8rem;">
+              <i class="fa-solid fa-shield-check"></i> Apply Max Safe Weight
+            </button>
+          </div>
+
+          <div class="option-box option-unsafe" style="background: rgba(255, 82, 82, 0.05); border: 1px solid rgba(255, 82, 82, 0.3); border-radius: 12px; padding: 1rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <h4 style="color: #ff5252; font-size: 0.95rem; margin-bottom: 0.5rem;"><i class="fa-solid fa-radiation"></i> Option 2: Force Unsafe</h4>
+              <div style="font-size: 1.5rem; font-weight: 700; color: #ff5252; margin-bottom: 0.5rem;" id="lbl-unsafe-mass-val">40.0 kg</div>
+              <ul style="list-style: none; padding: 0; font-size: 0.78rem; display: flex; flex-direction: column; gap: 0.3rem;">
+                <li>• Faceplate t_f: <strong id="lbl-unsafe-fp" style="color:#fff;">5.0</strong> mm (Thin!)</li>
+                <li>• Cell Grid Size: <strong id="lbl-unsafe-cs" style="color:#fff;">300</strong> mm</li>
+                <li>• Rib Width t_w: <strong id="lbl-unsafe-rt" style="color:#fff;">2.5</strong> mm (Thin!)</li>
+              </ul>
+            </div>
+            <button id="btn-proceed-unsafe" class="btn btn-secondary btn-block" style="border-color: #ff5252; color: #ff5252; margin-top: 1rem; font-size: 0.8rem;">
+              <i class="fa-solid fa-triangle-exclamation"></i> Force Proceed (Unsafe)
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="display: flex; justify-content: flex-end;">
+        <button id="btn-cancel-unsafe-modal" class="btn btn-secondary" style="font-size: 0.82rem;">
+          <i class="fa-solid fa-xmark"></i> Cancel (Keep Current Layout)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
