@@ -1938,7 +1938,7 @@ function generateNXCode(pocketCount, finalMass) {
     '    line2 = workPart.Curves.CreateLine(NXOpen.Point3d(RADIUS, 0.0, BACK_Z), NXOpen.Point3d(r_hole_start, 0.0, BACK_Z))',
     '    line3 = workPart.Curves.CreateLine(NXOpen.Point3d(r_hole_start, 0.0, BACK_Z), NXOpen.Point3d(r_hole_start, 0.0, sag_hole))',
     '',
-    '    z_direction = create_z_direction(workPart, line1)',
+    '    z_direction = create_z_direction(workPart, line3)',
     '    section1 = workPart.Sections.CreateSection(0.0095, 0.01, 0.5)',
     '    section1.SetAllowedEntityTypes(NXOpen.Section.AllowTypes.OnlyCurves)',
     '    curves_rule = workPart.ScRuleFactory.CreateRuleCurveDumb([spline_curve, line1, line2, line3])',
