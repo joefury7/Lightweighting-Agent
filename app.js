@@ -398,33 +398,33 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     if (pattern === 'isogrid') {
       const rowH = cellSize * Math.sqrt(3.0) / 2.0;
       const pocketSide = cellSize - ribThick * 2.0 / Math.sqrt(3.0);
-      const pocketRadius = pocketSide / Math.sqrt(3.0);
       
       const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
       const fRad = Math.min(filletRadius || 5.0, maxF * 0.95);
-      singlePocketArea = (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI);
+      singlePocketArea = Math.max(0, (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI));
       
-      const nRows = Math.floor(maxR / rowH) + 2;
-      const nCols = Math.floor(maxR / cellSize) + 2;
+      const nRows = Math.ceil(maxR / rowH) + 1;
+      const nCols = Math.ceil(maxR / cellSize) + 1;
+      // Standard triangular lattice: vertex at origin
+      // Even rows: upward triangles at (i*s, j*h + h/3), downward at ((i+0.5)*s, j*h + 2h/3)
+      // Odd rows: shift x by s/2
       for (let j = -nRows; j <= nRows; j++) {
         const yBase = j * rowH;
-        const xShift = (Math.abs(j) % 2) * cellSize * 0.5;
+        const xOff = (j % 2 !== 0) ? cellSize * 0.5 : 0.0;
         for (let i = -nCols; i <= nCols; i++) {
-          // Centered grid pocket 1
-          const cx = (i - 0.5) * cellSize + xShift;
+          // Upward triangle centroid
+          const cx = i * cellSize + xOff;
           const cy = yBase + rowH / 3.0;
-          if (Math.hypot(cx, cy) <= maxR && Math.hypot(cx, cy) >= centralExcludeR) {
-            if (!isCloseToSupport(cx, cy, hubs, threshold)) {
-              pocketCount++;
-            }
+          const d1 = Math.hypot(cx, cy);
+          if (d1 <= maxR && d1 >= centralExcludeR) {
+            if (!isCloseToSupport(cx, cy, hubs, threshold)) pocketCount++;
           }
-          // Centered grid pocket 2
-          const cx2 = i * cellSize + xShift;
+          // Downward triangle centroid
+          const cx2 = i * cellSize + cellSize * 0.5 + xOff;
           const cy2 = yBase + 2.0 * rowH / 3.0;
-          if (Math.hypot(cx2, cy2) <= maxR && Math.hypot(cx2, cy2) >= centralExcludeR) {
-            if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
-              pocketCount++;
-            }
+          const d2 = Math.hypot(cx2, cy2);
+          if (d2 <= maxR && d2 >= centralExcludeR) {
+            if (!isCloseToSupport(cx2, cy2, hubs, threshold)) pocketCount++;
           }
         }
       }
@@ -976,35 +976,29 @@ function updateCalculation() {
   if (state.pattern === 'isogrid') {
     const rowH = state.cellSize * Math.sqrt(3.0) / 2.0;
     const pocketSide = state.cellSize - state.ribThick * 2.0 / Math.sqrt(3.0);
-    const pocketRadius = pocketSide / Math.sqrt(3.0);
     
     const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
     const fRad = Math.min(state.filletRadius || 5.0, maxF * 0.95);
-    singlePocketArea = (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI);
+    singlePocketArea = Math.max(0, (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI));
     
-    const nRows = Math.floor(maxR / rowH) + 2;
-    const nCols = Math.floor(maxR / state.cellSize) + 2;
+    const nRows = Math.ceil(maxR / rowH) + 1;
+    const nCols = Math.ceil(maxR / state.cellSize) + 1;
     
     for (let j = -nRows; j <= nRows; j++) {
       const yBase = j * rowH;
-      const xShift = (Math.abs(j) % 2) * state.cellSize * 0.5;
+      const xOff = (j % 2 !== 0) ? state.cellSize * 0.5 : 0.0;
       for (let i = -nCols; i <= nCols; i++) {
-        // Centered grid pocket 1
-        const cx = (i - 0.5) * state.cellSize + xShift;
+        const cx = i * state.cellSize + xOff;
         const cy = yBase + rowH / 3.0;
-        if (Math.hypot(cx, cy) <= maxR && Math.hypot(cx, cy) >= centralExcludeR) {
-          if (!isCloseToSupport(cx, cy, hubs, threshold)) {
-            pocketCount++;
-          }
+        const d1 = Math.hypot(cx, cy);
+        if (d1 <= maxR && d1 >= centralExcludeR) {
+          if (!isCloseToSupport(cx, cy, hubs, threshold)) pocketCount++;
         }
-        
-        // Centered grid pocket 2
-        const cx2 = i * state.cellSize + xShift;
+        const cx2 = i * state.cellSize + state.cellSize * 0.5 + xOff;
         const cy2 = yBase + 2.0 * rowH / 3.0;
-        if (Math.hypot(cx2, cy2) <= maxR && Math.hypot(cx2, cy2) >= centralExcludeR) {
-          if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
-            pocketCount++;
-          }
+        const d2 = Math.hypot(cx2, cy2);
+        if (d2 <= maxR && d2 >= centralExcludeR) {
+          if (!isCloseToSupport(cx2, cy2, hubs, threshold)) pocketCount++;
         }
       }
     }
@@ -1318,10 +1312,10 @@ function drawMirrorCanvas(pocketCount) {
   if (state.pattern === 'isogrid') {
     const rowH = state.cellSize * Math.sqrt(3.0) / 2.0;
     const pocketSide = state.cellSize - state.ribThick * 2.0 / Math.sqrt(3.0);
-    const nRows = Math.floor(maxR / rowH) + 2;
-    const nCols = Math.floor(maxR / state.cellSize) + 2;
+    const nRows = Math.ceil(maxR / rowH) + 1;
+    const nCols = Math.ceil(maxR / state.cellSize) + 1;
     
-    // Enable circular clipping for visual trimming
+    // Circular clip for max-coverage visual: partial cells at edges are trimmed
     ctx.save();
     ctx.beginPath();
     ctx.arc(center, center, maxR * scale, 0, Math.PI * 2);
@@ -1330,23 +1324,25 @@ function drawMirrorCanvas(pocketCount) {
     
     for (let j = -nRows; j <= nRows; j++) {
       const yBase = j * rowH;
-      const xShift = (Math.abs(j) % 2) * state.cellSize * 0.5;
+      const xOff = (j % 2 !== 0) ? state.cellSize * 0.5 : 0.0;
       for (let i = -nCols; i <= nCols; i++) {
-        // Centered grid pocket 1
-        const cx = (i - 0.5) * state.cellSize + xShift;
+        // Upward triangle — allow partial cells at boundaries (clip handles trimming)
+        const cx = i * state.cellSize + xOff;
         const cy = yBase + rowH / 3.0;
-        if (Math.hypot(cx, cy) <= maxR && Math.hypot(cx, cy) >= centralExcludeR) {
+        const d1 = Math.hypot(cx, cy);
+        const halfCell = state.cellSize * 0.7;
+        if (d1 <= maxR + halfCell && d1 >= centralExcludeR - halfCell) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
-            drawTriangle(ctx, center + cx * scale, center + cy * scale, pocketSide * scale, 1);
+            drawTriangle(ctx, center + cx * scale, center + cy * scale, pocketSide * scale, 1, state.filletRadius * scale);
           }
         }
-        
-        // Centered grid pocket 2
-        const cx2 = i * state.cellSize + xShift;
+        // Downward triangle — allow partial cells at boundaries
+        const cx2 = i * state.cellSize + state.cellSize * 0.5 + xOff;
         const cy2 = yBase + 2.0 * rowH / 3.0;
-        if (Math.hypot(cx2, cy2) <= maxR && Math.hypot(cx2, cy2) >= centralExcludeR) {
+        const d2 = Math.hypot(cx2, cy2);
+        if (d2 <= maxR + halfCell && d2 >= centralExcludeR - halfCell) {
           if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
-            drawTriangle(ctx, center + cx2 * scale, center + cy2 * scale, pocketSide * scale, -1);
+            drawTriangle(ctx, center + cx2 * scale, center + cy2 * scale, pocketSide * scale, -1, state.filletRadius * scale);
           }
         }
       }
@@ -2180,8 +2176,8 @@ function generateNXCode(pocketCount, finalMass) {
       '    r_in = pocket_side / math.sqrt(3.0)',
       '    r_fillet = ' + state.filletRadius.toFixed(1),
       '    hub_outer_limit = HUB_OUTER_R + 6.0',
-      '    n_rows = int(max_r / row_h) + 2',
-      '    n_cols = int(max_r / CELL_SIDE) + 2',
+      '    n_rows = int(math.ceil(max_r / row_h)) + 1',
+      '    n_cols = int(math.ceil(max_r / CELL_SIDE)) + 1',
       '',
       '    def get_pocket_height(cx, cy):',
       '        r = math.hypot(cx, cy)',
@@ -2215,11 +2211,13 @@ function generateNXCode(pocketCount, finalMass) {
       '',
       '    for j in range(-n_rows, n_rows + 1):',
       '        y_base = j * row_h',
-      '        x_shift = (CELL_SIDE / 2.0) if (abs(j) % 2 != 0) else 0.0',
+      '        x_off = (CELL_SIDE * 0.5) if (j % 2 != 0) else 0.0',
       '        for i in range(-n_cols, n_cols + 1):',
-      '            cx = (i - 0.5) * CELL_SIDE + x_shift',
+      '            # Upward triangle',
+      '            cx = i * CELL_SIDE + x_off',
       '            cy = y_base + row_h / 3.0',
-      '            if math.hypot(cx, cy) <= max_r and math.hypot(cx, cy) >= CENTRAL_EXCLUDE_R:',
+      '            d1 = math.hypot(cx, cy)',
+      '            if d1 <= max_r and d1 >= CENTRAL_EXCLUDE_R:',
       '                if not is_close_to_support(cx, cy, hubs_list, hub_outer_limit):',
       '                    lines = build_filleted_triangle_lines(cx, cy, r_in, r_fillet, 1, BACK_Z)',
       '                    h_extrude = get_pocket_height(cx, cy)',
@@ -2230,9 +2228,11 @@ function generateNXCode(pocketCount, finalMass) {
       '                        try: c.Blank()',
       '                        except Exception: pass',
       '',
-      '            cx2 = i * CELL_SIDE + x_shift',
+      '            # Downward triangle',
+      '            cx2 = i * CELL_SIDE + CELL_SIDE * 0.5 + x_off',
       '            cy2 = y_base + 2.0 * row_h / 3.0',
-      '            if math.hypot(cx2, cy2) <= max_r and math.hypot(cx2, cy2) >= CENTRAL_EXCLUDE_R:',
+      '            d2 = math.hypot(cx2, cy2)',
+      '            if d2 <= max_r and d2 >= CENTRAL_EXCLUDE_R:',
       '                if not is_close_to_support(cx2, cy2, hubs_list, hub_outer_limit):',
       '                    lines = build_filleted_triangle_lines(cx2, cy2, r_in, r_fillet, -1, BACK_Z)',
       '                    h_extrude = get_pocket_height(cx2, cy2)',
@@ -2405,26 +2405,20 @@ function generateNXCode(pocketCount, finalMass) {
   pyCode.push(
     '    log(lw, f"Subtracted {pocket_count} ' + state.pattern.toUpperCase() + ' pockets: SUCCESS")',
     '',
-    '    # 4. SUPPORT HUBS (' + state.supportType.toUpperCase() + ')',
-    '    hubs = []',
+    '    # 4. WHIFFLETREE SUPPORT HOLES (' + state.supportType.toUpperCase() + ')',
+    '    # Simple through-holes at each support node (no boss pads — holes in ribs only)',
     '    for hx, hy in hubs_list:',
-    '        lines = []',
-    '        for s in range(12):',
-    '            a1 = math.radians(30.0 * s)',
-    '            a2 = math.radians(30.0 * (s + 1))',
-    '            line = workPart.Curves.CreateLine(NXOpen.Point3d(hx + HUB_OUTER_R * math.cos(a1), hy + HUB_OUTER_R * math.sin(a1), BACK_Z), NXOpen.Point3d(hx + HUB_OUTER_R * math.cos(a2), hy + HUB_OUTER_R * math.sin(a2), BACK_Z))',
-    '            lines.append(line)',
-    '        extrude_pocket_boolean(workPart, lines, revolved_body, z_direction, "POCKET_DEPTH", bool_unite)',
-    '',
     '        hole_lines = []',
-    '        for s in range(12):',
-    '            a1 = math.radians(30.0 * s)',
-    '            a2 = math.radians(30.0 * (s + 1))',
-    '            line = workPart.Curves.CreateLine(NXOpen.Point3d(hx + HUB_INNER_R * math.cos(a1), hy + HUB_INNER_R * math.sin(a1), BACK_Z), NXOpen.Point3d(hx + HUB_INNER_R * math.cos(a2), hy + HUB_INNER_R * math.sin(a2), BACK_Z))',
+    '        for s in range(16):',
+    '            a1 = math.radians(22.5 * s)',
+    '            a2 = math.radians(22.5 * (s + 1))',
+    '            line = workPart.Curves.CreateLine(',
+    '                NXOpen.Point3d(hx + HUB_INNER_R * math.cos(a1), hy + HUB_INNER_R * math.sin(a1), BACK_Z),',
+    '                NXOpen.Point3d(hx + HUB_INNER_R * math.cos(a2), hy + HUB_INNER_R * math.sin(a2), BACK_Z))',
     '            hole_lines.append(line)',
     '        extrude_pocket_boolean(workPart, hole_lines, revolved_body, z_direction, "POCKET_DEPTH", bool_sub)',
     '',
-    '    log(lw, "Built Whiffletree Support Pads & Holes: SUCCESS")',
+    '    log(lw, "Built Whiffletree Support Holes: SUCCESS")',
     '',
     '    log(lw, "Restoring Outer and Inner Boundary Walls (Maximum Surface Area Trimming)...")',
     '    # Revolve outer ring to restore outer wall',
