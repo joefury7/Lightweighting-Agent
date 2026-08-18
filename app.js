@@ -544,27 +544,23 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   const maxCS = Math.min(120.0, Math.max(35.0, Math.floor(state.diameter / 6.0)));
 
-  // Search loop: Vary faceplate (minimum 1.0mm), ribThick (minimum 1.5mm), cellSize, and filletRadius
-  for (let fp = 1.0; fp <= 25.0; fp += 0.5) {
-    if (H - fp < 5.0) continue;
-    for (let rt = 1.5; rt <= 8.0; rt += 0.5) {
-      for (let cs = 20; cs <= maxCS; cs += 2) {
+  // Fast optimized search loop: vary fp, rt, cs (fr computed directly)
+  for (let fp = 1.5; fp <= Math.min(15.0, H - 5.0); fp += 0.5) {
+    for (let rt = 1.5; rt <= 6.0; rt += 0.5) {
+      for (let cs = 25; cs <= maxCS; cs += 3) {
         const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
-        if (pocketSide <= 2.0) continue;
-        const max_fr = Math.floor(pocketSide / (2.0 * Math.sqrt(3.0)));
-        const frLimit = Math.min(20.0, max_fr);
+        if (pocketSide <= 4.0) continue;
+        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide / (3.0 * Math.sqrt(3.0)))));
         
-        for (let fr = 1.0; fr <= frLimit; fr += 1.0) {
-          const m = calculateMassForCombo(fp, cs, rt, fr);
-          if (m < minMass) {
-            minMass = m;
-            minMassCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
-          }
-          const diff = Math.abs(m - targetMass);
-          if (diff < bestDiff) {
-            bestDiff = diff;
-            bestCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
-          }
+        const m = calculateMassForCombo(fp, cs, rt, fr);
+        if (m < minMass) {
+          minMass = m;
+          minMassCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
+        }
+        const diff = Math.abs(m - targetMass);
+        if (diff < bestDiff) {
+          bestDiff = diff;
+          bestCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
       }
     }
@@ -572,21 +568,17 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   let unsafeCombo = null;
   let unsafeMinDiff = 999999;
-  for (let fp = 1.0; fp <= 25.0; fp += 0.5) {
-    if (H - fp < 3.0) continue;
-    for (let rt = 1.0; rt <= 10.0; rt += 0.5) {
-      for (let cs = 15; cs <= maxCS + 20; cs += 2) {
+  for (let fp = 1.0; fp <= Math.min(15.0, H - 3.0); fp += 0.5) {
+    for (let rt = 1.0; rt <= 6.0; rt += 0.5) {
+      for (let cs = 15; cs <= maxCS + 20; cs += 3) {
         const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
-        const max_fr = Math.floor(pocketSide / (2.0 * Math.sqrt(3.0)));
-        const frLimit = Math.min(25.0, max_fr);
-        
-        for (let fr = 1.0; fr <= frLimit; fr += 1.0) {
-          const m = calculateMassForCombo(fp, cs, rt, fr);
-          const diff = Math.abs(m - targetMass);
-          if (diff < unsafeMinDiff) {
-            unsafeMinDiff = diff;
-            unsafeCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
-          }
+        if (pocketSide <= 2.0) continue;
+        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide / (3.0 * Math.sqrt(3.0)))));
+        const m = calculateMassForCombo(fp, cs, rt, fr);
+        const diff = Math.abs(m - targetMass);
+        if (diff < unsafeMinDiff) {
+          unsafeMinDiff = diff;
+          unsafeCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
       }
     }
