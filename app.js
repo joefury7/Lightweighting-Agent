@@ -15,7 +15,8 @@ const state = {
   targetMass: 100,
   faceplate: 15.0,
   conicConstant: -1.0,
-  centralHoleDia: 200.0
+  centralHoleDia: 200.0,
+  filletRadius: 5.0
 };
 
 const PATTERN_CATALOG = {
@@ -82,6 +83,13 @@ function initEventListeners() {
   safeAddListener('inp-faceplate', 'input', () => updateCalculation());
   safeAddListener('inp-conic-constant', 'input', () => updateCalculation());
   safeAddListener('inp-central-hole', 'input', () => updateCalculation());
+  safeAddListener('inp-fillet-radius', 'input', () => {
+    const val = parseFloat(document.getElementById('inp-fillet-radius').value);
+    if (!isNaN(val) && val > 0) {
+      state.filletRadius = val;
+      updateCalculation();
+    }
+  });
 
   safeAddListener('inp-target-mass', 'input', (e) => {
     const val = parseFloat(e.target.value);
@@ -225,6 +233,18 @@ function importFromJSON(jsonString) {
       }
     }
 
+    // Fillet radius
+    if (data.fillet_radius || data.filletRadius || data.r_fillet) {
+      const val = parseFloat(data.fillet_radius || data.filletRadius || data.r_fillet);
+      if (!isNaN(val) && val >= 1 && val <= 50) {
+        state.filletRadius = val;
+        const el = document.getElementById('inp-fillet-radius');
+        if (el) { el.value = val; el.classList.add('field-imported'); }
+        importedCount++;
+        importedFields.push(`r_fillet=${val}mm`);
+      }
+    }
+
     // Pattern - expanded normalization for all supported patterns
     if (data.pattern) {
       const p = String(data.pattern).toLowerCase();
@@ -349,7 +369,8 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       maxReducibleWeight: solidMass,
       faceplate: 20.0,
       cellSize: 150,
-      ribThick: 6.0,
+      ribThick: state.ribThick,
+      filletRadius: 5.0,
       mass: solidMass,
       reason: `The target mass (${targetMass.toFixed(0)} kg) is too close to or exceeds the solid glass blank weight (${solidMass.toFixed(1)} kg). No lightweighting pockets are required to meet this target.`
     };
@@ -364,7 +385,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   const numHubs = supportType === '9point' ? 9 : 18;
   const hubInnerR = supportType === '9point' ? 4.0 : 3.0;
 
-  function calculateMassForCombo(faceplate, cellSize, ribThick) {
+  function calculateMassForCombo(faceplate, cellSize, ribThick, filletRadius) {
     const ribH = Math.max(10.0, H - faceplate);
     const hubVolRemoved = numHubs * Math.PI * (hubInnerR * hubInnerR) * ribH;
     const padArea = Math.PI * (hubOuterR * hubOuterR - hubInnerR * hubInnerR);
@@ -378,23 +399,29 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       const rowH = cellSize * Math.sqrt(3.0) / 2.0;
       const pocketSide = cellSize - ribThick * 2.0 / Math.sqrt(3.0);
       const pocketRadius = pocketSide / Math.sqrt(3.0);
-      singlePocketArea = (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide);
+      
+      const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
+      const fRad = Math.min(filletRadius || 5.0, maxF * 0.95);
+      singlePocketArea = (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI);
+      
       const nRows = Math.floor(maxR / rowH) + 2;
       const nCols = Math.floor(maxR / cellSize) + 2;
       for (let j = -nRows; j <= nRows; j++) {
         const yBase = j * rowH;
         const xShift = (Math.abs(j) % 2) * cellSize * 0.5;
         for (let i = -nCols; i <= nCols; i++) {
-          const cx = i * cellSize + xShift;
+          // Centered grid pocket 1
+          const cx = (i - 0.5) * cellSize + xShift;
           const cy = yBase + rowH / 3.0;
-          if (Math.hypot(cx, cy) + pocketRadius <= maxR && Math.hypot(cx, cy) - pocketRadius >= centralExcludeR) {
+          if (Math.hypot(cx, cy) <= maxR && Math.hypot(cx, cy) >= centralExcludeR) {
             if (!isCloseToSupport(cx, cy, hubs, threshold)) {
               pocketCount++;
             }
           }
-          const cx2 = cx + cellSize * 0.5;
+          // Centered grid pocket 2
+          const cx2 = i * cellSize + xShift;
           const cy2 = yBase + 2.0 * rowH / 3.0;
-          if (Math.hypot(cx2, cy2) + pocketRadius <= maxR && Math.hypot(cx2, cy2) - pocketRadius >= centralExcludeR) {
+          if (Math.hypot(cx2, cy2) <= maxR && Math.hypot(cx2, cy2) >= centralExcludeR) {
             if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
               pocketCount++;
             }
@@ -517,19 +544,26 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   let minMass = 999999;
   let minMassCombo = null;
 
-  for (let fp = 2.5; fp <= 25.0; fp += 0.5) {
-    for (let cs = 25; cs <= 280; cs += 5) {
-      for (let rt = 1.0; rt <= 10.0; rt += 0.25) {
-        if (H - fp < 5.0) continue;
-        const m = calculateMassForCombo(fp, cs, rt);
+  const rt = state.ribThick;
+
+  // Search loop: Vary faceplate (minimum 1.0mm), cellSize, and filletRadius
+  for (let fp = 1.0; fp <= 25.0; fp += 0.5) {
+    if (H - fp < 5.0) continue;
+    for (let cs = 20; cs <= 280; cs += 5) {
+      const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
+      const max_fr = Math.floor(pocketSide / (2.0 * Math.sqrt(3.0)));
+      const frLimit = Math.min(25.0, max_fr);
+      
+      for (let fr = 1.0; fr <= frLimit; fr += 1.0) {
+        const m = calculateMassForCombo(fp, cs, rt, fr);
         if (m < minMass) {
           minMass = m;
-          minMassCombo = { faceplate: fp, cellSize: cs, ribThick: rt, mass: m };
+          minMassCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
         const diff = Math.abs(m - targetMass);
         if (diff < bestDiff) {
           bestDiff = diff;
-          bestCombo = { faceplate: fp, cellSize: cs, ribThick: rt, mass: m };
+          bestCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
       }
     }
@@ -537,15 +571,19 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   let unsafeCombo = null;
   let unsafeMinDiff = 999999;
-  for (let fp = 2.0; fp <= 25.0; fp += 0.5) {
-    for (let cs = 20; cs <= 350; cs += 5) {
-      for (let rt = 0.8; rt <= 10.0; rt += 0.25) {
-        if (H - fp < 3.0) continue;
-        const m = calculateMassForCombo(fp, cs, rt);
+  for (let fp = 1.0; fp <= 25.0; fp += 0.5) {
+    if (H - fp < 3.0) continue;
+    for (let cs = 15; cs <= 350; cs += 5) {
+      const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
+      const max_fr = Math.floor(pocketSide / (2.0 * Math.sqrt(3.0)));
+      const frLimit = Math.min(25.0, max_fr);
+      
+      for (let fr = 1.0; fr <= frLimit; fr += 1.0) {
+        const m = calculateMassForCombo(fp, cs, rt, fr);
         const diff = Math.abs(m - targetMass);
         if (diff < unsafeMinDiff) {
           unsafeMinDiff = diff;
-          unsafeCombo = { faceplate: fp, cellSize: cs, ribThick: rt, mass: m };
+          unsafeCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
       }
     }
@@ -558,12 +596,14 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       faceplate: minMassCombo.faceplate,
       cellSize: minMassCombo.cellSize,
       ribThick: minMassCombo.ribThick,
+      filletRadius: minMassCombo.filletRadius,
       mass: minMass,
-      unsafeFaceplate: unsafeCombo ? unsafeCombo.faceplate : 6.0,
+      unsafeFaceplate: unsafeCombo ? unsafeCombo.faceplate : 3.0,
       unsafeCellSize: unsafeCombo ? unsafeCombo.cellSize : 220,
-      unsafeRibThick: unsafeCombo ? unsafeCombo.ribThick : 2.5,
+      unsafeRibThick: state.ribThick,
+      unsafeFilletRadius: unsafeCombo ? unsafeCombo.filletRadius : 5.0,
       unsafeMass: unsafeCombo ? unsafeCombo.mass : targetMass,
-      reason: `The target mass (${targetMass.toFixed(0)} kg) is below the minimum achievable mass (${minMass.toFixed(1)} kg). Reaching this weight requires parameters below Yoder Sec 2.5 structural limits (faceplate < 2.5 mm or rib < 1.0 mm).`
+      reason: `The target mass (${targetMass.toFixed(0)} kg) is below the minimum achievable mass (${minMass.toFixed(1)} kg). Reaching this weight requires parameters below Yoder Sec 2.5 structural limits (faceplate < 1.0 mm or rib < 1.0 mm).`
     };
   } else {
     return {
@@ -571,15 +611,17 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       faceplate: bestCombo.faceplate,
       cellSize: bestCombo.cellSize,
       ribThick: bestCombo.ribThick,
+      filletRadius: bestCombo.filletRadius,
       mass: bestCombo.mass
     };
   }
 }
 
-function applyCombo(faceplate, cellSize, ribThick) {
+function applyCombo(faceplate, cellSize, ribThick, filletRadius) {
   state.faceplate = faceplate;
   state.cellSize = cellSize;
   state.ribThick = ribThick;
+  state.filletRadius = filletRadius || 5.0;
   state.importedMass = null;
 
   const fpInp = document.getElementById('inp-faceplate');
@@ -588,6 +630,8 @@ function applyCombo(faceplate, cellSize, ribThick) {
   if (csInp) csInp.value = state.cellSize;
   const rtInp = document.getElementById('inp-rib-thick');
   if (rtInp) rtInp.value = state.ribThick;
+  const frInp = document.getElementById('inp-fillet-radius');
+  if (frInp) frInp.value = state.filletRadius;
 
   updateCalculation();
 }
@@ -609,13 +653,13 @@ function autoSolveTargetMass() {
   );
 
   if (solved.achievable) {
-    applyCombo(solved.faceplate, solved.cellSize, solved.ribThick);
+    applyCombo(solved.faceplate, solved.cellSize, solved.ribThick, solved.filletRadius);
     const statusVal = document.getElementById('val-import-status');
     if (statusVal && state.importedFileName) {
       statusVal.textContent = `Auto-Solved to ${solved.mass.toFixed(1)} kg`;
     }
 
-    alert(`Target mass of ${state.targetMass} kg is safely achievable!\n\nOptimized layout parameters:\n- Faceplate Thickness: ${state.faceplate} mm\n- Cell Grid Size: ${state.cellSize} mm\n- Rib Width: ${state.ribThick} mm\n\nSolved mass: ${solved.mass.toFixed(1)} kg.`);
+    alert(`Target mass of ${state.targetMass} kg is safely achievable!\n\nOptimized layout parameters:\n- Faceplate Thickness: ${state.faceplate} mm\n- Cell Grid Size: ${state.cellSize} mm\n- Rib Width: ${state.ribThick} mm\n- Fillet Radius: ${state.filletRadius} mm\n\nSolved mass: ${solved.mass.toFixed(1)} kg.`);
   } else {
     // Show Modal with 2 Choice Options (Apply Max Safe Weight vs Force Unsafe Target)
     const modal = document.getElementById('unsafe-target-modal');
@@ -649,7 +693,7 @@ function autoSolveTargetMass() {
     if (btnProceedSafe) {
       btnProceedSafe.onclick = () => {
         state.forcedMass = null;
-        applyCombo(solved.faceplate, solved.cellSize, solved.ribThick);
+        applyCombo(solved.faceplate, solved.cellSize, solved.ribThick, solved.filletRadius);
         modal.style.display = 'none';
         const statusVal = document.getElementById('val-import-status');
         if (statusVal) statusVal.textContent = `Applied Max Safe Mass: ${solved.maxReducibleWeight.toFixed(1)} kg`;
@@ -661,7 +705,7 @@ function autoSolveTargetMass() {
     if (btnProceedUnsafe) {
       btnProceedUnsafe.onclick = () => {
         state.forcedMass = state.targetMass;
-        applyCombo(solved.unsafeFaceplate, solved.unsafeCellSize, solved.unsafeRibThick);
+        applyCombo(solved.unsafeFaceplate, solved.unsafeCellSize, solved.unsafeRibThick, solved.unsafeFilletRadius);
         modal.style.display = 'none';
         const statusVal = document.getElementById('val-import-status');
         if (statusVal) statusVal.textContent = `FORCED UNSAFE TARGET: ${state.targetMass.toFixed(1)} kg`;
@@ -933,7 +977,10 @@ function updateCalculation() {
     const rowH = state.cellSize * Math.sqrt(3.0) / 2.0;
     const pocketSide = state.cellSize - state.ribThick * 2.0 / Math.sqrt(3.0);
     const pocketRadius = pocketSide / Math.sqrt(3.0);
-    singlePocketArea = (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide);
+    
+    const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
+    const fRad = Math.min(state.filletRadius || 5.0, maxF * 0.95);
+    singlePocketArea = (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI);
     
     const nRows = Math.floor(maxR / rowH) + 2;
     const nCols = Math.floor(maxR / state.cellSize) + 2;
@@ -942,17 +989,19 @@ function updateCalculation() {
       const yBase = j * rowH;
       const xShift = (Math.abs(j) % 2) * state.cellSize * 0.5;
       for (let i = -nCols; i <= nCols; i++) {
-        const cx = i * state.cellSize + xShift;
+        // Centered grid pocket 1
+        const cx = (i - 0.5) * state.cellSize + xShift;
         const cy = yBase + rowH / 3.0;
-        if (Math.hypot(cx, cy) + pocketRadius <= maxR && Math.hypot(cx, cy) - pocketRadius >= centralExcludeR) {
+        if (Math.hypot(cx, cy) <= maxR && Math.hypot(cx, cy) >= centralExcludeR) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
             pocketCount++;
           }
         }
         
-        const cx2 = cx + state.cellSize * 0.5;
+        // Centered grid pocket 2
+        const cx2 = i * state.cellSize + xShift;
         const cy2 = yBase + 2.0 * rowH / 3.0;
-        if (Math.hypot(cx2, cy2) + pocketRadius <= maxR && Math.hypot(cx2, cy2) - pocketRadius >= centralExcludeR) {
+        if (Math.hypot(cx2, cy2) <= maxR && Math.hypot(cx2, cy2) >= centralExcludeR) {
           if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
             pocketCount++;
           }
@@ -1269,31 +1318,40 @@ function drawMirrorCanvas(pocketCount) {
   if (state.pattern === 'isogrid') {
     const rowH = state.cellSize * Math.sqrt(3.0) / 2.0;
     const pocketSide = state.cellSize - state.ribThick * 2.0 / Math.sqrt(3.0);
-    const pocketRadius = pocketSide / Math.sqrt(3.0);
     const nRows = Math.floor(maxR / rowH) + 2;
     const nCols = Math.floor(maxR / state.cellSize) + 2;
+    
+    // Enable circular clipping for visual trimming
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center, center, maxR * scale, 0, Math.PI * 2);
+    ctx.arc(center, center, centralExcludeR * scale, 0, Math.PI * 2, true);
+    ctx.clip();
     
     for (let j = -nRows; j <= nRows; j++) {
       const yBase = j * rowH;
       const xShift = (Math.abs(j) % 2) * state.cellSize * 0.5;
       for (let i = -nCols; i <= nCols; i++) {
-        const cx = i * state.cellSize + xShift;
+        // Centered grid pocket 1
+        const cx = (i - 0.5) * state.cellSize + xShift;
         const cy = yBase + rowH / 3.0;
-        if (Math.hypot(cx, cy) + pocketRadius <= maxR && Math.hypot(cx, cy) - pocketRadius >= centralExcludeR) {
+        if (Math.hypot(cx, cy) <= maxR && Math.hypot(cx, cy) >= centralExcludeR) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
             drawTriangle(ctx, center + cx * scale, center + cy * scale, pocketSide * scale, 1);
           }
         }
         
-        const cx2 = cx + state.cellSize * 0.5;
+        // Centered grid pocket 2
+        const cx2 = i * state.cellSize + xShift;
         const cy2 = yBase + 2.0 * rowH / 3.0;
-        if (Math.hypot(cx2, cy2) + pocketRadius <= maxR && Math.hypot(cx2, cy2) - pocketRadius >= centralExcludeR) {
+        if (Math.hypot(cx2, cy2) <= maxR && Math.hypot(cx2, cy2) >= centralExcludeR) {
           if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
             drawTriangle(ctx, center + cx2 * scale, center + cy2 * scale, pocketSide * scale, -1);
           }
         }
       }
     }
+    ctx.restore();
   } else if (state.pattern === 'square') {
     const pocketSide = state.cellSize - state.ribThick;
     const nGrid = Math.floor(maxR / state.cellSize) + 2;
@@ -2120,7 +2178,7 @@ function generateNXCode(pocketCount, finalMass) {
       '    row_h = CELL_SIDE * math.sqrt(3.0) / 2.0',
       '    pocket_side = CELL_SIDE - RIB_THICK * 2.0 / math.sqrt(3.0)',
       '    r_in = pocket_side / math.sqrt(3.0)',
-      '    r_fillet = max(2.0, pocket_side * 0.15)',
+      '    r_fillet = ' + state.filletRadius.toFixed(1),
       '    hub_outer_limit = HUB_OUTER_R + 6.0',
       '    n_rows = int(max_r / row_h) + 2',
       '    n_cols = int(max_r / CELL_SIDE) + 2',
@@ -2159,9 +2217,9 @@ function generateNXCode(pocketCount, finalMass) {
       '        y_base = j * row_h',
       '        x_shift = (CELL_SIDE / 2.0) if (abs(j) % 2 != 0) else 0.0',
       '        for i in range(-n_cols, n_cols + 1):',
-      '            cx = i * CELL_SIDE + x_shift',
+      '            cx = (i - 0.5) * CELL_SIDE + x_shift',
       '            cy = y_base + row_h / 3.0',
-      '            if math.hypot(cx, cy) + r_in <= max_r and math.hypot(cx, cy) - r_in >= CENTRAL_EXCLUDE_R:',
+      '            if math.hypot(cx, cy) <= max_r and math.hypot(cx, cy) >= CENTRAL_EXCLUDE_R:',
       '                if not is_close_to_support(cx, cy, hubs_list, hub_outer_limit):',
       '                    lines = build_filleted_triangle_lines(cx, cy, r_in, r_fillet, 1, BACK_Z)',
       '                    h_extrude = get_pocket_height(cx, cy)',
@@ -2172,9 +2230,9 @@ function generateNXCode(pocketCount, finalMass) {
       '                        try: c.Blank()',
       '                        except Exception: pass',
       '',
-      '            cx2 = cx + CELL_SIDE * 0.5',
+      '            cx2 = i * CELL_SIDE + x_shift',
       '            cy2 = y_base + 2.0 * row_h / 3.0',
-      '            if math.hypot(cx2, cy2) + r_in <= max_r and math.hypot(cx2, cy2) - r_in >= CENTRAL_EXCLUDE_R:',
+      '            if math.hypot(cx2, cy2) <= max_r and math.hypot(cx2, cy2) >= CENTRAL_EXCLUDE_R:',
       '                if not is_close_to_support(cx2, cy2, hubs_list, hub_outer_limit):',
       '                    lines = build_filleted_triangle_lines(cx2, cy2, r_in, r_fillet, -1, BACK_Z)',
       '                    h_extrude = get_pocket_height(cx2, cy2)',
@@ -2367,6 +2425,65 @@ function generateNXCode(pocketCount, finalMass) {
     '        extrude_pocket_boolean(workPart, hole_lines, revolved_body, z_direction, "POCKET_DEPTH", bool_sub)',
     '',
     '    log(lw, "Built Whiffletree Support Pads & Holes: SUCCESS")',
+    '',
+    '    log(lw, "Restoring Outer and Inner Boundary Walls (Maximum Surface Area Trimming)...")',
+    '    # Revolve outer ring to restore outer wall',
+    '    try:',
+    '        sec_outer = workPart.Sections.CreateSection(0.0095, 0.01, 0.5)',
+    '        sec_outer.SetAllowedEntityTypes(NXOpen.Section.AllowTypes.OnlyCurves)',
+    '        line_outer_v1 = workPart.Curves.CreateLine(NXOpen.Point3d(RADIUS, 0.0, BACK_Z), NXOpen.Point3d(RADIUS, 0.0, SAG))',
+    '        line_outer_h = workPart.Curves.CreateLine(NXOpen.Point3d(RADIUS - WALL_MARGIN, 0.0, BACK_Z), NXOpen.Point3d(RADIUS, 0.0, BACK_Z))',
+    '        r_inner_wall = RADIUS - WALL_MARGIN',
+    '        denom_w = R_CURV * (1.0 + math.sqrt(max(0.0001, 1.0 - (1.0 + CONIC_CONSTANT) * (r_inner_wall**2) / (R_CURV**2))))',
+    '        sag_inner_wall = (r_inner_wall**2) / denom_w',
+    '        line_outer_v2 = workPart.Curves.CreateLine(NXOpen.Point3d(r_inner_wall, 0.0, BACK_Z), NXOpen.Point3d(r_inner_wall, 0.0, sag_inner_wall))',
+    '        rule = workPart.ScRuleFactory.CreateRuleCurveDumb([spline_curve, line_outer_v1, line_outer_h, line_outer_v2])',
+    '        sec_outer.AddToSection([rule], spline_curve, NXOpen.NXObject.Null, NXOpen.NXObject.Null, NXOpen.Point3d(RADIUS - WALL_MARGIN/2.0, 0.0, 0.0), NXOpen.Section.Mode.Create, False)',
+    '        revolve_outer = workPart.Features.CreateRevolveBuilder(NXOpen.Features.Revolve.Null)',
+    '        revolve_outer.Section = sec_outer',
+    '        revolve_outer.Axis = workPart.Axes.CreateAxis(axis_pt, z_direction, NXOpen.SmartObject.UpdateOption.WithinModeling)',
+    '        revolve_outer.Limits.StartExtend.Value.Value = 0.0',
+    '        revolve_outer.Limits.EndExtend.Value.Value = 360.0',
+    '        revolve_outer.BooleanOperation.Type = bool_unite',
+    '        revolve_outer.BooleanOperation.SetTargetBodies([revolved_body])',
+    '        revolve_outer.CommitFeature()',
+    '        revolve_outer.Destroy()',
+    '    except Exception as e:',
+    '        log(lw, f"Outer wall restore warning: {e}")',
+    '',
+    '    # Revolve inner ring to restore inner wall',
+    '    try:',
+    '        sec_inner = workPart.Sections.CreateSection(0.0095, 0.01, 0.5)',
+    '        sec_inner.SetAllowedEntityTypes(NXOpen.Section.AllowTypes.OnlyCurves)',
+    '        r_hole = CENTRAL_HOLE_DIA / 2.0',
+    '        denom_h = R_CURV * (1.0 + math.sqrt(max(0.0001, 1.0 - (1.0 + CONIC_CONSTANT) * (r_hole**2) / (R_CURV**2))))',
+    '        sag_hole = (r_hole**2) / denom_h',
+    '        r_outer_wall = r_hole + WALL_MARGIN',
+    '        denom_ow = R_CURV * (1.0 + math.sqrt(max(0.0001, 1.0 - (1.0 + CONIC_CONSTANT) * (r_outer_wall**2) / (R_CURV**2))))',
+    '        sag_outer_wall = (r_outer_wall**2) / denom_ow',
+    '        line_inner_v1 = workPart.Curves.CreateLine(NXOpen.Point3d(r_hole, 0.0, BACK_Z), NXOpen.Point3d(r_hole, 0.0, sag_hole))',
+    '        line_inner_h = workPart.Curves.CreateLine(NXOpen.Point3d(r_hole, 0.0, BACK_Z), NXOpen.Point3d(r_outer_wall, 0.0, BACK_Z))',
+    '        line_inner_v2 = workPart.Curves.CreateLine(NXOpen.Point3d(r_outer_wall, 0.0, BACK_Z), NXOpen.Point3d(r_outer_wall, 0.0, sag_outer_wall))',
+    '        rule_inner = workPart.ScRuleFactory.CreateRuleCurveDumb([spline_curve, line_inner_v1, line_inner_h, line_inner_v2])',
+    '        sec_inner.AddToSection([rule_inner], spline_curve, NXOpen.NXObject.Null, NXOpen.NXObject.Null, NXOpen.Point3d(r_hole + WALL_MARGIN/2.0, 0.0, 0.0), NXOpen.Section.Mode.Create, False)',
+    '        revolve_inner = workPart.Features.CreateRevolveBuilder(NXOpen.Features.Revolve.Null)',
+    '        revolve_inner.Section = sec_inner',
+    '        revolve_inner.Axis = workPart.Axes.CreateAxis(axis_pt, z_direction, NXOpen.SmartObject.UpdateOption.WithinModeling)',
+    '        revolve_inner.Limits.StartExtend.Value.Value = 0.0',
+    '        revolve_inner.Limits.EndExtend.Value.Value = 360.0',
+    '        revolve_inner.BooleanOperation.Type = bool_unite',
+    '        revolve_inner.BooleanOperation.SetTargetBodies([revolved_body])',
+    '        revolve_inner.CommitFeature()',
+    '        revolve_inner.Destroy()',
+    '    except Exception as e:',
+    '        log(lw, f"Inner wall restore warning: {e}")',
+    '',
+    '    # Clean up construction curves',
+    '    for c in ["line_outer_v1", "line_outer_h", "line_outer_v2", "line_inner_v1", "line_inner_h", "line_inner_v2"]:',
+    '        try:',
+    '            locals()[c].Blank()',
+    '        except Exception: pass',
+    '',
     '    assign_or_create_zerodur(workPart, revolved_body, lw)',
     ''
   );
