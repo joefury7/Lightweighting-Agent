@@ -398,6 +398,8 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     if (pattern === 'isogrid') {
       const rowH = cellSize * Math.sqrt(3.0) / 2.0;
       const pocketSide = cellSize - ribThick * 2.0 / Math.sqrt(3.0);
+      if (pocketSide <= 0) return 9999;  // Rib too thick for this cell size
+      const pocketRadius = pocketSide / Math.sqrt(3.0);   // circumradius of pocket triangle
       
       const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
       const fRad = Math.min(filletRadius || 5.0, maxF * 0.95);
@@ -405,25 +407,22 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       
       const nRows = Math.ceil(maxR / rowH) + 1;
       const nCols = Math.ceil(maxR / cellSize) + 1;
-      // Standard triangular lattice: vertex at origin
-      // Even rows: upward triangles at (i*s, j*h + h/3), downward at ((i+0.5)*s, j*h + 2h/3)
-      // Odd rows: shift x by s/2
       for (let j = -nRows; j <= nRows; j++) {
         const yBase = j * rowH;
         const xOff = (j % 2 !== 0) ? cellSize * 0.5 : 0.0;
         for (let i = -nCols; i <= nCols; i++) {
-          // Upward triangle centroid
+          // Upward triangle — STRICT fit: pocket must fully lie within annular region
           const cx = i * cellSize + xOff;
           const cy = yBase + rowH / 3.0;
           const d1 = Math.hypot(cx, cy);
-          if (d1 <= maxR && d1 >= centralExcludeR) {
+          if (d1 + pocketRadius <= maxR && d1 - pocketRadius >= centralExcludeR) {
             if (!isCloseToSupport(cx, cy, hubs, threshold)) pocketCount++;
           }
-          // Downward triangle centroid
+          // Downward triangle — STRICT fit
           const cx2 = i * cellSize + cellSize * 0.5 + xOff;
           const cy2 = yBase + 2.0 * rowH / 3.0;
           const d2 = Math.hypot(cx2, cy2);
-          if (d2 <= maxR && d2 >= centralExcludeR) {
+          if (d2 + pocketRadius <= maxR && d2 - pocketRadius >= centralExcludeR) {
             if (!isCloseToSupport(cx2, cy2, hubs, threshold)) pocketCount++;
           }
         }
@@ -976,6 +975,7 @@ function updateCalculation() {
   if (state.pattern === 'isogrid') {
     const rowH = state.cellSize * Math.sqrt(3.0) / 2.0;
     const pocketSide = state.cellSize - state.ribThick * 2.0 / Math.sqrt(3.0);
+    const pocketRadius = pocketSide / Math.sqrt(3.0);
     
     const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
     const fRad = Math.min(state.filletRadius || 5.0, maxF * 0.95);
@@ -991,13 +991,13 @@ function updateCalculation() {
         const cx = i * state.cellSize + xOff;
         const cy = yBase + rowH / 3.0;
         const d1 = Math.hypot(cx, cy);
-        if (d1 <= maxR && d1 >= centralExcludeR) {
+        if (d1 + pocketRadius <= maxR && d1 - pocketRadius >= centralExcludeR) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) pocketCount++;
         }
         const cx2 = i * state.cellSize + state.cellSize * 0.5 + xOff;
         const cy2 = yBase + 2.0 * rowH / 3.0;
         const d2 = Math.hypot(cx2, cy2);
-        if (d2 <= maxR && d2 >= centralExcludeR) {
+        if (d2 + pocketRadius <= maxR && d2 - pocketRadius >= centralExcludeR) {
           if (!isCloseToSupport(cx2, cy2, hubs, threshold)) pocketCount++;
         }
       }
