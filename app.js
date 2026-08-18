@@ -398,8 +398,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     if (pattern === 'isogrid') {
       const rowH = cellSize * Math.sqrt(3.0) / 2.0;
       const pocketSide = cellSize - ribThick * 2.0 / Math.sqrt(3.0);
-      if (pocketSide <= 0) return 9999;  // Rib too thick for this cell size
-      const pocketRadius = pocketSide / Math.sqrt(3.0);   // circumradius of pocket triangle
+      if (pocketSide <= 0) return 9999;
       
       const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
       const fRad = Math.min(filletRadius || 5.0, maxF * 0.95);
@@ -411,18 +410,16 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
         const yBase = j * rowH;
         const xOff = (j % 2 !== 0) ? cellSize * 0.5 : 0.0;
         for (let i = -nCols; i <= nCols; i++) {
-          // Upward triangle — STRICT fit: pocket must fully lie within annular region
           const cx = i * cellSize + xOff;
           const cy = yBase + rowH / 3.0;
           const d1 = Math.hypot(cx, cy);
-          if (d1 + pocketRadius <= maxR && d1 - pocketRadius >= centralExcludeR) {
+          if (d1 <= maxR && d1 >= centralExcludeR) {
             if (!isCloseToSupport(cx, cy, hubs, threshold)) pocketCount++;
           }
-          // Downward triangle — STRICT fit
           const cx2 = i * cellSize + cellSize * 0.5 + xOff;
           const cy2 = yBase + 2.0 * rowH / 3.0;
           const d2 = Math.hypot(cx2, cy2);
-          if (d2 + pocketRadius <= maxR && d2 - pocketRadius >= centralExcludeR) {
+          if (d2 <= maxR && d2 >= centralExcludeR) {
             if (!isCloseToSupport(cx2, cy2, hubs, threshold)) pocketCount++;
           }
         }
@@ -545,13 +542,16 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   const rt = state.ribThick;
 
+  const maxCS = Math.min(120.0, Math.max(35.0, Math.floor(state.diameter / 6.0)));
+
   // Search loop: Vary faceplate (minimum 1.0mm), cellSize, and filletRadius
   for (let fp = 1.0; fp <= 25.0; fp += 0.5) {
     if (H - fp < 5.0) continue;
-    for (let cs = 20; cs <= 280; cs += 5) {
+    for (let cs = 20; cs <= maxCS; cs += 2) {
       const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
+      if (pocketSide <= 2.0) continue;
       const max_fr = Math.floor(pocketSide / (2.0 * Math.sqrt(3.0)));
-      const frLimit = Math.min(25.0, max_fr);
+      const frLimit = Math.min(20.0, max_fr);
       
       for (let fr = 1.0; fr <= frLimit; fr += 1.0) {
         const m = calculateMassForCombo(fp, cs, rt, fr);
@@ -572,7 +572,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   let unsafeMinDiff = 999999;
   for (let fp = 1.0; fp <= 25.0; fp += 0.5) {
     if (H - fp < 3.0) continue;
-    for (let cs = 15; cs <= 350; cs += 5) {
+    for (let cs = 15; cs <= maxCS + 20; cs += 2) {
       const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
       const max_fr = Math.floor(pocketSide / (2.0 * Math.sqrt(3.0)));
       const frLimit = Math.min(25.0, max_fr);
