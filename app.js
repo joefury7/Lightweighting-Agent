@@ -888,6 +888,8 @@ function getExactGridIntersectionNodes(pattern, diameter, cellSize) {
     const rHex = cs / Math.sqrt(3.0);
     const stepX = cs * Math.sqrt(3.0) / 2.0;
     const stepY = cs;
+    const minR = (state.centralHoleDia / 2.0) + 12.0;
+    const boundMaxR = R - 10.0;
     const nCols = Math.floor(maxR / stepX) + 2;
     const nRows = Math.floor(maxR / stepY) + 2;
     for (let c = -nCols; c <= nCols; c++) {
@@ -900,7 +902,8 @@ function getExactGridIntersectionNodes(pattern, diameter, cellSize) {
             const a = k * Math.PI / 3.0;
             const vx = cx + rHex * Math.cos(a);
             const vy = cy + rHex * Math.sin(a);
-            if (Math.hypot(vx, vy) <= maxR) {
+            const d = Math.hypot(vx, vy);
+            if (d >= minR && d <= boundMaxR) {
               nodes.push({ x: vx, y: vy });
             }
           }
@@ -1814,10 +1817,13 @@ function drawRadialSector(ctx, cx, cy, rInner, rOuter, a1, a2) {
 function getWhiffletreeHubPositions(type, R, pattern, cellSize) {
   const pat = pattern || state.pattern;
   const cs = cellSize || state.cellSize;
+  const Ri = (state.centralHoleDia / 2.0) || 0.0;
+  const areaSpan = Math.max(100.0, R * R - Ri * Ri);
+  const r1 = Math.sqrt(Ri * Ri + areaSpan / 6.0);
+  const r2 = Math.sqrt(Ri * Ri + (2.0 * areaSpan) / 3.0);
   const hubs = [];
+
   if (type === '9point') {
-    const r1 = 0.45 * R;
-    const r2 = 0.82 * R;
     for (let i = 0; i < 3; i++) {
       const a = (i * 120.0) * Math.PI / 180.0;
       hubs.push(snapToGridIntersection(r1 * Math.cos(a), r1 * Math.sin(a), pat, cs));
@@ -1827,8 +1833,6 @@ function getWhiffletreeHubPositions(type, R, pattern, cellSize) {
       hubs.push(snapToGridIntersection(r2 * Math.cos(a), r2 * Math.sin(a), pat, cs));
     }
   } else {
-    const r1 = 0.4 * R;
-    const r2 = 0.8 * R;
     for (let i = 0; i < 6; i++) {
       const a = (i * 60.0) * Math.PI / 180.0;
       hubs.push(snapToGridIntersection(r1 * Math.cos(a), r1 * Math.sin(a), pat, cs));
@@ -2222,7 +2226,9 @@ function generateNXCode(pocketCount, finalMass) {
     '                            a = k * math.pi / 3.0',
     '                            vx = cx + r_hex * math.cos(a)',
     '                            vy = cy + r_hex * math.sin(a)',
-    '                            if math.hypot(vx, vy) <= max_r:',
+    '                            d = math.hypot(vx, vy)',
+    '                            min_r = CENTRAL_EXCLUDE_R + 9.0',
+    '                            if d >= min_r and d <= max_r - 5.0:',
     '                                nodes.append((vx, vy))',
     '        return nodes',
     '',
@@ -2239,12 +2245,14 @@ function generateNXCode(pocketCount, finalMass) {
     '        return best_node',
     '',
     '    # Whiffletree Hub centers (snapped to layout intersections)',
-    '    hubs_list = []'
+    '    hubs_list = []',
+    '    area_span = max(100.0, RADIUS**2 - (CENTRAL_HOLE_DIA / 2.0)**2)',
+    '    r1 = math.sqrt((CENTRAL_HOLE_DIA / 2.0)**2 + area_span / 6.0)',
+    '    r2 = math.sqrt((CENTRAL_HOLE_DIA / 2.0)**2 + 2.0 * area_span / 3.0)'
   ];
 
   if (state.supportType === '9point') {
     pyCode.push(
-      '    r1, r2 = 0.45 * RADIUS, 0.82 * RADIUS',
       '    for i in range(3):',
       '        a = math.radians(i * 120.0)',
       '        hx, hy = r1 * math.cos(a), r1 * math.sin(a)',
@@ -2256,7 +2264,6 @@ function generateNXCode(pocketCount, finalMass) {
     );
   } else {
     pyCode.push(
-      '    r1, r2 = 0.4 * RADIUS, 0.8 * RADIUS',
       '    for i in range(6):',
       '        a = math.radians(i * 60.0)',
       '        hx, hy = r1 * math.cos(a), r1 * math.sin(a)',
