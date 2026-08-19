@@ -1201,9 +1201,9 @@ function updateCalculation() {
         const cy = r * stepY + yShift;
         const d = Math.hypot(cx, cy);
         const rMin = Math.min(maxR, Math.max(0.0, d - pocketSide));
-        const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + conicK) * (rMin * rMin) / (R_curv * R_curv))));
+        const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (rMin * rMin) / (R_curv * R_curv))));
         const zMin = (rMin * rMin) / denom_p;
-        const hPkt = H - state.faceplate + zMin;
+        const hPkt = state.depth - state.faceplate + zMin;
 
         if (d + pocketSide <= maxR && d - pocketSide >= centralExcludeR) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
@@ -1218,8 +1218,8 @@ function updateCalculation() {
         }
       }
     }
-    const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * H;
-    const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * H;
+    const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * state.depth;
+    const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * state.depth;
     const numHubs = state.supportType === '9point' ? 9 : 18;
     const hubInnerR = state.supportType === '9point' ? 4.0 : 3.0;
     const hubVolRemoved = numHubs * Math.PI * (hubInnerR * hubInnerR) * ribH;
