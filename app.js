@@ -511,18 +511,24 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     } else {
       const W = cellSize;
       const pocketW = W - ribThick;
+      if (pocketW <= 0) return 9999;
       const pocketSide = pocketW / Math.sqrt(3.0);
-      singlePocketArea = (3.0 * Math.sqrt(3.0) / 2.0) * (pocketSide * pocketSide);
+      const maxF = pocketW / 2.0;
+      const fRad = Math.min(filletRadius || 5.0, maxF * 0.95);
+      singlePocketArea = Math.max(0, (3.0 * Math.sqrt(3.0) / 2.0) * (pocketSide * pocketSide) - (fRad * fRad) * (2.0 * Math.sqrt(3.0) - Math.PI));
+      
       const stepX = W * Math.sqrt(3.0) / 2.0;
       const stepY = W;
       const nCols = Math.floor(maxR / stepX) + 2;
       const nRows = Math.floor(maxR / stepY) + 2;
+      const marginTol = W * 0.6;
       for (let c = -nCols; c <= nCols; c++) {
         const cx = c * stepX;
         const yShift = (Math.abs(c) % 2) * (stepY / 2.0);
         for (let r = -nRows; r <= nRows; r++) {
           const cy = r * stepY + yShift;
-          if (Math.hypot(cx, cy) + pocketSide <= maxR) {
+          const d = Math.hypot(cx, cy);
+          if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
             if (!isCloseToSupport(cx, cy, hubs, threshold)) {
               pocketCount++;
             }
@@ -548,7 +554,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   for (let fp = 1.5; fp <= Math.min(15.0, H - 5.0); fp += 0.5) {
     for (let rt = 1.5; rt <= 6.0; rt += 0.5) {
       for (let cs = 25; cs <= maxCS; cs += 3) {
-        const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
+        const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
         const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide / (3.0 * Math.sqrt(3.0)))));
         
@@ -571,7 +577,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   for (let fp = 1.0; fp <= Math.min(15.0, H - 3.0); fp += 0.5) {
     for (let rt = 1.0; rt <= 6.0; rt += 0.5) {
       for (let cs = 15; cs <= maxCS + 20; cs += 3) {
-        const pocketSide = cs - rt * 2.0 / Math.sqrt(3.0);
+        const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 2.0) continue;
         const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide / (3.0 * Math.sqrt(3.0)))));
         const m = calculateMassForCombo(fp, cs, rt, fr);
@@ -1138,20 +1144,24 @@ function updateCalculation() {
   } else {
     const W = state.cellSize;
     const pocketW = W - state.ribThick;
-    const pocketSide = pocketW / Math.sqrt(3.0);
-    singlePocketArea = (3.0 * Math.sqrt(3.0) / 2.0) * (pocketSide * pocketSide);
+    const pocketSide = Math.max(0.1, pocketW / Math.sqrt(3.0));
+    const maxF = pocketW / 2.0;
+    const fRad = Math.min(state.filletRadius || 5.0, maxF * 0.95);
+    singlePocketArea = Math.max(0, (3.0 * Math.sqrt(3.0) / 2.0) * (pocketSide * pocketSide) - (fRad * fRad) * (2.0 * Math.sqrt(3.0) - Math.PI));
     
     const stepX = W * Math.sqrt(3.0) / 2.0;
     const stepY = W;
     const nCols = Math.floor(maxR / stepX) + 2;
     const nRows = Math.floor(maxR / stepY) + 2;
+    const marginTol = W * 0.6;
     
     for (let c = -nCols; c <= nCols; c++) {
       const cx = c * stepX;
       const yShift = (Math.abs(c) % 2) * (stepY / 2.0);
       for (let r = -nRows; r <= nRows; r++) {
         const cy = r * stepY + yShift;
-        if (Math.hypot(cx, cy) + pocketSide <= maxR && Math.hypot(cx, cy) - pocketSide >= centralExcludeR) {
+        const d = Math.hypot(cx, cy);
+        if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
             pocketCount++;
           }
@@ -1598,24 +1608,33 @@ function drawMirrorCanvas(pocketCount) {
   } else {
     const W = state.cellSize;
     const pocketW = W - state.ribThick;
-    const pocketSide = pocketW / Math.sqrt(3.0);
+    const pocketSide = Math.max(0.1, pocketW / Math.sqrt(3.0));
     const stepX = W * Math.sqrt(3.0) / 2.0;
     const stepY = W;
     const nCols = Math.floor(maxR / stepX) + 2;
     const nRows = Math.floor(maxR / stepY) + 2;
     
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center, center, maxR * scale, 0, Math.PI * 2);
+    ctx.arc(center, center, centralExcludeR * scale, 0, Math.PI * 2, true);
+    ctx.clip();
+
+    const halfCell = W * 0.7;
     for (let c = -nCols; c <= nCols; c++) {
       const cx = c * stepX;
       const yShift = (Math.abs(c) % 2) * (stepY / 2.0);
       for (let r = -nRows; r <= nRows; r++) {
         const cy = r * stepY + yShift;
-        if (Math.hypot(cx, cy) + pocketSide <= maxR && Math.hypot(cx, cy) - pocketSide >= centralExcludeR) {
+        const d = Math.hypot(cx, cy);
+        if (d <= maxR + halfCell && d >= centralExcludeR - halfCell) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
-            drawHexagon(ctx, center + cx * scale, center + cy * scale, pocketSide * scale);
+            drawHexagon(ctx, center + cx * scale, center + cy * scale, pocketSide * scale, state.filletRadius * scale);
           }
         }
       }
     }
+    ctx.restore();
   }
 
   // Draw Central Support Hole & surrounding solid boss
@@ -1686,15 +1705,25 @@ function drawTriangle(ctx, x, y, side, ori, filletRadius) {
   ctx.stroke();
 }
 
-// Draw a hexagon
-function drawHexagon(ctx, x, y, side) {
-  ctx.beginPath();
+// Draw a filleted hexagon
+function drawHexagon(ctx, x, y, side, fillet = 0) {
+  const pts = [];
   for (let k = 0; k < 6; k++) {
     const a = k * Math.PI / 3.0;
-    const px = x + side * Math.cos(a);
-    const py = y + side * Math.sin(a);
-    if (k === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+    pts.push({ x: x + side * Math.cos(a), y: y + side * Math.sin(a) });
+  }
+  ctx.beginPath();
+  if (fillet <= 0.1) {
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let k = 1; k < 6; k++) ctx.lineTo(pts[k].x, pts[k].y);
+  } else {
+    const midX = (pts[5].x + pts[0].x) / 2;
+    const midY = (pts[5].y + pts[0].y) / 2;
+    ctx.moveTo(midX, midY);
+    for (let k = 0; k < 6; k++) {
+      const nextPt = pts[(k + 1) % 6];
+      ctx.arcTo(pts[k].x, pts[k].y, nextPt.x, nextPt.y, fillet);
+    }
   }
   ctx.closePath();
   ctx.fill();
@@ -2391,29 +2420,66 @@ function generateNXCode(pocketCount, finalMass) {
   } else {
     pyCode.push(
       '    W = CELL_SIDE',
-      '    pocket_W = W - RIB_THICK',
+      '    pocket_W = max(0.1, W - RIB_THICK)',
       '    pocket_side = pocket_W / math.sqrt(3.0)',
-      '    hub_outer_limit = HUB_OUTER_R + 15.0',
+      '    r_fillet = ' + state.filletRadius.toFixed(1),
+      '    hub_outer_limit = HUB_OUTER_R + 6.0',
       '    step_x = W * math.sqrt(3.0) / 2.0',
       '    step_y = W',
       '    n_cols = int(max_r / step_x) + 2',
       '    n_rows = int(max_r / step_y) + 2',
+      '',
+      '    def get_pocket_height(cx, cy):',
+      '        r_ctr = math.hypot(cx, cy)',
+      '        r_min = max(0.0, r_ctr - pocket_side)',
+      '        r_min = min(r_min, RADIUS - WALL_MARGIN)',
+      '        denom = R_CURV * (1.0 + math.sqrt(max(0.0001, 1.0 - (1.0 + CONIC_CONSTANT) * (r_min**2) / (R_CURV**2))))',
+      '        z_front_min = (r_min**2) / denom',
+      '        return max(5.0, z_front_min - FACESHEET - BACK_Z)',
+      '',
+      '    def build_filleted_hexagon(cx, cy, s_side, r_f, back_z):',
+      '        """Filleted regular hexagon at (cx,cy) with circumradius s_side & corner fillet r_f."""',
+      '        curves = []',
+      '        v_ang = [math.radians(60.0 * k) for k in range(6)]',
+      '        ac_inset = max(0.1, s_side - (2.0 * r_f / math.sqrt(3.0)))',
+      '        ac = [(cx + ac_inset * math.cos(a), cy + ac_inset * math.sin(a)) for a in v_ang]',
+      '        n_sub = 16',
+      '        for k in range(6):',
+      '            c_x, c_y = ac[k]',
+      '            c_nx, c_ny = ac[(k + 1) % 6]',
+      '            a_curr = v_ang[k]',
+      '            a_next = v_ang[(k + 1) % 6]',
+      '            a_s = a_curr - math.pi / 6.0',
+      '            a_e = a_curr + math.pi / 6.0',
+      '            a_ns = a_next - math.pi / 6.0',
+      '            for s in range(n_sub):',
+      '                ta1 = a_s + s * (a_e - a_s) / float(n_sub)',
+      '                ta2 = a_s + (s + 1) * (a_e - a_s) / float(n_sub)',
+      '                p1 = NXOpen.Point3d(c_x + r_f * math.cos(ta1), c_y + r_f * math.sin(ta1), back_z)',
+      '                p2 = NXOpen.Point3d(c_x + r_f * math.cos(ta2), c_y + r_f * math.sin(ta2), back_z)',
+      '                curves.append(workPart.Curves.CreateLine(p1, p2))',
+      '            p_s = NXOpen.Point3d(c_x  + r_f * math.cos(a_e),  c_y  + r_f * math.sin(a_e),  back_z)',
+      '            p_e = NXOpen.Point3d(c_nx + r_f * math.cos(a_ns), c_ny + r_f * math.sin(a_ns), back_z)',
+      '            curves.append(workPart.Curves.CreateLine(p_s, p_e))',
+      '        return curves',
       '',
       '    for c_idx in range(-n_cols, n_cols + 1):',
       '        cx = c_idx * step_x',
       '        y_shift = (step_y / 2.0) if (abs(c_idx) % 2 != 0) else 0.0',
       '        for r_idx in range(-n_rows, n_rows + 1):',
       '            cy = r_idx * step_y + y_shift',
-      '            if math.hypot(cx, cy) + pocket_side <= max_r:',
+      '            d = math.hypot(cx, cy)',
+      '            margin_tol = W * 0.6',
+      '            if d <= max_r + margin_tol and d >= max(5.0, CENTRAL_EXCLUDE_R - margin_tol):',
       '                if not is_close_to_support(cx, cy, hubs_list, hub_outer_limit):',
-      '                    hex_lines = []',
-      '                    for k in range(6):',
-      '                        a1 = math.radians(60.0 * k)',
-      '                        a2 = math.radians(60.0 * (k + 1))',
-      '                        line = workPart.Curves.CreateLine(NXOpen.Point3d(cx + pocket_side*math.cos(a1), cy + pocket_side*math.sin(a1), BACK_Z), NXOpen.Point3d(cx + pocket_side*math.cos(a2), cy + pocket_side*math.sin(a2), BACK_Z))',
-      '                        hex_lines.append(line)',
-      '                    if extrude_pocket_boolean(workPart, hex_lines, revolved_body, z_direction, "POCKET_DEPTH", bool_sub):',
-      '                        pocket_count += 1'
+      '                    curves = build_filleted_hexagon(cx, cy, pocket_side, r_fillet, BACK_Z)',
+      '                    h_ext  = get_pocket_height(cx, cy)',
+      '                    hp     = NXOpen.Point3d(cx, cy, BACK_Z)',
+      '                    if extrude_pocket_boolean(workPart, curves, revolved_body, z_direction, h_ext, bool_sub, hp):',
+      '                        pocket_count += 1',
+      '                    for c in curves:',
+      '                        try: c.Blank()',
+      '                        except Exception: pass'
     );
   }
 
