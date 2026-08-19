@@ -132,35 +132,35 @@
           <div class="form-group">
             <label>Lightweighting Pattern</label>
             <div class="toggle-switch-group pattern-grid">
-              <button class="toggle-btn" data-pattern="hexagonal">
+              <button class="toggle-btn" data-pattern="hexagonal" onclick="selectPattern('hexagonal')">
                 <i class="fa-solid fa-cube"></i> Hexagonal
                 <span class="pattern-ref">GMT</span>
               </button>
-              <button class="toggle-btn active" data-pattern="isogrid">
+              <button class="toggle-btn active" data-pattern="isogrid" onclick="selectPattern('isogrid')">
                 <i class="fa-solid fa-play rotate-90"></i> Isogrid
                 <span class="pattern-ref">JWST</span>
               </button>
-              <button class="toggle-btn" data-pattern="square">
+              <button class="toggle-btn" data-pattern="square" onclick="selectPattern('square')">
                 <i class="fa-solid fa-border-all"></i> Square Waffle
                 <span class="pattern-ref">Hubble</span>
               </button>
-              <button class="toggle-btn" data-pattern="radial">
+              <button class="toggle-btn" data-pattern="radial" onclick="selectPattern('radial')">
                 <i class="fa-solid fa-bullseye"></i> Radial + Ring
                 <span class="pattern-ref">Satellite</span>
               </button>
-              <button class="toggle-btn" data-pattern="hex_radial">
+              <button class="toggle-btn" data-pattern="hex_radial" onclick="selectPattern('hex_radial')">
                 <i class="fa-solid fa-circle-nodes"></i> Hex + Radial
                 <span class="pattern-ref">Hybrid</span>
               </button>
-              <button class="toggle-btn" data-pattern="iso_radial">
+              <button class="toggle-btn" data-pattern="iso_radial" onclick="selectPattern('iso_radial')">
                 <i class="fa-solid fa-play rotate-90"></i> Iso + Radial
                 <span class="pattern-ref">Hybrid</span>
               </button>
-              <button class="toggle-btn" data-pattern="double_arch">
+              <button class="toggle-btn" data-pattern="double_arch" onclick="selectPattern('double_arch')">
                 <i class="fa-solid fa-archway"></i> Double Arch
                 <span class="pattern-ref">>85% Saved</span>
               </button>
-              <button class="toggle-btn" data-pattern="sandwich_isogrid">
+              <button class="toggle-btn" data-pattern="sandwich_isogrid" onclick="selectPattern('sandwich_isogrid')">
                 <i class="fa-solid fa-layer-group"></i> Sandwich Iso
                 <span class="pattern-ref">Closed Back</span>
               </button>
@@ -169,10 +169,10 @@
           <div class="form-group">
             <label>Support Whiffletree System</label>
             <div class="toggle-switch-group">
-              <button class="toggle-btn" data-support="9point">
+              <button class="toggle-btn" data-support="9point" onclick="selectSupport('9point')">
                 <i class="fa-solid fa-circle-nodes"></i> 9-Point Support
               </button>
-              <button class="toggle-btn active" data-support="18point">
+              <button class="toggle-btn active" data-support="18point" onclick="selectSupport('18point')">
                 <i class="fa-solid fa-network-wired"></i> 18-Point Whiffletree
               </button>
             </div>

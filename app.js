@@ -105,25 +105,35 @@ function initEventListeners() {
     }
   });
 
+  window.selectPattern = function(patternName) {
+    if (!patternName) return;
+    state.pattern = patternName;
+    document.querySelectorAll('[data-pattern]').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-pattern') === patternName);
+    });
+    updateCalculation();
+  };
+
+  window.selectSupport = function(supportName) {
+    if (!supportName) return;
+    state.supportType = supportName;
+    document.querySelectorAll('[data-support]').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-support') === supportName);
+    });
+    updateCalculation();
+  };
+
   document.querySelectorAll('[data-pattern]').forEach(btn => {
     btn.onclick = function() {
       const patternName = this.getAttribute('data-pattern');
-      if (!patternName) return;
-      document.querySelectorAll('[data-pattern]').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      state.pattern = patternName;
-      updateCalculation();
+      window.selectPattern(patternName);
     };
   });
 
   document.querySelectorAll('[data-support]').forEach(btn => {
     btn.onclick = function() {
       const supportName = this.getAttribute('data-support');
-      if (!supportName) return;
-      document.querySelectorAll('[data-support]').forEach(b => b.classList.remove('active'));
-      this.classList.add('active');
-      state.supportType = supportName;
-      updateCalculation();
+      window.selectSupport(supportName);
     };
   });
 
