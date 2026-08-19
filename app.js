@@ -415,33 +415,52 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     
     if (pattern === 'isogrid') {
       const rowH = cellSize * Math.sqrt(3.0) / 2.0;
-      const pocketSide = cellSize - ribThick * 2.0 / Math.sqrt(3.0);
-      if (pocketSide <= 0) return 9999;
-      
+      const pocketSide = Math.max(0.1, cellSize - ribThick * 2.0 / Math.sqrt(3.0));
+      const r_in = pocketSide / Math.sqrt(3.0);
       const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
       const fRad = Math.min(filletRadius || 5.0, maxF * 0.95);
       singlePocketArea = Math.max(0, (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI));
       
       const nRows = Math.ceil(maxR / rowH) + 1;
       const nCols = Math.ceil(maxR / cellSize) + 1;
+      const marginTol = cellSize * 0.6;
+      let effectiveVolRemoved = 0;
+
       for (let j = -nRows; j <= nRows; j++) {
         const yBase = j * rowH;
         const xOff = (j % 2 !== 0) ? cellSize * 0.5 : 0.0;
         for (let i = -nCols; i <= nCols; i++) {
-          const cx = i * cellSize + xOff;
-          const cy = yBase + rowH / 3.0;
-          const d1 = Math.hypot(cx, cy);
-          if (d1 <= maxR && d1 >= centralExcludeR) {
-            if (!isCloseToSupport(cx, cy, hubs, threshold)) pocketCount++;
-          }
-          const cx2 = i * cellSize + cellSize * 0.5 + xOff;
-          const cy2 = yBase + 2.0 * rowH / 3.0;
-          const d2 = Math.hypot(cx2, cy2);
-          if (d2 <= maxR && d2 >= centralExcludeR) {
-            if (!isCloseToSupport(cx2, cy2, hubs, threshold)) pocketCount++;
+          const pairs = [
+            [i * cellSize + xOff, yBase + rowH / 3.0],
+            [i * cellSize + cellSize * 0.5 + xOff, yBase + 2.0 * rowH / 3.0]
+          ];
+          for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
+            const cx = pairs[pIdx][0];
+            const cy = pairs[pIdx][1];
+            const d = Math.hypot(cx, cy);
+            if (d > maxR + marginTol || d < Math.max(5.0, centralExcludeR - marginTol)) continue;
+            if (isCloseToSupport(cx, cy, hubs, threshold)) continue;
+
+            const rMin = Math.min(maxR, Math.max(0.0, d - r_in));
+            const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (rMin * rMin) / (R_curv * R_curv))));
+            const zMin = (rMin * rMin) / denom_p;
+            const hPkt = H - faceplate + zMin;
+
+            if (d + r_in <= maxR && d - r_in >= centralExcludeR) {
+              pocketCount++;
+              effectiveVolRemoved += singlePocketArea * hPkt;
+            } else if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
+              pocketCount += 0.55;
+              effectiveVolRemoved += singlePocketArea * 0.55 * hPkt;
+            }
           }
         }
       }
+      const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * H;
+      const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * H;
+      const totalPocketVolRemoved = effectiveVolRemoved + hubVolRemoved - padVolAdded - (volOuterWall + volInnerWall) * 0.35;
+      const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
+      return finalVol * rho;
     } else if (pattern === 'square') {
       const pocketSide = cellSize - ribThick;
       singlePocketArea = pocketSide * pocketSide;
@@ -585,16 +604,16 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   const rt = state.ribThick;
 
   const spanRadius = (state.diameter - state.centralHoleDia) / 2.0;
-  const minCS = pattern === 'hexagonal' ? Math.max(45.0, Math.floor(spanRadius / 4.0)) : 25;
-  const maxCS = pattern === 'hexagonal' ? Math.min(105.0, Math.floor(spanRadius / 1.8)) : Math.min(120.0, Math.max(35.0, Math.floor(state.diameter / 6.0)));
+  const minCS = pattern === 'hexagonal' ? Math.max(40.0, Math.floor(spanRadius / 4.0)) : Math.max(40.0, Math.floor(spanRadius / 4.5));
+  const maxCS = pattern === 'hexagonal' ? Math.min(100.0, Math.floor(spanRadius / 1.8)) : Math.min(110.0, Math.floor(spanRadius / 1.7));
 
-  // Fast optimized search loop: vary fp, rt, cs (fr computed directly)
-  for (let fp = 1.5; fp <= Math.min(15.0, H - 5.0); fp += 0.5) {
-    for (let rt = 1.5; rt <= 4.0; rt += 0.5) {
-      for (let cs = minCS; cs <= maxCS; cs += 3) {
+  // Dynamic Multi-Parameter Search: vary fp, rt, cs, fr to accurately reach target mass
+  for (let fp = 1.5; fp <= Math.min(6.0, H - 5.0); fp += 0.5) {
+    for (let rt = 1.5; rt <= 3.5; rt += 0.5) {
+      for (let cs = minCS; cs <= maxCS; cs += 2) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
-        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide * 0.18)));
+        const fr = Math.min(10.0, Math.max(2.0, Math.round(cs * 0.11 * 10) / 10));
         
         const m = calculateMassForCombo(fp, cs, rt, fr);
         if (m < minMass) {
@@ -612,12 +631,12 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   let unsafeCombo = null;
   let unsafeMinDiff = 999999;
-  for (let fp = 1.0; fp <= Math.min(15.0, H - 3.0); fp += 0.5) {
-    for (let rt = 1.0; rt <= 3.5; rt += 0.5) {
-      for (let cs = minCS; cs <= maxCS + 10; cs += 3) {
+  for (let fp = 1.0; fp <= Math.min(4.0, H - 3.0); fp += 0.5) {
+    for (let rt = 1.0; rt <= 3.0; rt += 0.5) {
+      for (let cs = minCS; cs <= maxCS + 10; cs += 2) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 2.0) continue;
-        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide * 0.18)));
+        const fr = Math.min(10.0, Math.max(2.0, Math.round(cs * 0.11 * 10) / 10));
         const m = calculateMassForCombo(fp, cs, rt, fr);
         const diff = Math.abs(m - targetMass);
         if (diff < unsafeMinDiff) {
