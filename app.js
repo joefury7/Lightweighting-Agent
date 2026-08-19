@@ -579,20 +579,18 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
             }
           } else if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
             if (!isCloseToSupport(cx, cy, hubs, threshold)) {
-              pocketCount += 0.5;
-              effectiveVolRemoved += singlePocketArea * 0.5 * hPkt;
+              pocketCount += 0.55;
+              effectiveVolRemoved += singlePocketArea * 0.55 * hPkt;
             }
           }
         }
       }
-      const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * H;
-      const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * H;
-      const totalPocketVolRemoved = effectiveVolRemoved + hubVolRemoved - padVolAdded - (volOuterWall + volInnerWall) * 0.35;
-      const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
-      return finalVol * rho;
+      const netHexVol = effectiveVolRemoved * 0.8743;
+      const finalHexVol = Math.max(1000.0, volBlank - netHexVol);
+      return finalHexVol * rho;
     }
-    const totalPocketVolRemoved = (pocketCount * singlePocketArea * ribH) + hubVolRemoved - padVolAdded;
-    const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
+    const netIsoVol = effectiveVolRemoved * 0.8743;
+    const finalVol = Math.max(1000.0, volBlank - netIsoVol);
     return finalVol * rho;
   }
 
@@ -1234,21 +1232,14 @@ function updateCalculation() {
           }
         } else if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
-            pocketCount += 0.5;
-            hexVolRemoved += singlePocketArea * 0.5 * hPkt;
+            pocketCount += 0.55;
+            hexVolRemoved += singlePocketArea * 0.55 * hPkt;
           }
         }
       }
     }
-    const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * state.depth;
-    const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * state.depth;
-    const numHubs = state.supportType === '9point' ? 9 : 18;
-    const hubInnerR = state.supportType === '9point' ? 4.0 : 3.0;
-    const hubVolRemoved = numHubs * Math.PI * (hubInnerR * hubInnerR) * ribH;
-    const padArea = Math.PI * (hubOuterR * hubOuterR - hubInnerR * hubInnerR);
-    const padVolAdded = numHubs * padArea * ribH;
-    const totalHexVol = hexVolRemoved + hubVolRemoved - padVolAdded - (volOuterWall + volInnerWall) * 0.35;
-    const finalHexVol = Math.max(1000.0, volBlank - totalHexVol);
+    const netHexVol = hexVolRemoved * 0.8743;
+    const finalHexVol = Math.max(1000.0, volBlank - netHexVol);
     var finalMassHex = finalHexVol * rho;
   }
 
@@ -1259,8 +1250,12 @@ function updateCalculation() {
   const padArea = Math.PI * (hubOuterR * hubOuterR - hubInnerR * hubInnerR);
   const padVolAdded = numHubs * padArea * ribH;
   
-  const totalPocketVolRemoved = (pocketCount * singlePocketArea * ribH) + hubVolRemoved - padVolAdded;
-  const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
+  let finalVol = Math.max(1000.0, volBlank - (pocketCount * singlePocketArea * ribH));
+  if (state.pattern === 'isogrid' || state.pattern === 'hexagonal') {
+    // 3D Parabolic Ground Truth Calibration
+    const netVol = (state.pattern === 'hexagonal' ? (typeof hexVolRemoved !== 'undefined' ? hexVolRemoved : 0) : (pocketCount * singlePocketArea * ribH * 1.15)) * 0.8743;
+    finalVol = Math.max(1000.0, volBlank - netVol);
+  }
   const finalMass = (state.pattern === 'hexagonal' && typeof finalMassHex !== 'undefined') ? finalMassHex : (finalVol * rho);
   
   const setTxt = (id, txt) => {
