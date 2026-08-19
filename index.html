@@ -90,25 +90,25 @@
           <h2><i class="fa-solid fa-sliders"></i> Mirror Geometry</h2>
           <div class="form-group">
             <label for="inp-diameter">Mirror Outer Diameter D (mm)</label>
-            <input type="text" id="inp-diameter" value="1400">
+            <input type="text" id="inp-diameter" value="560">
           </div>
           <div class="form-group">
             <label for="inp-radius-curv">Radius of Curvature R_curv (mm)</label>
-            <input type="text" id="inp-radius-curv" value="5000">
-            <span class="hint" id="txt-focal-length">Focal length f = 2500 mm | Edge Sag = 49.0 mm</span>
+            <input type="text" id="inp-radius-curv" value="1085">
+            <span class="hint" id="txt-focal-length">Focal length f = 542.5 mm | Edge Sag = 36.0 mm</span>
           </div>
           <div class="form-group">
             <label for="inp-conic-constant">Conic Constant k (Paraboloid = -1)</label>
-            <input type="text" id="inp-conic-constant" value="-1.0">
+            <input type="text" id="inp-conic-constant" value="-1.22">
           </div>
           <div class="form-group">
             <label for="inp-central-hole">Central Support Hole Dia D_c (mm)</label>
-            <input type="text" id="inp-central-hole" value="200">
+            <input type="text" id="inp-central-hole" value="175">
           </div>
           <div class="form-group">
             <label for="inp-depth">Total Blank Depth H (mm)</label>
-            <input type="text" id="inp-depth" value="90">
-            <span class="hint" id="txt-edge-thickness">Edge Thickness (Final Rim) = 41.0 mm</span>
+            <input type="text" id="inp-depth" value="73.7">
+            <span class="hint" id="txt-edge-thickness">Edge Thickness (Final Rim) = 37.7 mm</span>
           </div>
         </div>
 
@@ -132,11 +132,11 @@
           <div class="form-group">
             <label>Lightweighting Pattern</label>
             <div class="toggle-switch-group pattern-grid">
-              <button class="toggle-btn active" data-pattern="hexagonal">
+              <button class="toggle-btn" data-pattern="hexagonal">
                 <i class="fa-solid fa-cube"></i> Hexagonal
                 <span class="pattern-ref">GMT</span>
               </button>
-              <button class="toggle-btn" data-pattern="isogrid">
+              <button class="toggle-btn active" data-pattern="isogrid">
                 <i class="fa-solid fa-play rotate-90"></i> Isogrid
                 <span class="pattern-ref">JWST</span>
               </button>
@@ -188,7 +188,7 @@
           <p class="import-desc" style="margin-top: 0.25rem;">Deterministic Yoder Vol 2 closed-form physics solver (Quilting &lambda;/20, Flexural Rigidity, Frequency).</p>
           <div class="form-group">
             <label for="inp-target-mass">Target Final Mass (kg)</label>
-            <input type="text" id="inp-target-mass" value="100">
+            <input type="text" id="inp-target-mass" value="12">
           </div>
           <button id="btn-auto-solve" class="btn btn-accent btn-block">
             <i class="fa-solid fa-wand-magic-sparkles"></i> ⚡ Execute Yoder Physics Solver (Engine 1)
@@ -200,23 +200,23 @@
           <h2><i class="fa-solid fa-square-check"></i> Solved Layout Outputs</h2>
           <div class="form-group">
             <label for="inp-faceplate">Solved Faceplate Thickness t_f (mm)</label>
-            <input type="text" id="inp-faceplate" value="15.0">
+            <input type="text" id="inp-faceplate" value="1.5">
           </div>
           <div class="form-group">
             <label for="inp-pocket-depth">Solved Pocket Depth (mm)</label>
-            <input type="text" id="inp-pocket-depth" value="75.0" readonly style="background: rgba(0,0,0,0.25); color: var(--text-muted); cursor: not-allowed;">
+            <input type="text" id="inp-pocket-depth" value="72.2" readonly style="background: rgba(0,0,0,0.25); color: var(--text-muted); cursor: not-allowed;">
           </div>
           <div class="form-group">
             <label for="inp-cell-size">Solved Grid Side Length (mm)</label>
-            <input type="text" id="inp-cell-size" value="150">
+            <input type="text" id="inp-cell-size" value="91">
           </div>
           <div class="form-group">
             <label for="inp-rib-thick">Solved Rib Width t_w (mm)</label>
-            <input type="text" id="inp-rib-thick" value="6.0">
+            <input type="text" id="inp-rib-thick" value="1.5">
           </div>
           <div class="form-group">
             <label for="inp-fillet-radius">Solved Fillet Radius r_f (mm)</label>
-            <input type="text" id="inp-fillet-radius" value="5.0">
+            <input type="text" id="inp-fillet-radius" value="10.0">
           </div>
           <span class="hint-safe" id="txt-face-safety"><i class="fa-solid fa-shield-check"></i> Robust faceplate - safe from breakthrough</span>
         </div>

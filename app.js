@@ -3,20 +3,20 @@
 // ==============================================================================
 
 const state = {
-  diameter: 1400,
-  radiusCurv: 5000,
-  depth: 90,
-  pattern: 'hexagonal',
-  cellSize: 150,
-  ribThick: 6.0,
+  diameter: 560,
+  radiusCurv: 1085,
+  depth: 73.7,
+  pattern: 'isogrid',
+  cellSize: 91,
+  ribThick: 1.5,
   supportType: '18point',
   material: 'zerodur',
   density: 2530,
-  targetMass: 100,
-  faceplate: 15.0,
-  conicConstant: -1.0,
-  centralHoleDia: 200.0,
-  filletRadius: 5.0
+  targetMass: 12,
+  faceplate: 1.5,
+  conicConstant: -1.22,
+  centralHoleDia: 175.0,
+  filletRadius: 10.0
 };
 
 const PATTERN_CATALOG = {
