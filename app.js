@@ -80,16 +80,49 @@ function initEventListeners() {
     if (el) el.addEventListener(event, fn);
   };
 
-  safeAddListener('inp-diameter', 'input', () => updateCalculation());
-  safeAddListener('inp-radius-curv', 'input', () => updateCalculation());
-  safeAddListener('inp-depth', 'input', () => updateCalculation());
-  safeAddListener('inp-cell-size', 'input', () => updateCalculation());
-  safeAddListener('inp-rib-thick', 'input', () => updateCalculation());
-  safeAddListener('inp-density', 'input', () => updateCalculation());
-  safeAddListener('inp-faceplate', 'input', () => updateCalculation());
-  safeAddListener('inp-conic-constant', 'input', () => updateCalculation());
-  safeAddListener('inp-central-hole', 'input', () => updateCalculation());
+  const clearOverrides = () => {
+    state.forcedMass = null;
+    state.importedMass = null;
+  };
+
+  safeAddListener('inp-diameter', 'input', () => { clearOverrides(); updateCalculation(); });
+  safeAddListener('inp-radius-curv', 'input', () => { clearOverrides(); updateCalculation(); });
+  safeAddListener('inp-depth', 'input', () => {
+    clearOverrides();
+    const pdEl = document.getElementById('inp-pocket-depth');
+    const fpVal = parseFloat(document.getElementById('inp-faceplate').value) || state.faceplate;
+    const dVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
+    if (pdEl) pdEl.value = Math.max(0, dVal - fpVal).toFixed(1);
+    updateCalculation();
+  });
+  safeAddListener('inp-cell-size', 'input', () => { clearOverrides(); updateCalculation(); });
+  safeAddListener('inp-rib-thick', 'input', () => { clearOverrides(); updateCalculation(); });
+  safeAddListener('inp-density', 'input', () => { clearOverrides(); updateCalculation(); });
+  safeAddListener('inp-faceplate', 'input', () => {
+    clearOverrides();
+    const fpVal = parseFloat(document.getElementById('inp-faceplate').value);
+    const dVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
+    const pdEl = document.getElementById('inp-pocket-depth');
+    if (!isNaN(fpVal) && pdEl) {
+      pdEl.value = Math.max(0, dVal - fpVal).toFixed(1);
+    }
+    updateCalculation();
+  });
+  safeAddListener('inp-pocket-depth', 'input', () => {
+    clearOverrides();
+    const pdVal = parseFloat(document.getElementById('inp-pocket-depth').value);
+    const dVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
+    const fpEl = document.getElementById('inp-faceplate');
+    if (!isNaN(pdVal) && pdVal >= 0 && pdVal < dVal) {
+      state.faceplate = Math.max(0.5, dVal - pdVal);
+      if (fpEl) fpEl.value = state.faceplate.toFixed(1);
+    }
+    updateCalculation();
+  });
+  safeAddListener('inp-conic-constant', 'input', () => { clearOverrides(); updateCalculation(); });
+  safeAddListener('inp-central-hole', 'input', () => { clearOverrides(); updateCalculation(); });
   safeAddListener('inp-fillet-radius', 'input', () => {
+    clearOverrides();
     const val = parseFloat(document.getElementById('inp-fillet-radius').value);
     if (!isNaN(val) && val > 0) {
       state.filletRadius = val;
@@ -979,11 +1012,12 @@ function updateCalculation() {
   const faceplateVal = getVal('inp-faceplate', state.faceplate);
   const cellSizeVal = getVal('inp-cell-size', state.cellSize);
   const ribThickVal = getVal('inp-rib-thick', state.ribThick);
+  const filletRadiusVal = getVal('inp-fillet-radius', state.filletRadius);
   const densityVal = getVal('inp-density', state.density);
 
   // Prevent calculation or drawing with invalid/empty parameters during mid-typing
   if (diameterVal <= 100 || radiusCurvVal <= 200 || depthVal <= 5 || 
-      faceplateVal <= 1 || cellSizeVal <= 5 || ribThickVal <= 0.5 || 
+      faceplateVal < 0.5 || cellSizeVal <= 5 || ribThickVal < 0.5 || 
       densityVal <= 100 || centralHoleDiaVal < 0) {
     return; // Safe exit, keeps UI responsive and ignores empty/zero states
   }
@@ -997,6 +1031,7 @@ function updateCalculation() {
   state.faceplate = faceplateVal;
   state.cellSize = cellSizeVal;
   state.ribThick = ribThickVal;
+  state.filletRadius = Math.max(1.0, filletRadiusVal);
   state.density = densityVal;
 
   const R = state.diameter / 2.0;
