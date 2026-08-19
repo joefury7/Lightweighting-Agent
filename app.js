@@ -522,19 +522,37 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       const nCols = Math.floor(maxR / stepX) + 2;
       const nRows = Math.floor(maxR / stepY) + 2;
       const marginTol = W * 0.6;
+      let effectiveVolRemoved = 0;
+
       for (let c = -nCols; c <= nCols; c++) {
         const cx = c * stepX;
         const yShift = (Math.abs(c) % 2) * (stepY / 2.0);
         for (let r = -nRows; r <= nRows; r++) {
           const cy = r * stepY + yShift;
           const d = Math.hypot(cx, cy);
-          if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
+          const rMin = Math.min(maxR, Math.max(0.0, d - pocketSide));
+          const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + conicK) * (rMin * rMin) / (R_curv * R_curv))));
+          const zMin = (rMin * rMin) / denom_p;
+          const hPkt = H - faceplate + zMin;
+
+          if (d + pocketSide <= maxR && d - pocketSide >= centralExcludeR) {
             if (!isCloseToSupport(cx, cy, hubs, threshold)) {
               pocketCount++;
+              effectiveVolRemoved += singlePocketArea * hPkt;
+            }
+          } else if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
+            if (!isCloseToSupport(cx, cy, hubs, threshold)) {
+              pocketCount += 0.5;
+              effectiveVolRemoved += singlePocketArea * 0.5 * hPkt;
             }
           }
         }
       }
+      const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * H;
+      const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * H;
+      const totalPocketVolRemoved = effectiveVolRemoved + hubVolRemoved - padVolAdded - (volOuterWall + volInnerWall) * 0.35;
+      const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
+      return finalVol * rho;
     }
     const totalPocketVolRemoved = (pocketCount * singlePocketArea * ribH) + hubVolRemoved - padVolAdded;
     const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
@@ -548,15 +566,17 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   const rt = state.ribThick;
 
-  const maxCS = Math.min(120.0, Math.max(35.0, Math.floor(state.diameter / 6.0)));
+  const spanRadius = (state.diameter - state.centralHoleDia) / 2.0;
+  const minCS = pattern === 'hexagonal' ? Math.max(45.0, Math.floor(spanRadius / 4.0)) : 25;
+  const maxCS = pattern === 'hexagonal' ? Math.min(105.0, Math.floor(spanRadius / 1.8)) : Math.min(120.0, Math.max(35.0, Math.floor(state.diameter / 6.0)));
 
   // Fast optimized search loop: vary fp, rt, cs (fr computed directly)
   for (let fp = 1.5; fp <= Math.min(15.0, H - 5.0); fp += 0.5) {
-    for (let rt = 1.5; rt <= 6.0; rt += 0.5) {
-      for (let cs = 25; cs <= maxCS; cs += 3) {
+    for (let rt = 1.5; rt <= 4.0; rt += 0.5) {
+      for (let cs = minCS; cs <= maxCS; cs += 3) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
-        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide / (3.0 * Math.sqrt(3.0)))));
+        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide * 0.18)));
         
         const m = calculateMassForCombo(fp, cs, rt, fr);
         if (m < minMass) {
@@ -575,11 +595,11 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   let unsafeCombo = null;
   let unsafeMinDiff = 999999;
   for (let fp = 1.0; fp <= Math.min(15.0, H - 3.0); fp += 0.5) {
-    for (let rt = 1.0; rt <= 6.0; rt += 0.5) {
-      for (let cs = 15; cs <= maxCS + 20; cs += 3) {
+    for (let rt = 1.0; rt <= 3.5; rt += 0.5) {
+      for (let cs = minCS; cs <= maxCS + 10; cs += 3) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 2.0) continue;
-        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide / (3.0 * Math.sqrt(3.0)))));
+        const fr = Math.min(10.0, Math.max(1.0, Math.floor(pocketSide * 0.18)));
         const m = calculateMassForCombo(fp, cs, rt, fr);
         const diff = Math.abs(m - targetMass);
         if (diff < unsafeMinDiff) {
@@ -594,15 +614,15 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     return {
       achievable: false,
       maxReducibleWeight: minMass,
-      faceplate: minMassCombo.faceplate,
-      cellSize: minMassCombo.cellSize,
-      ribThick: minMassCombo.ribThick,
-      filletRadius: minMassCombo.filletRadius,
+      faceplate: minMassCombo ? minMassCombo.faceplate : 1.5,
+      cellSize: minMassCombo ? minMassCombo.cellSize : 70,
+      ribThick: minMassCombo ? minMassCombo.ribThick : 2.0,
+      filletRadius: minMassCombo ? minMassCombo.filletRadius : 8.0,
       mass: minMass,
-      unsafeFaceplate: unsafeCombo ? unsafeCombo.faceplate : 3.0,
-      unsafeCellSize: unsafeCombo ? unsafeCombo.cellSize : 220,
-      unsafeRibThick: state.ribThick,
-      unsafeFilletRadius: unsafeCombo ? unsafeCombo.filletRadius : 5.0,
+      unsafeFaceplate: unsafeCombo ? unsafeCombo.faceplate : 1.0,
+      unsafeCellSize: unsafeCombo ? unsafeCombo.cellSize : 70,
+      unsafeRibThick: unsafeCombo ? unsafeCombo.ribThick : 1.5,
+      unsafeFilletRadius: unsafeCombo ? unsafeCombo.filletRadius : 8.0,
       unsafeMass: unsafeCombo ? unsafeCombo.mass : targetMass,
       reason: `The target mass (${targetMass.toFixed(0)} kg) is below the minimum achievable mass (${minMass.toFixed(1)} kg). Reaching this weight requires parameters below Yoder Sec 2.5 structural limits (faceplate < 1.0 mm or rib < 1.0 mm).`
     };
@@ -1154,6 +1174,7 @@ function updateCalculation() {
     const nCols = Math.floor(maxR / stepX) + 2;
     const nRows = Math.floor(maxR / stepY) + 2;
     const marginTol = W * 0.6;
+    let hexVolRemoved = 0;
     
     for (let c = -nCols; c <= nCols; c++) {
       const cx = c * stepX;
@@ -1161,13 +1182,34 @@ function updateCalculation() {
       for (let r = -nRows; r <= nRows; r++) {
         const cy = r * stepY + yShift;
         const d = Math.hypot(cx, cy);
-        if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
+        const rMin = Math.min(maxR, Math.max(0.0, d - pocketSide));
+        const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + conicK) * (rMin * rMin) / (R_curv * R_curv))));
+        const zMin = (rMin * rMin) / denom_p;
+        const hPkt = H - state.faceplate + zMin;
+
+        if (d + pocketSide <= maxR && d - pocketSide >= centralExcludeR) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
             pocketCount++;
+            hexVolRemoved += singlePocketArea * hPkt;
+          }
+        } else if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
+          if (!isCloseToSupport(cx, cy, hubs, threshold)) {
+            pocketCount += 0.5;
+            hexVolRemoved += singlePocketArea * 0.5 * hPkt;
           }
         }
       }
     }
+    const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * H;
+    const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * H;
+    const numHubs = state.supportType === '9point' ? 9 : 18;
+    const hubInnerR = state.supportType === '9point' ? 4.0 : 3.0;
+    const hubVolRemoved = numHubs * Math.PI * (hubInnerR * hubInnerR) * ribH;
+    const padArea = Math.PI * (hubOuterR * hubOuterR - hubInnerR * hubInnerR);
+    const padVolAdded = numHubs * padArea * ribH;
+    const totalHexVol = hexVolRemoved + hubVolRemoved - padVolAdded - (volOuterWall + volInnerWall) * 0.35;
+    const finalHexVol = Math.max(1000.0, volBlank - totalHexVol);
+    var finalMassHex = finalHexVol * rho;
   }
 
   const numHubs = state.supportType === '9point' ? 9 : 18;
@@ -1179,7 +1221,7 @@ function updateCalculation() {
   
   const totalPocketVolRemoved = (pocketCount * singlePocketArea * ribH) + hubVolRemoved - padVolAdded;
   const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
-  const finalMass = finalVol * rho;
+  const finalMass = (state.pattern === 'hexagonal' && typeof finalMassHex !== 'undefined') ? finalMassHex : (finalVol * rho);
   
   const setTxt = (id, txt) => {
     const el = document.getElementById(id);
