@@ -33,10 +33,7 @@ import traceback
 DIAMETER     = 1400.0   # mm
 RADIUS       = 700.0    # mm
 R_CURV       = 5000.0   # mm
-CONIC_CONSTANT = -1.0
-CENTRAL_HOLE_DIA = 200.0 # mm
-SAG          = (RADIUS ** 2) / (R_CURV * (1.0 + math.sqrt(max(0.0, 1.0 - (1.0 + CONIC_CONSTANT) * RADIUS**2 / R_CURV**2))))  # 49.0 mm
-CENTRAL_EXCLUDE_R = (CENTRAL_HOLE_DIA / 2.0) + max(6.0, 15.0)
+SAG          = (RADIUS ** 2) / (2.0 * R_CURV)  # 49.0 mm
 
 TOTAL_DEPTH  = 90.0     # mm
 FACESHEET    = 15.0     # mm
@@ -135,7 +132,7 @@ def get_exact_isogrid_nodes(D, cell_side):
         y_base = j * row_h
         x_shift = (cell_side * 0.5) if (abs(j) % 2 != 0) else 0.0
         for i in range(-n_cols, n_cols + 1):
-            cx = (i + 0.5) * cell_side + x_shift
+            cx = i * cell_side + x_shift
             cy = y_base
             if math.hypot(cx, cy) <= max_r:
                 nodes.append((cx, cy))
@@ -218,7 +215,7 @@ def main():
     revolve_builder.Limits.EndExtend.Value.Value = 360.0
 
     revolve_feat = revolve_builder.CommitFeature()
-    revolved_body = revolve_feat.GetBodies()[0]
+    revolved_body = revolve_feat.GetEntities()[0]
     revolve_builder.Destroy()
     log(lw, "Solid Mirror Blank Body Created: SUCCESS")
 
@@ -261,58 +258,46 @@ def main():
                 return True
         return False
 
-    r_fillet = max(2.0, pocket_side * 0.15)
-
-    def build_filleted_triangle_lines(cx, cy, r_in, r_fillet, ori_sign, back_z):
-        lines = []
-        v_angles = [(math.radians(90.0 + 120.0 * k)) if ori_sign == 1 else (math.radians(-90.0 + 120.0 * k)) for k in range(3)]
-        arc_centers = [(cx + (r_in - 2.0 * r_fillet) * math.cos(a), cy + (r_in - 2.0 * r_fillet) * math.sin(a), a) for a in v_angles]
-        n_sub = 6
-        for k in range(3):
-            c_x, c_y, a_curr = arc_centers[k]
-            c_next_x, c_next_y, a_next = arc_centers[(k + 1) % 3]
-            a_start = a_curr - math.pi / 3.0
-            a_end   = a_curr + math.pi / 3.0
-            for s in range(n_sub):
-                ta1 = a_start + s * (a_end - a_start) / float(n_sub)
-                ta2 = a_start + (s + 1) * (a_end - a_start) / float(n_sub)
-                p1 = NXOpen.Point3d(c_x + r_fillet * math.cos(ta1), c_y + r_fillet * math.sin(ta1), back_z)
-                p2 = NXOpen.Point3d(c_x + r_fillet * math.cos(ta2), c_y + r_fillet * math.sin(ta2), back_z)
-                lines.append(workPart.Curves.CreateLine(p1, p2))
-            a_next_start = a_next - math.pi / 3.0
-            p_straight_start = NXOpen.Point3d(c_x + r_fillet * math.cos(a_end), c_y + r_fillet * math.sin(a_end), back_z)
-            p_straight_end   = NXOpen.Point3d(c_next_x + r_fillet * math.cos(a_next_start), c_next_y + r_fillet * math.sin(a_next_start), back_z)
-            lines.append(workPart.Curves.CreateLine(p_straight_start, p_straight_end))
-        return lines
-
     for j in range(-n_rows, n_rows + 1):
         y_base = j * row_h
         x_shift = (CELL_SIDE * 0.5) if (abs(j) % 2 != 0) else 0.0
         for i in range(-n_cols, n_cols + 1):
             cx1 = i * CELL_SIDE + x_shift
             cy1 = y_base + row_h / 3.0
-            if math.hypot(cx1, cy1) + pocket_radius <= max_r and math.hypot(cx1, cy1) - pocket_radius >= CENTRAL_EXCLUDE_R:
+            if math.hypot(cx1, cy1) + pocket_radius <= max_r:
                 if not is_close_to_hub(cx1, cy1):
-                    tri_lines = build_filleted_triangle_lines(cx1, cy1, pocket_radius, r_fillet, 1, BACK_Z)
+                    tri_lines = []
+                    for k in range(3):
+                        a1 = math.radians(120.0 * k + 30.0)
+                        a2 = math.radians(120.0 * (k + 1) + 30.0)
+                        p1 = NXOpen.Point3d(cx1 + pocket_radius * math.cos(a1), cy1 + pocket_radius * math.sin(a1), BACK_Z)
+                        p2 = NXOpen.Point3d(cx1 + pocket_radius * math.cos(a2), cy1 + pocket_radius * math.sin(a2), BACK_Z)
+                        tri_lines.append(workPart.Curves.CreateLine(p1, p2))
                     if extrude_pocket_boolean(workPart, tri_lines, revolved_body, z_direction, "ISO_POCKET", bool_sub):
                         pocket_count += 1
 
             cx2 = cx1 + CELL_SIDE * 0.5
             cy2 = y_base + 2.0 * row_h / 3.0
-            if math.hypot(cx2, cy2) + pocket_radius <= max_r and math.hypot(cx2, cy2) - pocket_radius >= CENTRAL_EXCLUDE_R:
+            if math.hypot(cx2, cy2) + pocket_radius <= max_r:
                 if not is_close_to_hub(cx2, cy2):
-                    tri_lines = build_filleted_triangle_lines(cx2, cy2, pocket_radius, r_fillet, -1, BACK_Z)
+                    tri_lines = []
+                    for k in range(3):
+                        a1 = math.radians(120.0 * k - 30.0)
+                        a2 = math.radians(120.0 * (k + 1) - 30.0)
+                        p1 = NXOpen.Point3d(cx2 + pocket_radius * math.cos(a1), cy2 + pocket_radius * math.sin(a1), BACK_Z)
+                        p2 = NXOpen.Point3d(cx2 + pocket_radius * math.cos(a2), cy2 + pocket_radius * math.sin(a2), BACK_Z)
+                        tri_lines.append(workPart.Curves.CreateLine(p1, p2))
                     if extrude_pocket_boolean(workPart, tri_lines, revolved_body, z_direction, "ISO_POCKET", bool_sub):
                         pocket_count += 1
 
-    log(lw, f"Subtracted {pocket_count} Filleted Isogrid Triangular Pockets: SUCCESS")
+    log(lw, f"Subtracted {pocket_count} Isogrid Triangular Pockets: SUCCESS")
 
     # ----------------------------------------------------------------------------
-    # STEP 5: ADD 18 WHIFFLETREE SUPPORT PADS (SOLID POSTS - NO ACCESS HOLES)
+    # STEP 5: ADD 18 WHIFFLETREE SUPPORT PADS & MOUNTING HOLES (YODER FIG 2.54)
     # ----------------------------------------------------------------------------
-    log(lw, "[Step 5/5] Constructing Whiffletree Solid Support Posts at Intersection Nodes...")
+    log(lw, "[Step 5/5] Constructing Whiffletree Support Pads & Holes at Intersection Nodes...")
     for hx, hy in hubs_list:
-        # Outer Support Pad / Post Boss (Solid post - no inner hole drilling)
+        # Outer Support Pad Boss
         pad_lines = []
         for s in range(12):
             a1 = math.radians(30.0 * s)
@@ -321,6 +306,16 @@ def main():
             p2 = NXOpen.Point3d(hx + HUB_OUTER_R * math.cos(a2), hy + HUB_OUTER_R * math.sin(a2), BACK_Z)
             pad_lines.append(workPart.Curves.CreateLine(p1, p2))
         extrude_pocket_boolean(workPart, pad_lines, revolved_body, z_direction, "HUB_PAD", bool_unite)
+
+        # Inner Mounting Pin Hole
+        hole_lines = []
+        for s in range(12):
+            a1 = math.radians(30.0 * s)
+            a2 = math.radians(30.0 * (s + 1))
+            p1 = NXOpen.Point3d(hx + HUB_INNER_R * math.cos(a1), hy + HUB_INNER_R * math.sin(a1), BACK_Z)
+            p2 = NXOpen.Point3d(hx + HUB_INNER_R * math.cos(a2), hy + HUB_INNER_R * math.sin(a2), BACK_Z)
+            hole_lines.append(workPart.Curves.CreateLine(p1, p2))
+        extrude_pocket_boolean(workPart, hole_lines, revolved_body, z_direction, "HUB_HOLE", bool_sub)
 
     assign_or_create_zerodur(workPart, revolved_body, lw)
 

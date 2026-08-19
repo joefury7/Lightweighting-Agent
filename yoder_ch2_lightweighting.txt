@@ -1,0 +1,4229 @@
+=== BOOK PAGE 60 ===
+36 Opto-Mechanical Systems Design
+to be used for best results. The plating CTE is ~7 × 10 −6/K. According to Taylor et al. 
+(1985), higher phosphorous content improves surface finish, but increases the differ -
+ence in CTE between the mirror substrate and the plating. Barnes (1966) reported that 
+this mismatch in CTE induces a bimetallic bending in the mirror when the tempera -
+ture is changed.
+In many applications, this bimetallic bending is unacceptably large. One commonly 
+suggested solution is plating both sides of the mirror to reduce bimetallic bending by 
+inducing equal and opposite stresses with temperature in the substrate. Unfortunately, 
+this simple solution is usually not effective because bimetallic bending is also strongly 
+influenced by mirror shape variations and mounting constraints (see Vukobratovich 
+1997). This bimetallic bending problem is discussed in Chapter 6 on metallic mirrors 
+in this book.
+DESIGN EXAMPLE 1.10 TIME TO THERMAL 
+EQUILIBRIUM IN THE HOOKER TELESCOPE
+In the account by Noyes (1922) of the 1917 commissioning of the 2.5 m aperture Hooker 
+telescope, it was stated that the image quality of the telescope improved significantly 
+3 h after exposure to brief nighttime cooling. Assume the crown glass primary is BK-7 
+with these properties: h0 = 300 mm, ρ = 2510 kg/m3, k = 1.11 W /m-K, CP = 858 J/kg-K, 
+and α = 7 .1 × 10−6/K. The primary mirror focal ratio is f/5, so the radius R is 2 × 5 × 
+2.5 m = 25 m. The mirror face radius r is (2.5)(1000)/2 = 1250 mm.
+Atop Mt. Wilson, the air temperature drops about 10 K during the first hour after 
+sunset. This approximates the axial temperature gradient ΔTZ from surface to inte -
+rior because the upper surface of the mirror can lose heat via radiation and convec -
+tion, while the back and sides of the mirror are insulated by the mirror cell:
+ (a) How long does this mirror take to reach full equilibrium after this exposure?
+ (b) What wavefront error is introduced 3 h after the exposure?
+ (a) By Equation 1.49, the glass thermal diffusivity is
+ D  = 1.11/(2510 × 858) = 5.154 × 10−7 m2/s
+By Equation 1.48, τ = (300)2/(π2 × 5.154 × 10−7) = 4.915 h.
+By rule of thumb, full equilibrium is recovered in ~5τ = ~24.6 h.
+ NOTE:  Records indicate that the telescope required ~24 h to fully recover.
+ (b)  C3 = ΔTZ/h0 = 10 K/300 = 0.033 K/mm.
+ By the first term in Equation 1.42, the spherical aberration from an axial gradient is
+ α C3r4/(8R2) = (7 .1 × 10−6)(0.033)(1250)4/[(8)(25,000)2] = 0.114 µm
+This is a surface aberration, so the aberration on the wavefront is twice as big 
+or 0.43 wave, in green light (λ = 0.546 in.), which is well above the Rayleigh cri-
+teria and will dramatically degrade image quality. After 3 h, the temperature 
+differential decreases by a factor of exp (−3 h/ 4.9 h) = 0.542 or 5.4 K. This drops 
+the aberration to about 0.23 wave on the wavefront, which satisfies the Rayleigh 
+“quarter wave” requirement. Hence, this analysis supports Noyes’ account.
+
+=== BOOK PAGE 61 ===
+37Factors Affecting Mirror Performance
+References
+Arnold, W.R., Study of small variations of coefficient of thermal expansion in Corning ULE™ glass, 
+Proc. SPIE, 5179, 28, 2003.
+Barnes, W.P ., Jr., Some effects of aerospace thermal environments on high-acuity optical systems, 
+Appl. Opt., 5, 701, 1966.
+Baustian, W.W., General philosophy of mirror support systems, Optical Telescope Technology, NASA 
+SP-233, 381, 1969.
+Blake, R.E., Basic vibration theory, in Shock and Vibration Handbook, 2nd edn., Harris, C.M. and Crede, 
+C.E. eds., McGraw-Hill, New York, 1976.
+Blevins, R.D., Formulas for Natural Frequency and Mode Shape, Van Nostrand Reinhold Co., New York, 1979.
+Bowen, I.S., The 200-inch Hale Telescope, in Telescopes, Kuiper, G.P . and Middlehurst, B.M., eds., 
+University of Chicago Press, Chicago, IL, 1960.
+Chanan, G., Mast, T., and Nelson, J., Keck telescope primary mirror segments: Initial alignment and 
+active control, Keck Observatory Report No. 171, April 1988, in Proceedings of the ESO Conference 
+on Very Large Telescopes and Their Instrumentation, Garching, Germany, March 21–24, 1988.
+Curtis, A.J., Concepts in vibration data analysis, in Shock and Vibration Handbook , 2nd edn., Harris, 
+C.M. and Crede, C.E., eds., McGraw-Hill, New York, 1976.
+Fischer, R.E., Tadic-Galeb, B., and Yoder, P .R., Jr., Optical System Design , 2nd edn., McGraw-Hill, 
+New York, 2008.
+Folkman, S.L. and Steven, M.S., Characterization of electroless nickel plating on aluminum mirrors, 
+Proc. SPIE, 4771, 254, 2002.
+Foster, K., Response spectrum analysis for random vibration, in Designing Electronic Equipment for 
+Random Vibration Environments: Proceedings. Institute of Environmental Sciences, Los Angeles, 
+CA, 1982.
+Gordon, C.G., Generic vibration criteria for vibration-sensitive equipment, Proc. SPIE, 3786, 22, 1999.
+Grundmann, W.A., Passive support systems for thin mirrors, Proc. SPIE, 444, 218, 1983.
+James, D.W., High damping metals for engineering application, Mater. Sci. Eng., 4, 1–8, 1969.
+Jedamzik, R., Muller, R., and Hartmann, P ., Homogeneity of the linear thermal expansion coefficient 
+of Zerodur® measured with improved accuracy, Proc. SPIE, 6273, 06, 2006.
+Kremer, R.M., Response of paraboloidal surfaces to linear thermal gradients, Proc. SPIE, 5176, 9, 2003.
+Lazan, B.J., Damping of Materials and Members in Structural Mechanics , Pergamon Press, Oxford, NY, 
+1968.
+Loftus, J.P ., Jr. et al., Launch systems, in Space Mission Analysis and Design, Wertz, J.R. and Larson, W.J., 
+eds., Kluwer Academic Publishers, Dordrecht, the Netherlands, 1991.
+Martin, D.J. and Nelson, R.E., Mirror substrate scalability: Fabrication limitations, Proc. SPIE, 542, 
+19, 1985.
+Miles, J.W., On structural fatigue under random loading, J. Aeronaut. Sci., 21, 753, 1954.
+Miller, J.L. and Friedman, E., Photonics Rules of Thumb, 2nd edn., McGraw-Hill, New York, 2003.
+Noyes, A., Watchers of the Sky, F.A. Stokes, New York, 1922.
+Paquin, R.A., Dimensional instability: An overview, Proc. SPIE, 1335, 2, 1990.
+Pearson, E. and Stepp, L., Response of large optical mirrors to thermal distributions, Proc. SPIE, 748, 
+215, 1987.
+Pellerin, C.J. et al., New opportunities from materials selection trade-offs for high precision space 
+mirrors, Proc. SPIE, 542, 5, 1985.
+Pepi, J.W., Design considerations for mirrors with large diameter to thickness ratios, Proc. SPIE , 
+CR43, 207, 1992.
+Schwesinger, G., Optical effect of flexure in vertically mounted precision mirrors, J. Opt. Soc. Am., 44, 
+417, 1954.
+Schwesinger, G. and Knohl, E.D., Comments on a series of articles by L.A. Selke, Appl. Opt., 11, 200, 
+1972.
+
+=== BOOK PAGE 62 ===
+38 Opto-Mechanical Systems Design
+Shannon, R.R., Image quality, in Optical Engineer’s Desk Reference, Wolfe, W.L., ed., Optical Society of 
+America, Washington, DC, 2003.
+Simonian, S.S., Survey of spacecraft damping measurements: Applications to electro-optic jitter prob-
+lems, in The Role of Damping in Vibration and Noise Control, Proceeding of the ASME, Symposium of 
+the Role of Damping in Vibration and Shock Control, New York, pp. 287–292, 1987.
+Smith, S.T. and Chetwynd, D.G., Foundations of Ultraprecision Mechanism Design, Gordon and Breach 
+Science Publishers, Montreux, Switzerland, 1992.
+Stepp, L., Conceptual design of the primary mirror cell assembly, RPT-O-G0025, Gemini 8-M 
+Telescopes Project, Gemini Project Office, Tucson, AZ, 1993.
+Strong, J., Procedures in Applied Optics, Marcel Dekker, Inc., New York, 1989.
+Taylor, J.S. et al., Surface finish measurements of diamond-turned electroless-nickel-plated mirrors, 
+Proc. SPIE, 571, 10, 1985.
+Vukobratovich, D. et al., Therm-optic analysis of bi-metallic mirrors, Proc. SPIE, 3132, 12, 1997.
+Wada, B.K. and DesForges, D.T., Spacecraft damping considerations in structural design, in 
+Proceedings of the 48th Meeting of the AGARD Structures and Materials Panel (AGARD Proc. 277) , 
+Williamsburg, VA. April 2–3, NATO Advisory Group for Aerospace Research And Development, 
+Neuilly-Sur-Seine, France, 6, 1979.
+Wan, D.-S., Angel, J.R.P ., and Parks, R.E., Mirror deflection on multiple point supports, Appl. Opt., 
+28, 354, 1989.
+Yoder, P .R., Jr., Mounting Optics in Optical Instruments, 2nd edn., SPIE Press, Bellingham, WA, 2008.
+
+=== BOOK PAGE 63 ===
+39
+2
+Large Mirror Design
+Daniel Vukobratovich
+2.1 Introduction and Summary
+Important mechanical performance criteria for large mirrors are weight, stiffness, and 
+response to temperature changes. This chapter describes basic techniques for the design of 
+large mirrors based on these aspects of performance. As outlined in Chapter 1 of Volume 1, 
+it is best to utilize a three-step process to design a state-of-the-art large mirror. This pro -
+cess is described briefly in Section 2.4 of this chapter.
+CONTENTS
+2.1 Introduction and Summary ...............................................................................................39
+2.2 Large Mirror Characteristics ..............................................................................................42
+2.2.1 Definitions .................................................................................................................42
+2.2.2 Lightweighting Configurations .............................................................................44
+2.2.3 Figure of Merit for Weight ......................................................................................45
+2.2.4 Structural Figures of Merit .....................................................................................50
+2.2.5 Thermal Figures of Merit ........................................................................................56
+2.3 Historical Perspective ..........................................................................................................62
+2.3.1 Speculum Metal Mirrors ........................................................................................62
+2.3.2 Cast Glass Mirrors ...................................................................................................62
+2.3.3 Low-Expansion Mirror Materials ..........................................................................62
+2.3.4 Thickness Reduction ...............................................................................................63
+2.3.5 Slotted-Core and Built-Up Fused Structures .......................................................64
+2.3.6 Frit-Bonded Substrates ............................................................................................69
+2.3.7 Machined Core Substrates ......................................................................................71
+2.3.8 Segmented Mirrors .................................................................................................. 76
+2.3.9 Spin-Cast Mirrors ....................................................................................................76
+2.4 Large Mirror Design Process .............................................................................................78
+2.5 Design of Thin Mirrors  .......................................................................................................78
+2.5.1 Thin, Flat Back Mirrors ...........................................................................................78
+2.5.2 Thin Meniscus Mirrors  ...........................................................................................80
+2.6 Contoured-Back Solid Mirrors ...........................................................................................83
+2.7 Structured Lightweight Mirrors ........................................................................................87
+2.7.1 Sandwich Mirrors ....................................................................................................87
+2.7.2 Open-Back Configurations .....................................................................................97
+2.8 Semirigid/ Active Ultra-Lightweight Mirrors ................................................................101
+2.9 Scaling Relationships for Lightweight Mirrors ............................................................. 106
+References .....................................................................................................................................110
+
+=== BOOK PAGE 64 ===
+40 Opto-Mechanical Systems Design
+Two different definitions are used to separate large from small mirrors; one based on opti-
+cal surface deflection (which affects image quality) and the other on means for handling. 
+A mirror is considered large if a complex support system is necessary to reduce self-weight 
+deflection to an acceptable level. Alternatively, a mirror is considered large if one person 
+cannot pick it up and move it from one place to another.
+Although mirror mass and weight are often used interchangeably in discussions of mir-
+ror design, the meanings of these words are different. Mass is resistance to acceleration 
+and is independent of gravity. It is most often used in reduced or zero-gravity applications, 
+such as in outer space or in dynamic applications. On the other hand, weight is force. It 
+applies to all mirrors as they are fabricated on Earth and when used in terrestrial applica -
+tions. Self-weight equals mirror mass times the local acceleration g of the Earth’s gravity. 
+Nominally, g = 9.807 m/s 2. Calculating mirror structural deflection requires evaluation 
+of the force on the mirror. This force is normally called self-weight. In the International 
+System of Units (SI), the unit of mass is the kg, while the force unit is the Newton (which 
+is 1  kg times 1 m/s 2 of acceleration). It is customary to express mirror weight also in 
+kgf, which makes for confusion with units when calculating self-weight deflection. In 
+this chapter, we are concerned primarily with cases where weight is the appropriate 
+terminology.
+It is desirable to reduce the weights of large mirrors for practically all applications. 
+Satellite launch capability is limited and costly so minimization of weight of telescopes 
+intended for use in space is essential. According to Meinel (1981), the costs of large ter -
+restrial telescopes are closely associated with overall weights of those systems. Because 
+the primary mirror is the largest single-item weight in a telescope and drives the total 
+weight, reducing the primary mirror weight tends to reduce cost. Key figures of merit 
+for mirror weight include areal density and lightweight efficiency. The thermal time 
+constants of large solid mirrors are prohibitively long in some situations, as discussed in 
+Chapter 1. In this chapter, we describe how these constants can be reduced by using vari -
+ous types of lightweight configurations and by providing ventilation. We also consider 
+how the coefficient of thermal expansion (CTE) of the mirror material and its unifor -
+mity can influence large mirror response to conventional thermal soak or to cryogenic 
+applications.
+Large mirrors are made in a variety of configurations. Thin mirrors, made in either flat-
+back or meniscus shapes, reduce mirror weight, lower cost, and minimize thermal time 
+constant. Simply reducing thickness, which increases aspect ratio (diameter/thickness or 
+D/t), lowers stiffness and makes mirror support more complex by making the location of 
+the center of gravity (CG) inaccessible in conventional mirror mounts. Mirror design is 
+therefore almost always a compromise.
+Seibert (1990) provided a menu for selecting a mirror/mount design from the variety 
+of candidate structural constructions, surface contours, materials, and mount configura -
+tions. This menu is shown in Figure 2.1. The path indicated by arrows is one possible 
+combination of an unsymmetrical, sandwich structure in a meniscus shape made of 
+ULE and supported on a whiffletree mount. The number of possible combinations that 
+can be made from the items listed here is obviously quite large. Representative configu -
+rations are shown in Figure 2.2. In order to select the optimum combination, one must 
+consider many performance-related requirements, such as the magnitude and distribu -
+tion of allowable surface figure errors at various possible orientations under self-weight, 
+gravity-free, or acceleration conditions; thermal inputs and losses, including gradients; 
+coating spectral reflectance and durability; microroughness contributions to scatter; radi -
+ation hardening requirements; overall and local size and weight constraints; material 
+
+=== BOOK PAGE 65 ===
+41Large Mirror Design
+availability; production feasibility and lead time; and cost. Although only a few of these 
+requirements can be treated in any detail here, this chapter is intended to help the reader 
+understand the advantages and disadvantages of various types of large mirror designs.
+A modest reduction in mirror weight can be obtained by contouring the mirror back. 
+Single-arch, double-arch, and symmetric cross sections are described here. Single-arch 
+mirrors, when combined with Meinel structures, * offer minimum weight for the entire 
+telescope systems. They are used for this reason in some space applications. The perfor -
+mance of new contoured-back mirrors is typically scaled from previous designs because 
+the variation in mirror thickness makes analysis of performance using closed-form equa -
+tions difficult.
+Open-back lightweight mirrors provide the greatest reduction in mirror weight, while 
+the best structural efficiency is obtained with a sandwich configuration. Analysis of the 
+stiffness of these mirrors requires consideration of the interaction between face-sheet thick-
+ness, shear core rib thickness, and shear core cell size. Shear is important in determining 
+stiffness of sandwich and open-back mirrors because the height of the ribs connecting the 
+individual shear core cells is comparable to the size of the cells. Deflection of the face sheet 
+* Meinel telescope structures are discussed in Chapter 7 of this volume.
+Structural
+section Core pattern Mirror proﬁle Substrate material Mount type
+Solid
+Sandwich
+  Symmetrical
+  Unsymmetrical
+  Perforated back
+  Open back
+  Foam core
+None
+Square
+Triangular
+Hexagonal
+Circular
+Trussed
+Foam
+Plano-plano
+Plano-concave
+Plano-convex
+Meniscus
+Concentric
+Conical back
+Single arch
+Double arch
+R2 > R1
+R1 > R2
+Rim support
+/T_hree-point
+Whiffletree
+Counterweight
+Air bag
+Piston
+Moment
+Fused silica
+ULE
+Zerodur
+Pyrex
+Beryllium
+Aluminum
+Silicon carbide
+Copper
+Molybdenum
+Graphite epoxy
+FIGURE 2.1
+Menu of possible structural and shape configurations, materials, and mounting arrangements for large light -
+weighted mirrors. One possible combination is indicated by arrows. (Adapted from Seibert, G.E., Design of 
+Lightweight Mirrors, SPIE Short Course SC18, 1990.)
+(a) (b) (c) (d) (e)
+FIGURE 2.2
+Representative cross sections for machined and built-up cellular mirror substrates. (a) Symmetrical sandwich, 
+(b) unsymmetrical sandwich, (c) partially open back, (d) open back ( waffle), and (e) foam sandwich. (Adapted 
+from Seibert, G.E., Design of Lightweight Mirrors, SPIE Short Course SC18, 1990.)
+
+=== BOOK PAGE 66 ===
+42 Opto-Mechanical Systems Design
+under lap pressure during polishing, a phenomenon called quilting, must also be taken into 
+account. All these design variations and their interactions are considered in this chapter.
+The chapter concludes with brief considerations of active mirrors and scaling relation -
+ships for lightweight mirrors.
+2.2 Large Mirror Characteristics
+2.2.1 Definitions
+In discussions of large optics, a baseline conventional solid mirror is used for comparison. 
+These mirrors are made in the form of right-circular cylinders, that is, ones in which the 
+cylinder axis is normal to the circular ends. The weight WS of such a cylindrical mirror is 
+related to its diameter D and thickness t by
+ 
+W tD
+S = πρ 2
+4  (2.1)
+where ρ is the mirror material density.
+An important parameter in the design of large mirrors is the aspect ratio. It is defined as 
+the ratio of mirror diameter to thickness, or D/t. In Osterbrock (1993), Ritchey suggested that 
+the optimum diameter-to-thickness ratio for a cylindrical mirror was 6:1. This ratio is com-
+mon for conventional mirrors of all sizes. Until 1985, the aspect ratio of most large mirrors 
+for astronomical telescopes (up to a diameter of ~4 m [~17 .5 ft]) was about that value. The 
+European Southern Observatory’s (ESO’s) New Technology Telescope (NTT), with a 3.58 m 
+(11.75 ft) diameter primary mirror, pioneered a more radical aspect ratio of 15:1. More recent 
+8 m class telescopes, such as ESO’s Very Large Telescope (VLT), Gemini, and Subaru, all use 
+primary mirrors with aspect ratios of 40 or more. Even larger aspect ratios are proposed 
+for space systems; the Large Active Mirror Program (LAMP) test mirror aspect ratio is 235. 
+That mirror is discussed in relation to Figure 5.65 and is reproduced here as Figure 2.3.
+Because aspect ratio is linked to thickness, it can be used to determine solid mirror 
+weight, WS. Let ζ be the aspect ratio of the mirror. Then,
+ 
+W D
+S = πρ
+ζ
+3
+4  (2.2)
+This equation indicates that, at constant aspect ratio, the weight of the mirror is propor -
+tional to the cube of the diameter. Densities of the conventional glasses used in solid mir -
+rors range from ~2200  kg/m3 for borosilicate glass to ~2520  kg/m3 for Schott Zerodur™. 
+Using 2200 kg/m3 for the density and a 6:1 aspect ratio, the weight of a conventional solid 
+glass mirror would be given by
+ WDM ⊕288 3  (2.3)
+where
+WM is in kg
+D is in m
+It was indicated at the beginning of Chapter 9 of Volume 1 that, from a human engi -
+neering viewpoint based on U.S. MIL-HDBK-759C, the upper limit for weight that one 
+
+=== BOOK PAGE 67 ===
+43Large Mirror Design
+man can safely lift and place on a shelf at a height of 5 ft (1.52 m) is 25.4 kg (56.0 lb). From 
+Equation 2.3, this indicates that a solid glass mirror is large if its diameter exceeds 0.45 m 
+(17 .7 in.). Others have set this limit for a mirror at ~30 kg (~66 lb) to reflect the use of han -
+dling equipment for safety reasons. Substituting the latter value into Equation 2.3, a mirror 
+is large when its diameter is greater than ~0.47 m (18.5 in.).
+An alternate definition of a large mirror is based on the need for a complex support sys-
+tem to minimize self-weight deflection. The worst-case self-weight deflection occurs when 
+gravity is normal to the mirror optical surface, that is, parallel to the optical axis. A three-
+point back support is the simplest type of mount for a mirror and is common for small 
+and moderate sized optics. Minimum deflection occurs when the three back supports are 
+equally spaced on a common diameter of ~64.5% of the mirror diameter. Assuming the 
+use of an optimized three-point mount, the peak-to-valley maximum self-weight deflec -
+tion δPV of a right-circular mirror, with gravity perpendicular to the optical surface, is 
+given by Williams and Brinson (1974) as
+ 
+δ ρ −ν ρ −ν ζPV
+E
+D
+hE D≈ () = ()00 21 00 212
+4
+2
+22 2..  (2.4)
+where
+E is the elastic modulus
+ν is Poisson’s ratio for the mirror material
+ζ is the aspect ratio
+FIGURE 2.3
+Photograph of the 4 m (13.1 ft) aperture, seven-segment, actively supported LAMP mirror with a thin face sheet. 
+(Courtesy of Goodrich Corporation, Danbury, CT.)
+
+=== BOOK PAGE 68 ===
+44 Opto-Mechanical Systems Design
+For selected glasses used in conventional mirrors, ρ/E ranges from ~275 × 10−9 m−1 for 
+Schott Zerodur to ~347 × 10−9 m−1 for Pyrex. Both values are weight units. Poisson’s ratio is 
+about 0.2 for both materials. Assuming borosilicate glass, where ρ/E ≈ 304 × 10−9 m−1, and 
+an aspect ratio of 6:1, the aforementioned equation becomes
+ δPV D≈×()
+−−209 10 91 2m  (2.5)
+For visual systems, the peak-to-valley tolerance on the wave front for “diffraction lim -
+ited” performance is λ/ 4 at λ ≈ 560 nm. This tolerance is reduced by a factor of two for the 
+surface, so the maximum peak-to-valley deflection tolerance is 560/8 = 70 nm. Using this 
+criterion and Equation 2.5, a mirror is large, or its self-weight deflection is excessive, when 
+the diameter exceeds 0.58 m (22.8 in.).
+Another criterion was derived by Danjon and Couder (1935). It defines a rigid mirror as 
+one small enough to maintain its shape when supported by its hard points. * Using this 
+criterion, a mirror is rigid if D4/h2 < 5 m2, where D and h are in m. This applies to mirrors 
+made of conventional glass. Assuming a 6:1 aspect ratio, a mirror that meets this criterion 
+must be smaller than about 0.37 m (14.6 in.) in diameter to be rigid.
+Using the handling and self-weight criteria, a reasonable diameter for the transition 
+between a small to a large mirror is ~0.50 m. This assumes conventional 6:1 aspect ratio 
+solid glass mirrors used in the visible. Different materials or mirror configurations, as well 
+as other deflection criteria, will change this diameter of transition from small to large. 
+Design Example 2.1 illustrates the application of Equation 2.4.
+2.2.2  Lightweighting Configurations
+Figure 2.2 shows the five basic built-up structures used for lightweight cellular mirrors. In 
+some designs, the shear core, or web, is integral with the front and back face sheets and 
+unwanted material is machined away. In other words, the web is made as a separate part and 
+completely or partially attached to those sheets. Attachment means for the latter types of 
+construction include fusion bonding, frit bonding, adhesive bonding, and (for metal mirrors) 
+brazing and welding. The geometric parameters available to the designer for lightweight-
+ing a mirror are material characteristics; face-sheet thickness; web height; rib thickness; 
+* Hard points are three small-area rigid reference surfaces that locate (or define) the back of a mirror with 
+respect to its mount but support only an extremely small fraction of the mirror’s total weight at all orientations.
+DESIGN EXAMPLE 2.1 DIAMETER OF A DIFFRACTION-LIMITED 
+METAL MIRROR OPERATING AT A WAVELENGTH OF 1 μm
+An aluminum mirror with 8:1 aspect ratio is used in an IR application at a wave -
+length of 1 μm. Performance is to meet the traditional λ/ 4 p-v diffraction limit on 
+wave front or λ/8 on surface deflection. What is the limiting diameter for the mirror?
+We assume that ρ/E is 390 × 10−9 m−1 and ν = 0.33. Solving Equation 2.4 for D we 
+have
+ 
+D EPV=
+()
+/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+=
+×
+()
+×()
+15 0
+1
+1
+8
+50 125 10
+390 10 10 32
+12 9
+9ζ
+δ
+ρ− ν−
+−
+−
+/
+. 33
+0 530 20 872
+12
+()
+/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+=
+()
+/
+.. .mi n
+
+=== BOOK PAGE 69 ===
+45Large Mirror Design
+and cell size and pattern. Figure 2.4 shows, in views (b) through (d), the three most com -
+monly used cell patterns for cellular mirrors. View (a) of that figure shows the key cross-
+sectional dimensions of any cell in the models. These dimensions are as follows: tF is the front 
+face-sheet thickness, tB is the back face-sheet thickness, tW is the web wall thickness, hC is the 
+web height, and NA is the distance from the front face of the mirror to the neutral surface.
+2.2.3 Figure of Merit for Weight
+A figure of merit used to describe the weight of mirrors is the amount of lightweighting, 
+usually given as a percentage. This figure of merit relates weight between comparable size 
+solid and lightweight mirrors. The percentage lightweighting is given by
+ 
+ε−LW
+LW
+S
+W
+W= 1  (2.6)
+where
+εLW is the lightweighting parameter
+WLW is the weight of the lightweight mirror
+WS is the weight of a comparable solid mirror
+From this equation, for a mirror that weighs 12.5% of the weight of a comparable size solid, 
+the lightweighting parameter (or lightweighting efficiency) is 1 − (0.125/1) = 0.875. That 
+mirror is then said to be ~88% lightweighted.
+(a)
+Neutral
+surface
+NA
+tB
+tChC
+tF
+(b)
+B
+(d)
+B
+(c)
+B = closed-back
+mirror cell size
+B = open-back
+mirror cell size
+FIGURE 2.4
+(a) Variables for two-dimensional cellular-web mirror substrates. Views (b–d) regular polygon patterns 
+for square, triangular, and hexagonal cells. Scale is graphic. (Adapted from Doyle, K.B. et  al., Integrated 
+Optomechanical Analysis , 2nd edn., SPIE Press, Bellingham, WA, 2002.)
+
+=== BOOK PAGE 70 ===
+46 Opto-Mechanical Systems Design
+For right-circular cylindrical mirrors made of the same material, the weight of the light-
+weight mirror is
+ 
+W D
+LW LW= () () /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F1 4
+3
+−ε ρ π
+ζ  (2.7)
+where all terms have been defined earlier.
+An alternative figure of merit for the weight of mirrors is the areal density, symbolized 
+by ρA. This is the weight per unit area of the mirror surface. Typical units for ρA are kg/m2. 
+Areal density is sometimes called surface density. When the mirror is solid and of con -
+stant thickness, ρA is the product of the thickness t and the material density, that is, ( ρt). 
+Table 2.1 lists the areal density of some representative mirrors used in terrestrial and space 
+telescopes.
+A parameter called the unit volume V0, expressed in units of length, is used for light -
+weight mirrors. It defines the amount of material contained within the total mirror thick -
+ness. For example, for open-back lightweight mirrors, Equation 2.8 applies:
+ Vt hFC0 =+ η  (2.8)
+where
+tF is the face-sheet thickness
+hC is the depth of the shear core ribs
+η is the dimensionless rib solidity ratio representing the amount of material in the ribs 
+per unit area
+For a lightweight mirror of constant thickness, the areal density ρA equals ρV0. The total 
+weight of such a mirror is then given by
+ WALW AL W=ρ  (2.9)
+where ALW is the surface area of the lightweight mirror.
+Assuming use of the same materials in both solid and lightweight mirrors of the same 
+surface area, the lightweighting efficiency in terms of the unit volume is given by
+ 
+εζLW
+V
+D=−()1 0  (2.10)
+TABLE 2.1
+Areal Density of Representative Mirrors Used in Terrestrial and Space Telescopes
+Mirror Date Diameter D (m) Type Material Areal Density ρA (kg/m2) 
+BTA
+Palomar (Hale)
+ESO VLT
+MMT (6.5 m)
+MMT (1.8 m original)
+Keck (segment)
+HST
+IRAS
+Spitzer
+JWST (segment)
+1975
+1950
+1999
+2000
+1979
+1996
+1990
+1983
+2003
+(2018?)
+6
+5
+8.2
+6
+1.8
+2
+2.4
+0.6
+0.85
+1.52
+Solid
+Open back
+Solid, meniscus
+Sandwich
+Sandwich
+Solid, meniscus
+Sandwich
+Open back
+Single arch
+Open back
+Borosilicate
+Borosilicate
+Zerodur
+Borosilicate
+Fused silica
+Zerodur
+ULE
+Beryllium
+Beryllium
+Beryllium
+1510
+670
+443
+287
+223
+192
+160
+45
+28
+14
+
+=== BOOK PAGE 71 ===
+47Large Mirror Design
+where all terms have been defined. Design Example 2.2 shows how the last few equations 
+might be applied.
+Another more complex example of lightweight mirror design is given as Design Example 
+2.3. It is based on a specification for quilting due to polishing pressure effects on the face -
+plate shape between the shear core ribs rather than self-weight deformation of the face 
+sheet. Note that numbered Equations (2.11) through (2.26) and Figures 2.5 through 2.7 are 
+provided or referenced within this example.
+DESIGN EXAMPLE 2.2 DESIGN CHARACTERISTICS 
+FOR A LARGE LIGHTWEIGHT MIRROR
+A 0.50 m (19.68 in.) diameter open-back flat mirror made of aluminum with density 
+2700 kg/m2 has an aspect ratio ζ of 8 so its total thickness t is 62.50 mm (2.46 in.). The 
+face-sheet thickness tF is 15.00 mm (0.59 in.). The core thickness hC is t − tF = 62.50 − 
+15.000 = 47 .50 mm (1.87 in.). (a) Assume the rib solidity ratio to be 0.27 . What are the 
+mirror’s areal density ρALW and total weight? (b) What are the areal density ρAS and 
+total weight of the same sized solid mirror?
+ (a) From Equation 2.8, the unit volume is
+ V 0 = tF + ηhC = 15.00 + (0.27)(47 .50) = 27 .83 mm = 0.028 m
+From Equation 2.10, the lightweighting efficiency is
+ ϵ LW = 1 − ζV0/D = 1 − [(8)(0.028)/0.500] = 0.552
+The areal density of the mirror is
+ ρ ALW = ρV0 = (2700)(0.028) = 75.600 kg/m2
+The reflecting area of the mirror is
+ πD2/ 4 = (3.142)(0.500)2/ 4 = 0.196 m2
+The weight of the lightweight mirror is (75.600)(0.196) = 14.82 kg.
+To check this using Equation 2.9,
+ WLW = (1 − εW)(π/4)  (ρD3/ζ) = (1 − 0.552)(0.785)(42.19) = 14.84 kg
+ (b) The areal density ρAS of the same sized solid mirror is (2700)(0.500/8) = 
+168.750 kg/m2.
+The weight of the solid mirror is then (168.750)(0.196) = 33.08 kg.
+Check: The weight of the lightweight mirror = (lightweighting efficiency)
+ WS = (1 − 0.552)(33.08) = 14.82 kg
+This value agrees with the calculation earlier.
+Check: The weight of the solid aluminum mirror is also (face area) (thickness)
+ = (0.196)(0.0625)(2700) = 33.08 kg
+
+=== BOOK PAGE 72 ===
+48 Opto-Mechanical Systems Design
+DESIGN EXAMPLE 2.3 DESIGN OF AN OPEN-BACK 
+LIGHTWEIGHT MIRROR TO ACCOMMODATE QUILTING 
+REQUIREMENTS FOR OPTICAL FABRICATION
+A lightweight fused silica open-back mirror with diameter D = 1 m is required to have 
+a minimum fundamental frequency of 400 Hz on a three-point mount, a maximum 
+weight W of 50 kg (110.2 lb), and maximum quilting deflections δC of 0.05 λ at 633 nm 
+wavelength or 3.165 × 10−8 m. Limitations from the fabrication process set both the 
+core web rib and the face-sheet minimum thicknesses tW and tF at 6 mm (0.236 in.). The 
+polishing pressure P is to be 2000 Pa (0.290 lb/in.2). The shear core cells are triangular 
+with an inscribed circle diameter B. The pertinent material properties are E = 72 × 109 
+Pa, υ = 0.17 , and ρ = 2190 kg/m3.
+Normally, mirrors are designed to have a maximum allowable self-weight deflec -
+tion δPV rather than to provide a specific fundamental frequency. So, we must convert 
+the latter specification using the following equation:
+ 
+f g
+n
+PV
+= 1
+2πδ  (2.11)
+where
+g is the gravitational constant (9.807 m/s2)
+δPV is the maximum allowable face-sheet self-weight deflection at the center of the 
+mirror
+Solving for this deflection,
+ 
+δ ππ
+PV
+n
+g
+f== =× ×−−
+()
+.
+[( )( )] .)2
+9 807
+2 400 1 553 10 1022
+68m( 6.1 in.
+The maximum face-sheet quilting deflection δC inside a cell of the shear core is related to 
+the size of the cells through the diameter B for the inscribed circle in a cell (assuming all 
+cells to be identical in size and configuration, that is, triangular, square, or hexagonal), 
+the material properties, and the polishing pressure. The following equation applies:
+ 
+t PB
+E
+F
+C
+= /uni23A1
+/uni23A3/uni23A2
+/uni23A4
+/uni23A6/uni23A5
+12 1 24 13
+Ψ− υ
+δ
+()
+/
+ (2.12)
+For the present example, we assume triangular cells for which ψ = 0.00151 (from 
+Figure 2.4c) and other values as listed earlier. From Equation 2.12, B = 61.16 mm.
+The variation of tF with B is plotted in Figure 2.5 for the range 0 ≤ B ≤ 150. The 
+specified faceplate thickness and the calculated value for B are indicated by the two 
+dashed lines in the figure.
+The relationship between the dimensionless rib solidity ratio η, B, and the rib 
+thickness tW is:
+ 
+η= +()
++
+2
+2
+Bt t
+Bt
+WW
+W
+()
+()
+ (2.13)
+
+=== BOOK PAGE 73 ===
+49Large Mirror Design
+Substituting the requirement value of 6.00  mm for tW and the corresponding 
+B = 61.16 mm into this equation results in η = 0.179.
+Next, we determine the appropriate height of the shear core hC. The maximum mir-
+ror weight specification of 50 kg controls this dimension. Equation 2.14 applies:
+ WA thMM FC=+ ()ρη  (2.14)
+Here, AM is the mirror face area, which is given by
+ 
+A D
+M = π 2
+4  (2.15)
+For D = 1.000 m, AM = (π) (1.000)2/ 4 = 0.785 m2
+Solving Equation 2.14 for hC and substituting parameter values from earlier, we obtain 
+the maximum core height:
+ 
+h WA t
+A
+C
+CM F
+M
+= − = −ρ
+ρη
+50 2190 0 785 0 006
+2190 0 785 0 179
+() (. )( .)
+() (. )( . )) .( .i n.)= 0 129 5 079m
+Figure 2.6 shows the relationship between hC and B over the range 25 < B < 150 mm. 
+The shear core height hC peaks at B = ~100 mm. This corresponds to hC = ~160 mm. 
+At the aforementioned calculated value of 61.16  mm for B, hC is approximately 
+130 mm. The calculated value of 129 mm is more accurate as the maximum for this 
+dimension.
+Next, we calculate the self-weight deflection of the mirror. For this, we need the 
+mirror flexural rigidity DF which is given by
+ 
+D E
+t h th
+t hF
+FF
+F
+= −
+−/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F−/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F++() /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
++12 1
+1 22 2
+2
+2
+4
+4 4
+() υ
+ηη η
+η
+/uni23A1/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A2
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+/uni23A5
+/uni23A5
+/uni23A5
+ (2.16)
+The unit area of the mirror is
+ 
+A Bt th t
+Bt
+WF W
+W
+0 = ++
++
+() () ()  (2.17)
+The shear coefficient is
+ 
+S u
+DD DD
+C = ++ +12 34
+ (2.18)
+where
+ 
+M Bt
+th t
+F
+FW
+= +()  (2.19)
+ 
+N B
+th
+M
+F
+= +  (2.20)
+
+=== BOOK PAGE 74 ===
+50 Opto-Mechanical Systems Design
+2.2.4 Structural Figures of Merit
+Although the lightweighting efficiency is the most common parameter associated 
+with large and lightweight mirrors, alternate figures of merit for structural response 
+are also used. Often, the stiffness and self-weight deflection of a lightweight mirror 
+are inferior to those for a comparable solid mirror. Lower stiffness and the resulting 
+increased deflection require more sophisticated mounts, with higher cost and com -
+plexity. The importance of the structural response of mirrors is emphasized by Stahl’s 
+(2010) suggestion that stiffness is more important than areal density in evaluating 
+lightweight mirrors.
+Lightweight mirror stiffness is defined as the spring rate of the mirror, which is the force 
+(i.e., weight), divided by the self-weight deflection δPV. Hence,
+ 
+S W
+LW
+LW
+PV
+= δ  (2.27a)
+ uM=+ +10 11 4 2() ()υ  (2.21)
+ DM MM1
+2312 96 276 192=+ ++  (2.22)
+ DM MM2
+2311 88 248 216=+ ()/uni23A1/uni23A3 /uni23A4
+/uni23A6
+++υ  (2.23)
+ DN MMM3
+2230=+() ()  (2.24)
+ DN MM MM4
+22 310 45=+ +() ()υ  (2.25)
+ 
+δ M
+MF M
+Wg
+A
+r
+Dn
+Wg
+A= /uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F+ /uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F0 025 3 06 5
+4 2
+.. MA XM AX rr
+SG AnC
+2
+0
+3/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F (2.26)
+The latter equation for self-weight deflection is plotted as the solid line in Figure 2.7 . 
+The dash–dot line in that same figure represents the variation of face-sheet thickness. 
+The abscissa for both curves is the diameter B of the inscribed circle in the shear core. 
+For a three-point support, n = 3.
+From Figure 2.7 , we see that the self-weight deflection is smaller than the specifica-
+tion limit of 1.553 × 10−6 for any mirror with an inscribed circle diameter greater than 
+~26 mm. For practical face-sheet fabrication, that thickness must be at least 6 mm so B 
+needs to be greater than ~66 mm. We are well advised to choose a larger value, such 
+as B = ~85 mm (at the dashed vertical line) because that gives the smallest deflection 
+and generates performance margin for the design.
+From the dash–dot line, this new value for B leads to a face-sheet thickness tF of 
+~8.5 mm. Choice of this value over the specified 6 mm minimum would increase mir-
+ror weight slightly but adds stiffness and reduces quilting effects during polishing.
+
+=== BOOK PAGE 75 ===
+51Large Mirror Design
+100
+Minimum inscribed circle diameter, B (mm)
+Face-sheet thickness, tF (mm)
+50
+6
+61.16
+0
+0
+5
+10
+15
+20
+150
+FIGURE 2.5
+Relationship between face-sheet thickness tF and minimum cell inscribed circle diameter B as developed in 
+Design Example 2.3 of the text.
+Inscribed circle diameter, B (mm)
+Shear core height, hC (mm)
+150100
+61.16
+500
+60
+80
+100
+120
+140
+160
+FIGURE 2.6
+Relationship between shear core height hC and minimum cell inscribed circle diameter B as developed in 
+Design Example 2.3 of the text.
+
+=== BOOK PAGE 76 ===
+52 Opto-Mechanical Systems Design
+For a constant cross-sectional lightweight mirror, the stiffness S′L W is
+ 
+S A
+LW
+AL W
+PV
+ʹ = ρ
+δ  (2.27b)
+Self-weight deflection is proportional to the mirror weight as well as the mirror stiffness. 
+In Chapter 1, it is shown that the generic worst-case axial self-weight deflection for a right-
+circular cylinder solid mirror is
+ 
+δAA
+FRS
+C qr
+D=
+4
+ 
+(1.6)
+where
+δA is the mirror self-weight deflection
+q is the weight per unit area of the mirror (ρA in this chapter)
+r is the mirror radius
+CA is a constant associated with the mirror mount geometry
+DFRS is the flexural rigidity of a solid mirror
+Then,
+ 
+D Et
+FRS =
+−()
+3
+212 1 ν
+ (2.28a)
+All terms here have been defined previously.
+15010050
+Inscrib e d circle diamete r,  B (mm)
+20
+15
+10
+5
+0
+Se lf-weight deﬂe ction, δ M
+Fa ce -s he et t hickness , t F (mm)
+5.0×1 0 –7
+1.0×1 0 –6
+1.5×1 0 –6
+2.0×1 0 –6
+0
+FIGURE 2.7
+Relationships between self-weight deflection δM and face-sheet thickness tF and minimum cell inscribed circle 
+diameter B as developed in Design Example 2.3 of the text.
+
+=== BOOK PAGE 77 ===
+53Large Mirror Design
+The flexural rigidity DFRLW of a lightweight mirror is also defined with respect to the 
+equivalent bending thickness tB, which is the thickness of a solid mirror having the same 
+stiffness as that of the same sized lightweight mirror. Then,
+ 
+D Et
+FRLW
+B=
+−()
+3
+12 1 2ν
+ (2.28b)
+The unit cross section moment of inertia I0 is derived from the flexural rigidity. Because 
+this parameter is independent of the mirror material and depends only on the geometry of 
+the mirror, it is useful in discussing  structural efficiencies of various mirror designs. Units 
+of I0 are m3. The unit cross section moment of inertia of a mirror structure is the stiffness 
+per unit area and is related to the flexural rigidity by
+ 
+ID E
+SF RS0 = −/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F
+1 2ν  (2.29a)
+or
+ 
+ID E
+LW FRLW0 = −/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F
+1 2ν  (2.29b)
+Using I0 instead of flexural rigidity, the self-weight deflection of a right-circular cylinder 
+mirror was given in Chapter 1 of this volume as
+ 
+δ
+ρ− ν
+AA
+E
+V
+I r= ()C
+1 2
+0
+0
+4
+ 
+(1.7)
+where CA is a dimensionless constant associated with the mirror mount geometry. See 
+mechanical engineering texts, such as Timoshenko and Woinowsky-Krieger (1959).
+The ratio V0/I0 is called the structural efficiency of the mirror, with units of (length)−2, or 
+m−2. Smaller values of the structural efficiency imply reduced self-weight deflection. For a 
+solid mirror, the structural efficiency is 12/h2. A lightweight mirror may not have the same 
+structural efficiency as a solid mirror of comparable thickness or weight.
+Using the expression for self-weight deflection SLW in the stiffness equation,
+ 
+S VA Vr
+C E
+V
+I r
+C
+EI
+r
+LW
+LW
+A
+A
+==
+()
+=ρ
+δ
+ρπ
+ρ− ν
+π00
+2
+2
+0
+0
+4
+0
+2
+1  (2.30)
+The figure of merit for stiffness is then ( EI0)/r2. Ignoring the effect of size, stiffness is pro -
+portional to the product of the mirror material elastic modulus and unit cross section 
+moment of inertia. Improved structural response requires using a material with a higher 
+elastic modulus or an increase in the unit cross section moment of inertia.
+
+=== BOOK PAGE 78 ===
+54 Opto-Mechanical Systems Design
+Considering the effect of mirror size and structure, stiffness is proportional to I0/r2. Bely 
+(2003) suggests that a similar ratio h3/D2 in units of meters defines the structural rigidity 
+of the mirror. Because I0 for a solid mirror is h3/12, Bely’s criterion becomes 12I0/D2. This 
+form is more useful because it can be applied to lightweight as well as solid mirrors. This 
+criterion defines the complexity of the support system, particularly with respect to the 
+number of actuators or supports needed per m 2 of mirror area. Bely’s four categories of 
+rigidity are given in Table 2.2.
+A more accurate assessment of the number of supports required for a given stiffness is 
+provided by Nelson et al. (1982). This provides a means of estimating the complexity of 
+the mirror mount as well as cost. Cost of a mirror mount is roughly proportional to the 
+number and complexity of the individual point supports. The following equation relates 
+the number of support points to area, weight per unit area, flexural rigidity, and deflection:
+ 
+δγ= /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+q
+D
+A
+NLW
+LW
+2
+ (2.31)
+where
+δ is the specified deflection
+γ is the support geometry parameter
+q is the mirror weight per unit area
+DLW is the mirror flexural rigidity
+ALW is the mirror area
+N is the number of support points
+Rewriting this equation in terms of structural efficiency V0/I0,
+ 
+δγ
+ρ− ν π= () /uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F
+1
+4
+2
+0
+0
+2 2
+E
+V
+I
+D
+N  (2.32)
+Rearranging and solving for N,
+ 
+ND E
+V
+I= () /uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D
+/uni239C
+/uni239C
+/uni239E
+/uni23A0
+/uni239F
+/uni239F
+π γ
+ρ− ν
+δ4
+1 1
+2
+2
+0
+0
+12/
+ (2.33)
+Values of the support parameter γ are given in Table 2.3. Design Example 2.4 illustrates 
+how to utilize the aforementioned equations during the design of a large solid mirror.
+TABLE 2.2
+Bely’s Stiffness Categories for Mirrors
+Stiffness Parameter Category Supports/m2 
+D4/h2 < 5 m2 (Couder) Rigid Defining points
+12I0/D2 > 10−2 m Semirigid 0.1–0.5
+10−2 m < 12I0/D2 < 10−6 m Low rigidity 1–10
+10−6 m < 12I0/D2 < 10−10 m Very low rigidity 10–100
+Source: Bely, P .Y., Proc. SPIE, 332, 212, 1982.
+
+=== BOOK PAGE 79 ===
+55Large Mirror Design
+Structural efficiency is related to the dynamic performance of mirrors. Response to 
+dynamic excitation is governed by the fundamental diaphragm bending frequency of 
+a mirror on its support. This frequency is determined by the mirror support, mirror 
+material properties, and structural efficiency. This is shown by solving for self-weight 
+deflection frequency for the mirror thickness, assuming a solid, right-circular cylinder 
+mirror:
+ 
+hC r E
+A=
+−()/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+2
+21 1ρν
+δ  (2.34)
+where
+h is the mirror thickness corresponding to a self-weight deflection δ
+CA is the mirror support constant
+DESIGN EXAMPLE 2.4 NUMBER OF SUPPORTS NEEDED 
+TO SUPPORT A LARGE SOLID TELESCOPE MIRROR
+The primary mirror of the BTA-6 is 6 m (19.7 ft) in diameter, 0.6 m thick and made 
+of a Pyrex-like material. Assuming the parameters for Pyrex, determine the number 
+of support points needed to limit the peak to valley self-weight surface deflection 
+to λ/20 at λ = 550 nm. The cells are hexagonal so, from Table 2.3, γ = 9.7 × 10−3. The 
+material properties are ρ = 2230 kg/m3, E = 63 GPa, and υ = 0.2. Fabrication errors and 
+thermal effects are neglected here.
+Applying Equation 2.33,
+ 
+ND E g V
+I= () /uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D
+/uni239C
+/uni239C
+/uni239E
+/uni23A0
+/uni239F
+/uni239F
+= /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F() ×
+π γ
+ρ− ν
+δ
+π
+4
+1 1
+4 6 97 1
+2
+2
+0
+0
+12
+2
+/
+(. 00 2230 98 11 02 12
+63 10 06 27 51 0
+32
+92 8
+−
+−
+−)( )( .) (. )( )
+() (. )( .)××
+/uni23A1
+/uni23A3/uni23A2
+/uni23A4
+/uni23A6/uni23A6/uni23A5=
+12
+55 6
+/
+.
+Round N to the next whole number = 56. In reality, the BTA-6 mirror has a 64-point 
+support. This equation assumes a semi-infinite plate, free of edge effects. In a real 
+mirror, there are edge effects. Additional supports are therefore needed near the rim.
+TABLE 2.3
+Parameters for Cells Used in Lightweight Mirrors
+Support Configuration γ Peak-to-Valley γ rms Cell Shape Constant, ψa 
+Triangular 4.95 × 10−3 1.19 × 10−3 0.00151
+Square 5.80 × 10−3 1.33 × 10−3 0.00126
+Hexagonal 9.70 × 10−3 2.36 × 10−3 0.00111
+a Cell shape constant used to quantify quilting effect in lightweight mirrors from polishing.
+
+=== BOOK PAGE 80 ===
+56 Opto-Mechanical Systems Design
+The fundamental frequency fn is approximated as (1/2 π)(g/δ)½. The mirror weight is 
+WM = πρhr2. Substituting for h in the mirror weight relationship, and also replacing δ−½ 
+with fn, the mirror weight is proportional to
+ 
+Wr gE
+Mn ∝ () () ()/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+f
+4
+32 12
+1ρ− ν
+/
+ (2.35)
+This equation shows that mirror weight is linearly proportional to the fundamental fre -
+quency and to the fourth power of the mirror diameter. A small change in mirror size 
+causes a large change in weight at constant frequency. For example, increasing the mirror 
+size by 10% increases weight by about a factor of 1.5. The parameter in square brackets 
+earlier is different from the specific stiffness used in static deflection analysis and is called 
+the dynamic parameter of the material.
+Another application of structural efficiency is in the analysis of scanning mirrors. A scan-
+ning mirror is typically a flat mirror that is periodically rotated through a small angle about 
+an axis perpendicular to the optical axis. The angle of rotation is the scan angle. An optical 
+beam impinging on the scanning mirror is deflected through twice the scan angle. Because 
+the mirror is not in continuous rotation, it is subject to continuously changing angular 
+acceleration which deflects the mirror surface. Surface deflection of the scan mirror induces 
+astigmatism into the scan beam and is undesirable if greater than some specified tolerance. 
+The generic relationship for the deflection of a scan mirror under angular acceleration is
+ 
+δ
+ρ− ν ω= ()C E
+V
+Ig rS
+1 2
+0
+0
+5  (2.36)
+where
+CS is the mirror support parameter
+ω is the angular acceleration
+Note that, in the aforementioned equation, I0 is the unit moment of inertia about a trans-
+verse axis in the plane of the mirror, not I0, the moment of inertia of the mirror about the 
+axis normal to the face at its center. Minimizing deflection in a scanning mirror requires 
+reducing the structural efficiency V0/I0, that is, decreasing the unit volume and increasing 
+the unit moment of inertia. Scanning mirrors are very sensitive to small changes in size 
+because the deflection scales as the fifth power of the radius or diameter. Deflection is also 
+linearly proportional to the inverse specific stiffness of the mirror. Scanning mirrors are 
+often made in a lightweight configuration to improve V0/I0 and materials with high spe -
+cific stiffness, such as beryllium, are used to reduce deflection.
+Structural efficiency, V0/I0, is an important parameter in both static and dynamic mir -
+ror applications. Later in this chapter, analytical techniques for calculating the structural 
+efficiency are given. In addition to structural efficiency, the performance of a mirror also 
+depends on its material properties and type of support.
+2.2.5 Thermal Figures of Merit
+Temperature changes can induce deflections in large mirrors that are comparable in 
+magnitude to gravity deflections. The effect of temperature changes is aggravated by the 
+
+=== BOOK PAGE 81 ===
+57Large Mirror Design
+long thermal time constant of most large mirrors, leading to significant gradient effects. 
+A recent concern is local air turbulence effects on optical propagation near the mirror due 
+to temperature differences between the surrounding air and mirror surface. Uniformity 
+of thermal expansion is an issue with very large mirrors and mirrors used at cryogenic 
+temperatures.
+Thermal time constants are discussed in detail in Chapter 1 on mirror performance 
+specifications. Here, the discussion of thermal time constants is limited to effects on large 
+mirrors. The Mt. Wilson anecdote illustrates that the thermal time constant of a large 
+mirror is typically longer than the rate of change of temperature in the service environ -
+ment. If the temperature of the mirror lags behind that of the environment, a temperature 
+gradient is induced in the mirror. This will distort the optical surface. Long thermal time 
+constants are also an issue in mirror fabrication, requiring long waits for the mirror to 
+reach equilibrium before testing to insure that the presence of thermal gradients does not 
+affect the optical figure. Reducing the thermal time constant of large mirror is therefore 
+highly desirable.
+A rough-order-of-magnitude estimate of gradient effects is made by assuming a linear 
+temperature gradient along the optical axis of right-circular cylinder solid mirror with a 
+concave optical surface. A linear gradient along the axis induces spherical aberration in the 
+mirror optical surface. The magnitude of this spherical aberration δSP is given by
+ 
+δαSP T D
+hR= 1
+128
+4
+2Δ  (2.37)
+where
+α is the mirror material CTE
+ΔT is the axial temperature difference
+R is the mirror optical radius of curvature
+The design example illustrates the use of Equation 2.37 .
+The thermal time constant of a solid mirror is proportional to the square of its thick -
+ness and inversely proportional to the mirror material’s thermal diffusivity. Thermal 
+ diffusivity of glasses typically used in large mirrors ranges from 483 × 10−9 m 2/s for 
+Pyrex to 788 × 10 −9 m 2/s for fused silica. Because the range of thermal diffusivity for 
+glass is limited, reducing the thermal time constant of a large mirror requires minimiz -
+ing the mirror thickness. This approach was used on the Hale 5.08 m (200 in.) primary 
+mirror for the Mt. Palomar Observatory (see Figure 2.8). According to Meinel (1981), by 
+adopting an open-back cast ribbed configuration, the maximum thickness of the mirror 
+is about 125 mm, whereas the thickness of most of the mirror is about 75 mm (2.95 in.). 
+Thanks to the reduction in thickness, the time to reach thermal equilibrium for the Hale 
+5.08 m primary mirror is about 17% of that of the much smaller Mt. Wilson Hooker 
+2.5 m (98.4 in.) primary. More information regarding means for making a variety of 
+reduced weight mirror substrates having minimal thermal time constants may be found 
+in Sections 2.7 and 2.8 of this chapter.
+The use of low-CTE materials is another way to reduce mirror optical figure changes 
+from gradients. If we return to Design Example 2.5 and replace the borosilicate glass in the 
+BTA-6 primary with a low-CTE material such as ULE, the figure change would reduce to 
+less than 1 nm, which is negligible. Even with large gradients, low-CTE mirrors are rela -
+tively immune to thermal distortion in most service environments.
+
+=== BOOK PAGE 82 ===
+58 Opto-Mechanical Systems Design
+The advent of active figure control for thin primary mirrors coupled with near-zero ther-
+mal expansion mirror materials solved the problem of figure change induced by tempera-
+ture gradients. Bely (2003) states that “thermally induced mirror figure deformation is no 
+problem for large meniscus mirrors with active optics.” The ESO NTT pioneered active 
+optical figure control of thin, meniscus primary mirrors.
+DESIGN EXAMPLE 2.5 SPHERICAL ABERRATION INTRODUCED INTO 
+A LARGE SOLID MIRROR BY AN AXIAL TEMPERATURE DIFFERENCE
+The dimensions of the Russian BTA-6 Telescope solid primary mirror are h = 0.600 m, 
+D = 6.00 m, and R = 48 m. Assume the mirror is made of Pyrex, where α = 3.3 × 10−6 K−1. 
+Assume that a 2 K axial temperature gradient exists. How much spherical aberration 
+is introduced into the mirror?
+We apply Equation 2.37:
+ 
+δSP =× () ()
+()
+≅×−− −1
+128 33 10 2 6
+06 48
+49 1061
+4
+2
+9.( )
+(. )
+KK m
+mm
+m
+In green light, this is about 49/550 = 0.09 wavelength of aberration on the surface or 
+0.18 wavelength on the wave front. This is an appreciable fraction of the optical imag-
+ing budget.
+This example indicates the sensitivity of a large mirror to a temperature gradient.
+Mount linkage
+attachment
+pocket (typ.)
+Lightweighting
+pocket (typ.)
+FIGURE 2.8
+Photograph showing the cast ribbed structure of the 200 in. (5.08 m) diameter Hale Telescope primary mirror. 
+(Adapted from Bowen, I.S., The 200-inch Hale Telescope, in Telescopes, Kuiper, G. and Middlehurst, B., Eds., 
+University of Chicago Press, Chicago, IL, 1960.)
+
+=== BOOK PAGE 83 ===
+59Large Mirror Design
+Another concern associated with the long thermal time constant of a large mirror is local 
+or mirror seeing. If the surface temperature of the mirror is appreciably different from the 
+surrounding air, convective heat transfer produces an air temperature gradient close to 
+the optical surface. This air temperature gradient induces a change in the index of refrac -
+tion in the air, with a resulting optical aberration in the beam reflected by the mirror. The 
+optical aberration from this mirror seeing increases the size of the diffraction disk at the 
+mirror focus. Witze (2013) indicated that an approximate relationship for the increase in 
+the angular size of the diffraction disk θM in arc seconds is
+ θMM T≅ ()04
+65
+.
+/
+Δ  (2.38)
+where ΔTM is the temperature difference between the surrounding air and the mirror in K.
+Mirror seeing became important with increased demands for higher resolution terres -
+trial astronomical telescopes. For example, the Keck error budget calls for a 0.42 arc second 
+blur at the focus. Just a 1 K temperature difference between the mirror and the surround -
+ing air would use up essentially the entire error budget. Realization of the importance of 
+mirror seeing led to requirements for the mirror surface temperature to be within about 
+0.2 K of the air temperature. If this specification could be met, the effect of mirror seeing 
+would be small, ~0.06 arc second.
+Right after sunset, the air temperature around a telescope mirror changes rapidly, by 
+as much as 10 K/h in some locations. Following this rate of change is an extremely chal -
+lenging problem for mirror thermal control systems. For most observatory locations, the 
+rate of air temperature changes during the rest of the night is much slower, usually on the 
+order of 0.25 K/h. Even this relatively slow change in temperature is a difficult thermal 
+control problem for massive, solid mirrors. According to Bohhanan et al. (2000), experience 
+with the Mt. Wilson telescope led to efforts toward matching the mirror and air tempera -
+ture. Many contemporary observatory telescope mirrors are cooled during the day to an 
+approximation of the predicted mean night air temperature.
+In the mid-1980s, Angel proposed active control of mirror temperature by forced air 
+ventilation of the inside of lightweight honeycomb or sandwich mirrors. To reduce the 
+thermal time constant of the mirror to less than 1 h, all parts must be thin, about 25 mm 
+thick. Maintaining adequate stiffness with thin sections led to the use of a sandwich struc-
+ture. Previous sandwich mirrors were expensive to produce. Angel also developed the 
+novel form of spin casting to near net shape using borosilicate glass in a rotating furnace 
+to reduce cost. This process is discussed in Section 2.3.9
+The thermal expansion of borosilicate glass is relatively high, about 3.3 × 10 −6 K−1 when 
+compared to the zero expansion materials such as ULE or Zerodur. However, active control 
+of temperature gradients and mirror figure would offset thermal changes in the mirror.
+Initial experiments in forced air cooling of sample borosilicate mirrors showed that ther-
+mal coupling between the air and mirror surface was poor, requiring high flow rates to 
+maintain mirror temperature near ambient air temperature. These results led to modified 
+ventilation schemes, with careful control of the temperature of the air used to ventilate 
+the mirror interior. For a typical mirror section, a flow of about 8.3 L/s of temperature-
+conditioned air is required (Cheng and Angel, 1988).
+In practice, developing good thermal control of large lightweight borosilicate mirrors 
+has proven to be difficult and time consuming. The 6.5 m MMT M1 mirror telescope was 
+commissioned in 2000 with a lightweight spin-cast sandwich mirror of the type proposed 
+by Angel. However, the goal of maintaining the mirror temperature within ±0.2 K was 
+not achieved until 2009 and then only for part of the night. Considerable development 
+
+=== BOOK PAGE 84 ===
+60 Opto-Mechanical Systems Design
+was necessary in the mirror sensors, chillers, heat exchangers, and control algorithms. 
+Thermal control problems continue with larger cast borosilicate mirrors such as those 
+in the Large Binocular Telescope and lead to controversy about the effectiveness of this 
+design approach.
+For the large meniscus primary mirrors in the 8 m class Gemini and ESO VLT telescopes, 
+an alternative active temperature control system employing radiative cooling of the mirror 
+back is used to keep the mirror temperature close to that of the ambient air. A plate with 
+integral cooling coils is placed close to the back of the mirror and is chilled by circulation 
+of a glycol–water mixture (Baumer and Sacre, 1997). Mirror seeing is induced by tem -
+perature differences between the mirror optical surface and ambient air. One approach 
+to minimizing this seeing is to cool the mirror below ambient during the day and use a 
+mirror surface optical coating heater to bring the optical surface into thermal equilibrium 
+with the ambient air temperature. Feeding an electrical current through an aluminum 
+surface coating provides the heating.
+As mirrors become larger, and as operating temperature ranges become more extreme, 
+the isotropy of the CTE of the mirror material is of increasing importance. Low-CTE 
+mirror materials, active figure control, and thermal control can minimize distortions of 
+the mirror surface induced by temperature gradients and local atmospheric turbulence 
+effects. A spatial variation (or anisotropy) in CTE induces a change in mirror figure with 
+temperature that may not respond to these means of control.
+There is limited knowledge in the literature on both the magnitude and distribution 
+of spatial variation of CTE in mirrors (see Pellerin et al., 1985). Anisotropy of 3%–5% in 
+CTE has been suggested as a rough rule of thumb. Measurement of a 1.9 m diameter Cer-
+Vit C-101 blank showed no variation within the mirror plane, but a change of 9 × 10 −9 K−1 
+through the 300 mm thickness. According to Osterbrock (1993), about 95% of a series of 
+measurements of the anisotropy of Schott Zerodur are within 15 × 10 −9 K−1. The CTE of 
+Corning 7972 ULE measured using an ultrasonic technique that is accurate to ±2 ppb/°C 
+(Sabia et al., 2006) indicated the anisotropy for large mirror blanks such as those for the 
+Gemini telescopes to be about ±5 × 10 −9 K−1. Krim et al. (1990) reported that, in thermal 
+analysis of ULE, a spatial variation of about ±15 × 10−9 K−1 is commonly assumed. More 
+recent measurements of actual large mirror blanks suggest that this assumption for ULE 
+is overly conservative.
+With the exception of ULE, the distribution of the variation in CTE for most materials is 
+usually not known with sufficient accuracy. A worst-case rough-order-of-magnitude esti-
+mate of the effect of anisotropy with temperature on the mirror figure can be made using 
+simple closed-form expressions. Two important types of distribution are a variation of 
+CTE along the optical axis and perpendicular to the optical axis. The first type of variation 
+(which is through the thickness of the mirror) causes a shift in focus. The surface deflec -
+tion δ from the spatial variation Δα through the thickness is given by
+ 
+δα= r
+h T
+2
+2 ΔΔ  (2.39)
+where
+r is the radius of the mirror
+h is the mirror thickness
+Δα is the total variation in thermal expansion through the thickness
+ΔT is the change in temperature
+
+=== BOOK PAGE 85 ===
+61Large Mirror Design
+A spatial variation that is perpendicular to the mirror axis, or in the plane of the mirror, 
+induces astigmatism if the CTEs are different in the two coordinate axes perpendicular 
+to the optical axis. If the optical axis is defined as the z-axis of a Cartesian coordinate 
+system and the CTEs in the x- and y-axis are αx and αy, respectively, the surface deflec -
+tion δ is
+ 
+δα α=− ()r
+h Txy
+2
+Δ  (2.40)
+Design Example 2.6 shows an application of this equation.
+This example shows the importance of anisotropy of CTE in modern high-performance 
+mirror systems. For the Keck mirror segments, the specified maximum axial variation 
+in CTE was about 0.6 × 10 −9 K−1. The 8 m Gemini primary mirrors were made by fus -
+ing together 55 individual pieces from 44 hexagonal segments, each with differing CTEs. 
+A sophisticated computer analysis was necessary to optimize the placement of the seg -
+ments to minimize the effect of spatial variation of CTE. For the Gemini mirrors, the maxi-
+mum rms surface error was about 15 nm.
+According to Feinberg et al. (2012), thermal properties for space telescope applications 
+are similar to those of terrestrial telescopes. However, local seeing effects do not occur in 
+the vacuum of space. Temperature control for spacecraft optical systems is complicated 
+by stringent limits on mass and power. System reliability must also be extremely high 
+since on-orbit servicing is difficult and expensive. In some applications, notably infrared 
+(IR) telescopes, an additional constraint is cryogenic operation of the optics to minimize 
+background radiation.
+Cryogenic operation requires a large temperature change since optics cannot be fabri -
+cated at cryogenic temperatures. Anisotropy of the CTE in the mirror material distorts the 
+mirror optical surface figure when the optics is cooled from room to cryogenic tempera -
+ture. This distortion is corrected using a cryo null fabrication process. The mirror optical 
+figure is measured at room temperature, then again at cryogenic temperature. The dif -
+ference in optical figure from room to cryogenic temperatures is used to optically correct 
+the mirror figure so that it meets requirements at the lower temperature. Hysteresis of the 
+DESIGN EXAMPLE 2.6 ESTIMATE THE CHANGE IN MIRROR OPTICAL 
+SURFACE FIGURE DUE TO VARIATION OF COEFFICIENT OF EXPANSION
+A 1.8 m (~71 in.) mirror segment such as might be used in the Keck telescope is 75 mm 
+(2.95 in.) thick. Assume a coefficient of expansion variation in the mirror plane to be 
+αX − αY = 5 × 10 −9 K−1. What change then occurs in mirror optical figure for a 25 K 
+temperature change?
+From Equation 2.40,
+ 
+δ= × ×() =×−− −(. )
+. ()09
+40 075 51 02 5 338 10
+2
+91 9m
+m KK m
+This surface deflection of 338 nm in the mirror surface is 21 times larger than the 
+λ/ 40 = 16 nm rms surface specification (at λ = 633 nm) for most modern telescope 
+mirrors.
+
+=== BOOK PAGE 86 ===
+62 Opto-Mechanical Systems Design
+mirror material can limit the usefulness of cryo null figuring since the mirror figure may 
+change randomly from test to test. Assuming that hysteresis is small and that the opera -
+tional temperature range is small, the use of cryo null figuring overcomes anisotropy of 
+CTE (see Stahl, 2004).
+2.3 Historical Perspective
+2.3.1 Speculum Metal Mirrors
+The first large telescope mirrors (such as Herschel’s 1.2 m and Rosse’s 1.8 m) were made of 
+speculum metal. This is a copper–tin alloy with a reflectivity of about 66% in the visible 
+when polished. Per Tolansky and Donaldson (1947), a drawback to speculum metal is tar-
+nishing when exposed to moist air, causing a loss of 2%–10% in reflectivity over 6 months. 
+Mirrors made of this metal had to be polished periodically to remove this tarnishing. This 
+posed a risk of loss of optical figure.
+In the mid-1850s, silver-on-glass films were developed that could be applied using chem-
+ical means. Reflectivity of a silver film in the visible is high in comparison with speculum, 
+with a fresh chemically deposited silver film reflecting about 95% at 550 nm. Like specu -
+lum metal, silver reflecting films tarnish in service, with reflectivity falling to about 77%. 
+Unlike speculum, the silver film can be chemically stripped and replaced without the risk 
+of changing the mirror figure.
+2.3.2 Cast Glass Mirrors
+Silver-on-glass films were used in the next generation of telescope mirrors. These were 
+made as thick solid right-circular cylinders from crown (plate) glasses. Thermal inertia and 
+the resulting temperature gradient–induced distortion was a serious issue. One example 
+of a thick crown glass mirror is the 2.5 m primary for the Hooker telescope on Mt. Wilson. 
+It had problems with thermal inertia as discussed in Chapter 1.
+Better thermal performance was obtained from the use of Corning Pyrex, which was 
+invented in 1915 and first used in the 5 m Hale telescope (see Florence, 1995). The CTE 
+of the special type of Pyrex used in this mirror is 2.3 × 10 −6 K−1, which is a factor of three 
+smaller than that of crown glass. Thermal inertia of the Hale telescope primary mirror was 
+minimized by the use of a lightweight cast open-back structure (see Bowen, 1960). A series 
+of similar mirrors were used in the next generation of large telescopes, including the Lick 
+Observatory 3 m and Kitt Peak National Observatory 2.1 m. Vacuum-deposited aluminum 
+reflective films replaced silver on the optical surfaces of this generation of large optics. 
+Although the deposition process was more complex, involving high vacuum, the long-term 
+durability of the aluminum film was superior to that of silver. First light for the Hale tele-
+scope occurred in December 1947 after several years of work interruption by World War II. 
+The telescope’s productivity continues today. Most large modern telescopes are designed to 
+be recoated in situ or on-site in order to maintain usefulness over extended lifetimes.
+2.3.3 Low-Expansion Mirror Materials
+During the early 1960s, Owens Illinois developed a near-zero CTE glass-ceramic, Cer-Vit 
+C-101, for use in telescope mirrors. Smoothness and thermal stability of this material were 
+discussed by Dietz and Bennett (1967). About the same time, Corning was able to produce 
+
+=== BOOK PAGE 87 ===
+63Large Mirror Design
+fused silica mirror blanks up to a diameter of 4 m. These new low-CTE materials were used 
+in a new generation of large telescopes, with primary mirror diameters up to 4 m. Thermal 
+gradients were not a serious problem with near-zero CTE materials, so mirrors were made 
+in the form of massive solid right-circular cylinders. The primary mirror for the Mayall 
+telescope at Kitt Peak National Observatory, commissioned in 1973, is an example of this 
+type of mirror. It has a diameter of 4 m and edge thickness of 0.57 m. Half a dozen tele -
+scopes using massive low-CTE primary mirrors of this type, with diameters ranging from 
+3.6 to 4 m, were commissioned between 1973 and 1979. One feature of the mirrors used in 
+these telescopes is a relatively large central perforation for Cassegrain applications. This 
+hole is normally about one-third of the mirror diameter in size.
+A telescope with a massive conventional solid mirror was the BTA-6 located at the 
+Crimean Observatory in what was then the Soviet Union. When commissioned in 1976, 
+this telescope was the largest in the world. Its primary mirror was a meniscus, with a 6 m 
+diameter and 600 mm thickness. Unfortunately, the quality of the borosilicate glass used 
+in the primary mirror was low and the condition of the mirror surface was poor. Because 
+the mirror was made of a borosilicate glass similar to Corning Pyrex and was not light -
+weighted, it suffered from a long thermal time constant. An ambient temperature change 
+of 2 K would put the telescope out of service for 2–3 days.
+The introduction by Schott Glaswerke of low-expansion Zerodur glass ceramic to the 
+realm of astronomical telescopes took the form of the 3.6 m diameter by 0.59 m thick pri -
+mary for a telescope on Celar Alto in Spain in the early 1970s. This material has since 
+become a material of choice for many astronomical instruments including the Keck tele -
+scopes and orbiting x-ray telescopes such as ROSAT and Chandra.
+According to Meinel (1978), studies of the then current generation of astronomical tele -
+scopes showed that their cost varied roughly as a power of the primary mirror diameter, 
+with the exponent typically being between 2.6 and 2.8. Extrapolating this power law scal -
+ing showed that the next-generation large astronomical telescopes, with primary mirrors 
+8–10 m in diameter, would be unaffordable. This was because costs would be 6–10 times 
+higher than 4 m class instruments. An important assumption in these cost studies was that 
+the existing technology would be used in the new instruments. Concerns about cost led to 
+the development of new mirror technologies.
+2.3.4 Thickness Reduction
+Reducing mirror thickness was the first approach to reducing large mirror cost. The 3.8 m 
+United Kingdom Infrared Telescope (UKIRK), commissioned in 1979, was a pioneer with 
+an aspect ratio of about 13. Even more radical was the ESO NTT with a 3.5 m diameter pri-
+mary mirror having an aspect ratio of about 15 (see Tarengi, 1986). Other new technologies 
+used in the NTT were an altazimuth mounting and closed-loop, active control of the pri -
+mary mirror optical figure. Active control of the mirror figure compensated for structural 
+flexure and thermal effects.
+Success of the NTT led to even higher aspect ratios of about 40 being used in the primary 
+mirrors for the Subaru, Gemini, and ESO VLT 8 m telescopes. A constant thickness menis-
+cus shape minimizes issues from temperature gradients and also simplifies the support 
+system design. Active control of the mirror optical surface figure further compensates for 
+any deformations of the mirror. Low-CTE materials such as Zerodur and ULE are used in 
+these large mirrors to reduce thermal distortion. In these telescopes, actuators deform the 
+large meniscus mirrors to maintain their correct shapes; this is a relatively complex control 
+problem, but one that yielded to intense development efforts.
+
+=== BOOK PAGE 88 ===
+64 Opto-Mechanical Systems Design
+2.3.5 Slotted-Core and Built-Up Fused Structures
+Techniques for making dimensionally stable, lightweight, built-up mirror blanks from 
+low-expansion materials have evolved from a slotted-rib (egg-crate) configuration devel -
+oped by Corning Glass Works in the late 1950s. The edges of the ribs in those blanks were 
+fused to the front and back face sheets, but the overlapping ribs were not fused together, 
+so the structures were not very stiff against shear. Figure 2.9 is a diagram of a 32 in. (81 cm) 
+diameter fused silica mirror of this type. The actual mirror is shown in Figure 2.10. It 
+was made by PerkinElmer and used in the Orbiting Astronomical Laboratory (OAO-C) 
+launched in 1972 by NASA. That mirror weighed approximately 105 lb (48 kg). The equiva-
+lent solid-disk mirror would have weighed 360 lb (164 kg).
+In the 1960s, Corning Glass Works developed a technique for making monolithic mir -
+ror structures with improved shear resistance by fusing or welding together many ell-
+shaped parts to create an egg-crate core and then fusing on the front and back plates. 
+Front face sheet
+Mounting ears
+(three places at 120°)
+Mounting block
+(three places at 120°)
+Egg-crate core
+Detail view
+of core joint
+Rear face sheet
+FIGURE 2.9
+Constructional details of the 32 in. (81 cm) diameter, slotted-strut, egg-crate mirror used in OAO-C. (Courtesy 
+of NASA.)
+FIGURE 2.10
+Photograph of the OAO-C lightweight primary mirror prior to coating. (Courtesy of NASA.)
+
+=== BOOK PAGE 89 ===
+65Large Mirror Design
+Figure 2.11 shows schematically how two joints of premachined parts are simultaneously 
+torch welded. Figure 2.12 shows a portion of a typical triangular cell core made in this 
+same manner. According to Hamill (1979), the core stiffness of a totally fused design is 
+typically twice that of the equivalent partially fused (slotted-rib) design.
+The fused monolithic construction is feasible only with materials of essentially zero CTE 
+because they do not fracture from temperature-gradient-induced stresses when rapidly 
+heated or cooled during the fusion process. Corning Glass Works Code 7971 ULE ceramic 
+glass composed of about 92.5% SiO2 and 7 .5% TiO2 is well suited for this type of construc -
+tion. Its CTE is predictably near zero in the temperature range 5°C–35°C. Furthermore, its 
+actual CTE can be measured precisely by nondestructive testing using ultrasonic velocity 
+measurement techniques (Hagy and Shirkey, 1975). The characteristics of this material are 
+listed in Table 3.13. Hobbs et al. (2003) reported that fused silica can also be fusion welded 
+but that the process requires higher temperatures.
+Numerous ULE mirrors of the fused monolithic type have been constructed and used 
+successfully in aerospace systems. A mirror substrate typically comprises two thin per -
+forated plates, a built-up core, and inner and outer rings, as illustrated in Figure 2.13. 
+Gas torch
+Reference surface
+Cell
+Ell
+Core web (typ.)
+FIGURE 2.11
+Attaching 90° ells by torch welding to form a monolithic mirror core. (Adapted from Lewis, W.C., Space tele -
+scope mirror substrate, in OSA Optical Fabrication and Testing Workshop, Tucson, AZ, 1979, Chapter 5.)
+Lightweighting
+hole (typ.)
+Fused
+joint (typ.)
+FIGURE 2.12
+Close-up photograph of a typical triangular-cell fused monolithic core structure for a lightweight mirror. 
+(Adapted from Loytty, E.Y., Lightweight mirror structures, in Optical Telescope Technology, MSFC Workshop, April 
+1969, NASA Report SP-233, 241, 1969.)
+
+=== BOOK PAGE 90 ===
+66 Opto-Mechanical Systems Design
+The materials for the two plates are closely matched to within 0.01 ppm/°C for CTE. The 
+front plate is the one that is accurately polished and figured. The glass for this is selected 
+for freedom from inclusions in order to minimize defects in the surface. Plates as large as 
+~2.8 m (~110 in.) can be made by heating a stack of raw material boules so they flow to the 
+required diameter. Plates as large as ~8.4 m (~331 in.) can be made by fusing hexagonal 
+segments edge to edge (Hobbs et al., 2003). The segments are created from slices of about 
+the required thickness cut from a raw material boule.
+Manufacture of the core is complex. If, for instance, a 25.4 cm (10 in.) thick core with 
+5.08 mm (0.2 in.) thick ribs is required, the necessary number of boule slices to create the 
+required volume of material are stacked vertically, placed in a furnace, and heated to about 
+1600°C. At this temperature, the slices fuse together to form a single monolithic plate. The 
+individual cell ribs are cut and ground to the proper thickness. These components are then 
+flame welded together to form ells and then cells as shown in Figure 2.11. This procedure 
+is continued row by row until the overall core size is adequate. The core is then cut into a 
+circular shape and ground to the proper height. Inner and outer rings are made by sagging 
+flat strips to the proper cylindrical radius by heating them on a mold. The individual sec -
+tions are then flame welded together to form complete rings.
+The plates, core, and rings are next placed in a furnace in their proper positions to make 
+a complete plano-plano assembly. The rings are positioned concentric with the core and 
+spaced a short distance away from the core rim. Gas burners then heat this assembly from 
+above, and a fusion seal is achieved. This bonds the uppermost plate to the core and rings. 
+The assembly is then cooled slowly, inverted, and placed back in the furnace, but this 
+time resting on a convex mandrel of appropriate radius to approximate the desired mirror 
+radius of curvature. It is then heated from above a second time, this time not only to seal 
+the other plate to the core and rings but also to allow the structure to slump to conform 
+to the domed hearth and achieve the meniscus-shaped, monolithic, mirror substrate con -
+figuration. The substrate is annealed and is then ready for inspection and subsequent ship-
+ment to the finisher. Figure 2.14 shows the flow of this manufacturing process.
+Three advantages of the built-up type of construction in making monolithic light -
+weight mirror blanks are (1) tight dimensional control (because they are made of precision 
+premachined parts), (2) repairability (within limits), and (3) simplicity of incorporating 
+Front plate Fused core Rear plate
+Outer ring Inner ring Fused substrate
+FIGURE 2.13
+Basic parts of a typical perforated fused monolithic mirror substrate. (Adapted from Lewis, W.C., Space tele -
+scope mirror substrate, in OSA Optical Fabrication and Testing Workshop, Tucson, AZ, 1979, Chapter 5.)
+
+=== BOOK PAGE 91 ===
+67Large Mirror Design
+provisions for mounting. If a core is damaged while in process, it can be reworked. In cer-
+tain instances, repairs can also be made to mirrors damaged in optical finishing.
+Figure 2.15 shows a mounting block fused into the rim of a typical lightweight mono -
+lithic mirror structure. These blocks provide strong points for attaching the mirror with 
+flexures to the mirror cell or instrument structure. The mirror shown here is a typical 
+1.52 m (60 in.) diameter, fused monolithic ULE mirror substrate with 7 .6 cm (3 in.) square 
+cells. The front and back face sheets are nominally 3.2 cm (1.25 in.) thick and the overall 
+blank thickness is 25 cm (10 in.). The finished face-sheet thicknesses are 1.5 cm (0.60 in.), 
+Manufacture and
+characterize
+raw material boules
+Manufacture
+front and back
+plates
+Manufacture
+core
+Manufacture
+inner and outer
+rings
+Stack and /f_low or cut
+boules to appropriate
+blank sizes
+Trial assembly
+of components
+Fuse one plate
+onto core and
+rings
+Invert and fuse
+second plate to
+assembly
+Slump assembly to
+meniscus shape
+and anneal
+Inspect mirror
+substrate
+Ship substrate
+FIGURE 2.14
+Flow chart for the Corning manufacturing process used to create large monolithic meniscus-shaped mirror 
+substrates from ULE. (Based on Hobbs, T.W. et al., Proc. SPIE, 5179, 1, 2003.)
+25.4 cm
+(10 in.)
+7.62 cm
+(3 in.)
+7.62 cm
+(3 in.)
+12.7 cm
+(5 in.)
+22 cm
+(8.7 in.)
+Face sheet
+t =3 .2 mm
+(1.25 in.)
+typ.
+3.8 mm
+(0.15 in.)
+typ.
+12.7 mm
+(5 in.)
+central hole
+Front
+face sheet
+radius
+ ~5 m
+Vent hole
+in cell
+typ.Edge
+band
+Edge band (two places)
+t = 6.35 mm (0.25 in.)Detail view of
+edge mounting
+block (ULE)
+Struts not fused
+to edge band
+Edge mounting block
+(three places at 120°)
+fused into outer edge band
+1.5 m
+(60 in.)
+diameter
+FIGURE 2.15
+Layout of a typical 1.52 m (60 in.) diameter fused and slumped monolithic ULE mirror blank.
+
+=== BOOK PAGE 92 ===
+68 Opto-Mechanical Systems Design
+so the finished mirror thickness is 22 cm (8.8 in.). The basic core ribs are 3.8 mm (0.15 in.) 
+thick, except in the vicinity of the nine mounting points, where the ribs are thickened to 
+9.5 mm (0.38 in.).
+Because fusing and slumping of this type of mirror structure entails softening of the mate-
+rial, the raw blank typically suffers many types of undesirable deformations. Figure 2.16a 
+illustrates some of the more common defects. In general, changes in dimensions are non -
+linear and hard to predict accurately. Since the face sheets may depart significantly from 
+the best-fit sphere, it is necessary to allow extra glass thickness so that the desired surface 
+can be located below the deepest valley. Radial clearance is normally provided between 
+the core and inner- and outer-edge rings to prevent localized contacts that could mod -
+ify the stiffness of the structure in those areas and affect polishing. Nonuniformities of 
+weight distribution properties may also result from shape and dimensional changes dur -
+ing fusion.
+Inclusions such as seeds and bubbles within the front face sheet of a mirror may create 
+problems if they occur too frequently in the region where the final optical surface is to be 
+created. Specifications for mirror blanks generally subdivide this sheet into zones with 
+different requirements for freedom from inclusions. Figure 2.16b illustrates a typical zone 
+distribution. Starting from the outermost surface, we note the zone from which the mate -
+rial must be removed to eliminate contour deformations such as shown in Figure 2.15 and 
+to bring the face sheet to near-final thickness. Next, we encounter the critical zone that 
+is to contain the finished optical surface. Below the critical zone is the noncritical zone, 
+where larger inclusions may occur. In most applications, freedom from bubbles and seeds 
+in or near the final surface is especially important. The specifications should call for a thin 
+supercritical zone with extremely tight inclusion limitations.
+In another fusion technique developed at the University of Arizona (Angel and 
+Wangsness, 1986) and now used by HEXTEK Corporation, similar lengths of circular glass 
+Surface
+contour
+variations
+Face-sheet
+stretching
+and thinning
+Quilting
+Web
+buckling
+(a)
+Desired mirror surface Outer surface
+of rough blank
+Material removal zone
+Critical zone
+Noncritical zone
+Core web (typ.)(b)
+FIGURE 2.16
+Details of the monolithic fused mirror blank. (a) Typical defects caused by heating ULE above the annealing 
+temperature and (b) location of the mirror surface within the best region of the front sheet.
+
+=== BOOK PAGE 93 ===
+69Large Mirror Design
+tubing are placed on end between drawn-glass face sheets to form a sandwich configura -
+tion as shown in Figure 2.17 . The rear sheet is perforated with small holes, one for each 
+tube. The assembly is placed over a manifold in an oven. The top sheet is weighted down 
+and gas is admitted to the tubes under sufficient pressure to just balance the weighted top 
+sheet. The oven temperature is raised until the tubes are fully fused to both sheets. Then 
+the pressure is increased to press the softened tubes outward until they contact and fuse 
+to the adjacent tubes. Depending on the initial tube layout, the structure becomes mono -
+lithic with either a square (see Figure 2.17a) or hexagonal (see Figure 2.17b) core pattern. 
+An integral side wall is also formed on the core as the softened tubes expand. The process 
+is detailed by Cannon and Wortley (1988).
+2.3.6 Frit-Bonded Substrates
+Except for the HEXTEK pressurized fusion process, the high-temperature processes used 
+to fuse mirror substrates discussed earlier tend to buckle or collapse the ribs, especially 
+if they are too thin to support the weight of the upper sheet. In order to allow reductions 
+in rib thickness, Corning Glass Works developed an adhesive material (frit) containing 
+an organic vehicle and a powdered glass material that melts at a lower temperature than 
+does ULE but has essentially the same low CTE as that material. Prior frits, used typically 
+to bond the faceplate to a television tube funnel, had much larger expansion properties.
+According to Spangenberg-Jolley and Hobbs (1988), firing of the fritted core/face-sheet 
+assembly bakes off the organic vehicle and devitrifies the powdered glass into a glass 
+ceramic that closely (within ±100 ppm/°C) matches the thermal expansion coefficient of 
+the mirror components. Reliable seals with localized fillets to blend the adjacent parts 
+together geometrically are produced. This and the thermal expansion match are important 
+because they minimize stress and risk of fracture during firing and increase the strength 
+Before pressurizing
+A΄A
+After pressurizing
+(idealized)
+(a) Section A–A΄
+B΄
+(b) Section B–B΄
+B
+FIGURE 2.17
+Tube placement pattern prior to heating and pneumatic expansion in the HEXTEK mirror manufacturing pro -
+cess: (a) square cells and (b) hexagonal cells. (Adapted from Parks, R.E. et al., Proc. SPIE, 1236, 735, 1990.)
+
+=== BOOK PAGE 94 ===
+70 Opto-Mechanical Systems Design
+of the joints. These attributes of the process also enhance the long-term stability of the mir-
+ror by reducing residual stress after returning to room temperature.
+Frit bonding also offers a distinct advantage to the FEA analyst since mirror analytical 
+models do not have to accommodate mirror blank distortion. The resulting bonds are typi-
+cally two to three times stronger than fusion-welded joints. Well-filleted frit bonds have 
+break strength of the order of >5000 lb/in. 2 (35 MPa), as opposed to 3000 lb/in.2 (21 MPa) 
+for fused joints (see Hobbs et al., 2003).
+Corning’s proprietary vehicle for frit application has the interesting property that it is 
+amenable to a dipping application. A layer of the viscous frit vehicle is spread to uniform 
+thickness onto a mold whose curvature matches that of the mirror sheet to be bonded. 
+Actually, this might be the mold used to slump the face sheet to the appropriate curvature. 
+The contoured core is dipped into the compound and lifted clear. The adhesive sticks to 
+the core webs so that, when placed against the face sheet, the appropriate thickness of 
+adhesive exists throughout the interface. The assembly is then vibrated to facilitate the 
+flowing and wetting action of the vehicle and fired to create a permanent bond (Hamill, 
+1979). Frit-bonded mirror blanks come to the optical processor within a few millimeters 
+of finished dimension. This eliminated removal of large amounts of glass in preparation 
+for polishing.
+Table 2.4 compares a frit-bonded design with a fused monolithic technology example. 
+The diameters of the two mirrors are the same, and the rigidities (or deflections when 
+simply supported) are about the same as well; both represent very rigid mirrors. The blank 
+weight has been significantly reduced from 33 to 9 lb (15 to 4.1 kg) by using frit as the bond-
+ing medium for thinner ribs.
+The frit-bonded mirror described in the table given earlier is sketched in Figure 2.18. 
+Although not shown, mounting blocks can be fused into the core as required. Optical figure 
+quality of 0.024 wave rms at 0.63 µm wavelength was reportedly achieved by conventional 
+polishing methods. A series of tests of this mirror before and after a series of temperature 
+cycles from −100°F to 200°F (−73°C to 93°C) disclosed no measurable figure change. The 
+purpose of this thermal cycle test was to induce elastic deformation in the joints to empha-
+size any instability that might exist. The mirror was also tested isothermally at 100°F, 70°F, 
+and 0°F (38°C, 21°C, and −18°C). The purpose of these tests was to detect and measure any 
+surface quilting due to the strain mismatch between the frit and the glass. Analysis had 
+predicted that, for these temperature changes, no quilting would occur and no measurable 
+quilting was observed. A mechanical deflection test was run to flex the joints in order to 
+disclose any instability that might exist. The mirror was then tested interferometrically at 
+TABLE 2.4
+Comparison of Classical versus Frit-Bonded Mirror Substrates
+Measurement Classical Frit Bonded 
+Diameter (in., mm) 20, 50.8 20, 0.508
+Thickness (in., mm) 5, 127 3, 76
+Self-weight deflection 
+(simply supported) (in., mm)
+3.9 × 10−6, 9.9 × 10−5 6.4 × 10−6, 2.5 × 10−7
+Weight (lb, kg) 33, 15 9, 4.1
+Core density (%) 12.5 7.0
+Joint strength (lb/in.2, MPa) 2800, 19.3 >5000, >34.5
+Source: Adapted from Fitzsimmons, T.C. and Crowe, D.A., Ultra-Lightweight Mirror Manufacturing and 
+Radiation Response Study, RADC-TR-81-226, Rome Air Development Center, Rome, NY, 1981.
+
+=== BOOK PAGE 95 ===
+71Large Mirror Design
+100°F, 70°F, and 0°F (38°C, 21°C, and −18°C). The purpose of these tests was to detect and 
+measure any surface distortion due to CTE mismatch between the frit and the glass. The 
+mirror was also simply supported and a uniform 4 g load was applied 10 times. The pre- 
+and postoptical tests measured no optical figure change. The mirror was then subjected to 
+a hard-vacuum test at approximately 10−6 torr, with no detectable change. The success of 
+these tests indicates the technical advantages of frit-bonded ULE mirrors. Several mirrors 
+of various sizes have since been made and applied to aerospace applications.
+2.3.7 Machined Core Substrates
+Another fundamental method of lightweighting mirrors is to machine depressions into the 
+back of a solid disk. A mirror made by this approach resembles that of the Hale telescope 
+primary, which has open cavities obtained by casting the glass around strategically placed 
+cores. Similar recesses can be sandblasted or waterblasted * into the disk or ground by 
+a computer numerically controlled (CNC) milling machine using diamond-impregnated 
+tools to form the chosen web structure configuration. Generally, mirrors with this type of 
+construction have lower rigidity than designs with a back face sheet.
+Stiffer mirrors are obtained if the cavities are created by a milling tool entering a solid 
+plate through blind access holes drilled into the back surface. These access holes have only 
+a small effect on the blank stiffness. This technique is not new. A mirror design described 
+* Waterblasting is similar to sandblasting with fine sand in an air jet except that the medium propelling the 
+abrasive is a highly pressurized water jet.
+0.150
+0.150
+0.050
+0.050
+Detail A
+Scale: none
+20.000±0.01
+two places
+0.100±0.008 0.100±0.008
+0.75±0.06 typ.
+1.40±0.06
+typ.
+80.0±1.00
+spherical R
+0.38± 0.06 dia
+one hole per
+strut plate
+See detail A
+0.75
+1.50
+2.80
+Front
+plate
+0.75 typ.
+1.50 typ.
+O 0.010 0.100
+Critical zone
+Back plate
+(plano)
+AA
+9.850±0.015R
+FIGURE 2.18
+A generic mirror design suitable for frit bonding. Dimensions are in inches. (Adapted from Fitzsimmons, T.C. 
+and Crowe, D.A., Ultra-Lightweight Mirror Manufacturing and Radiation Response Study , RADC-TR-81-226, Rome 
+Air Development Center, Rome, NY, 1981.)
+
+=== BOOK PAGE 96 ===
+72 Opto-Mechanical Systems Design
+by Simmons (1970) and illustrated by Figure 2.19 had triangular internal cavities obtained 
+by undercutting with a grinding tool through a series of blind access holes 2.5 in. (6.4 cm) 
+in diameter drilled into the back of a 64 in. (1.62 m) diameter × 12 in. (30.5 cm) thick solid 
+disk. Dimensions of interior features are indicated in that figure. Note the fillets at the 
+intersections of ribs with one another and with the front and back plates. A large post of 
+material was left at the intersections of each set of six triangles. Weight was reduced at 
+some expense in stiffness by removing material from the centers of these posts by machin-
+ing cylindrical holes into them.
+This blank contained 138 large, shaped cavities and 55 small, cylindrical cavities. It weighed 
+1035 lb (~470 kg). If solid, it would weigh 3475 lb (~1580 kg). This represented a weight reduc-
+tion of 70%. Dimensional control of the internal surfaces created by this technique was com-
+parable to that achieved with normal metalworking and was adequate for this application. 
+After removal of the unwanted material from the cavities, the mirror was machined to its 
+final external dimensions. It was then acid etched to remove surface imperfections and local 
+stresses in the surfaces and finally polished to the required optical surface specifications.
+A mirror design described by Pepi and Wollensak (1979) and Pepi et  al. (1980) had a 
+separate core lightweighted by machining numerous through holes of specific shapes and 
+locations (see Figure 2.20) into a solid disk of fused silica. Fused to that core were pre-
+formed, fused silica front and back face sheets. This design had a biconcave, symmetrical 
+cross section and a flat neutral surface. That surface was located at the mirror CG. The 
+20 in. (50.8 cm) diameter mirror weighed about 16 lb (7 .3 kg). Gravity sag when the mirror 
+was oriented with axis horizontal had a minimal value.
+Y
+Access hole (typ.)
+A
+A
+2.5 dia
+1.50
+dia
+0.20
+typ.
+7.30 32R
+0.25
+X
+0.75R
+typ.
+Pocket (typ.)
+Section AA
+12.0
+1.0
+1.5 0.75R
+typ.
+FIGURE 2.19
+Configuration of a 64 in. (1.62 m) diameter Cer-Vit mirror. All dimensions are in inches. (Adapted from 
+Simmons, G.A., The design of lightweight Cer-Vit mirror blanks, in Optical Telescope Technology, MSFC Workshop, 
+April 1969, NASA Report SP-233, 1970, p. 219.)
+
+=== BOOK PAGE 97 ===
+73Large Mirror Design
+The core fabrication process for this mirror was generally as follows. The core blank was 
+first diamond-generated to the double-concave configuration. Drilling and cavity grinding 
+utilized bonded diamond annular (core) drills and end mills of various sizes to produce 
+rib thicknesses of approximately 0.12 in. (3 mm). Factors considered to minimize the risk 
+associated with these operations beyond the obvious use of high-quality diamond tooling 
+were to properly support the blank from the back and to carefully remove the plugs that 
+remained after core drilling. Figure 2.21 shows a typical coring pattern. The cusps remain-
+ing after coring were carefully removed by milling with a diamond cutter.
+The preparation of the face sheets for this mirror required no new technology. The plates 
+were fabricated as meniscus blanks approximately 0.75 in. (19 mm) thick on conventional 
+optical sphere-generating equipment. Extra faceplate thickness was provided for sufficient 
+stiffness to minimize quilting effects during the subsequent fusing operation. The face -
+plates were thinned to their final thicknesses of 0.21 in. (5.3 mm) by diamond generating 
+after the blank was fused. The reflecting surface was then aspherized into an f/1.7 ellipse 
+for a particular application in a cryogenic orbital environment.
+A modern example of mirror fabrication by this technique is shown in Figure 2.22. This 
+is a diagram of the back side of the 2.7 m (106 in.) diameter Zerodur primary mirror for the 
+Stratospheric Observatory for Infrared Astronomy (SOFIA) telescope. The mirror design 
+is a plano-concave structure with a heavily beveled rim formed into a series of flying but-
+tress lateral supports and a circular central hole. Hexagonal internal cells with thin webs 
+were machined into the mirror blank using diamond tools to undercut material through 
+blind access holes drilled into the back surface. A nearly complete back plate remained. 
+After machining, all surfaces of the substrate were acid etched to further reduce weight 
+and to remove microscopic pits and cracks created during the grinding operation. The lat-
+ter operation greatly improved the strength of the material, as discussed in Chapter 11 of 
+Vent hole
+(typ.)
+3535
+3.1
+20
+FIGURE 2.20
+Configuration of a symmetrical concave mirror substrate with its core machined from a solid disk. The front 
+and back sheets were heated and sagged over a mandrel to meniscus shape and then fused onto the shear core. 
+The core had been machined previously, as indicated in Figure 2.21. (From Pepi, J.W. and Wollensak, R.J., Proc. 
+SPIE, 183, 131, 1979.)
+
+=== BOOK PAGE 98 ===
+74 Opto-Mechanical Systems Design
+Volume 1. The weight of the resulting structure was about 880 kg (1940 lb). This is about 
+20% of the weight of a solid substrate.
+Another machining technique for creating a lightweight core from a solid blank uses 
+the abrasive water jet (AWJ) cutting process perfected by Corning Glass Works. Edwards 
+(1998) described the technique and apparatus used (see Figure 2.23) as follows:
+The system is powered by two 250 horsepower motors driving hydraulic pumps, which 
+in turn feed intensifiers that output over 60,000 psi water pressure. Passing through 
+a 0.040 in. (1.02 mm) diameter sapphire jewel orifice, the water jet creates a vacuum, 
+pulling abrasive garnet into the stream. After fully entraining the abrasive in a mixing 
+tube, the water exits the nozzle at over Mach 2, capable of cutting through 30 cm thick 
+glass. A tool check station provides alignment and process parameter calibration. The 
+five-axis head can compensate for slight changes in the shape of the cut due to wear 
+of the jewel and mixing tube during jet-on time as well as any slight part movement. 
+3 mm (typ.)
+FIGURE 2.21
+Typical core machining pattern for the mirror shown in Figure 2.20. (From Pepi, J.W. and Wollensak, R.J., Proc. 
+SPIE, 183, 131, 1979.)
+Flying buttress
+rib (typ.)
+Lightweighting structure
+(cells machined through holes)
+Central hole
+Lateral interface
+location
+FIGURE 2.22
+Diagram of the back side of the 2.7 m (106 in.) diameter SOFIA primary mirror lightweighted by machining 
+pockets through holes in the back surface. (Adapted from Erdman, M. et al., Proc. SPIE, 4014, 309, 2000.)
+
+=== BOOK PAGE 99 ===
+75Large Mirror Design
+The system manipulator positions the nozzle in the 150 in. × 250 in. × 48 in. workspace 
+to an accuracy of better than ± 0.0025 in., repeatable to within ± 0.001 in. Each day the 
+operator makes test cuts that are measured to determine the health and contour of the 
+jet. Ongoing verification throughout the waterjet process ensures tight dimensional tol -
+erances are maintained in the resultant lightweight cores.
+Hobbs et al. (2003) further described the AWJ process and indicated that substrates up 
+to ~3 m ( ~118 in.) diameter could then be processed, that cores could be customized to 
+accommodate special mirror mounts, and that spatial nonuniformities and variable stiff -
+ness distributions could be produced if desired.
+Figure 2.24 shows a typical mirror core made by the Corning AWJ process. This is a 1.1 m 
+(43.3 in.) diameter core to be incorporated into one of the tertiary mirrors for the 6.5 m (255.9 in.) 
+FIGURE 2.23
+Photograph of the Corning AWJ machine used to make lightweight mirror cores. (From Edwards, M.J., Proc. 
+SPIE, 3356, 702, 1998.)
+FIGURE 2.24
+Typical example of a 1.1 m (43.3 in.) diameter mirror core lightweighted by the Corning AWJ process. (From 
+Edwards, M.J., Proc. SPIE, 3356, 702, 1998.)
+
+=== BOOK PAGE 100 ===
+76 Opto-Mechanical Systems Design
+aperture Magellan Telescopes. This particular design had thicker ribs at the outer edge and at 
+the central mounting hub, a hexagonal pattern superimposed on the elliptically shaped blank, 
+and a circular central through hole (Edwards, 1998).
+2.3.8 Segmented Mirrors
+Another approach to building large mirrors uses thin segments to make up the primary mir-
+ror such as those for the two Keck telescopes. In contrast to a large full-aperture thin menis-
+cus mirror, the individual segments are relatively stiff, and the control problem, although 
+still formidable, is reduced to maintaining the rigid body position of the segments relative to 
+each other. The individual segments typically are made in the form of hexagons. Optical fab-
+rication of the segments in the required quantities is a challenging problem and was solved 
+through the use of an innovative stressed mirror polishing technique to make segments for 
+the first Keck telescope (see Lubliner and Nelson, 1980; Nelson et al., 1980). This technique 
+was explained by Mast and Nelson (1990). A report on the success of that manufacturing 
+process was given by Pepi (1990). Figure 2.25 illustrates the technique for bending the mirror 
+blank symmetrically during polishing. For both Keck 10 m telescopes, the hexagons are 1.9 m 
+across and 75 mm thick and have with aspect ratios of about 25. Other segmented mirror 
+telescopes include the Gran Telescopio Canarias (GTC) 10.2 m telescope in the Canary Islands 
+and the South African Large Telescope (SALT) 9.2 m telescope in South Africa. According to 
+Sporer (2006) and by Daniel et al. (2010), it is expected that the segments for a Thirty Meter 
+Telescope (TMT) will be made in the United States using this basic technique.
+2.3.9 Spin-Cast Mirrors
+Currently, the most successful approach to making one-piece large mirrors is spin casting 
+borosilicate honeycomb mirrors. These mirrors are much stiffer than high-aspect-ratio menis-
+cus mirrors, thanks to their lightweight sandwich structure. However, the relatively high 
+CTE of borosilicate glass requires a complex thermal control system, as well as active sup-
+port of the primary mirror. The first large spin-cast borosilicate mirror placed in service 
+was the 6.5 m upgrade of the Smithsonian Astrophysical Observatory’s Multiple Mirror 
+Telescope (MMT) on Mount Hopkins, in Arizona (see Olbert et al., 1994).
+Polishing lap
+Levers Blank
+Optical polishing
+table
+Fluid pistons
+Weights
+Bonding pads
+FIGURE 2.25
+Schematic of the stress mirror polishing (SMP) concept involves (a) a plane-parallel (or meniscus-shaped) mir -
+ror disk segment, (b) application of bending moments to the rim of the disk while back-supported in a many 
+point fixture, (c) polishing the exposed surface to a flat or long radius sphere, and (d) the resulting typical 
+concave nonaxisymmetric (aspheric) mirror segment. Once polished, the mirror is cut to hexagonal shape and 
+touched up by ion or small-tool polishing. (From Daniel, J. et al., Proc. SPIE, 7733, 2010.)
+
+=== BOOK PAGE 101 ===
+77Large Mirror Design
+The so-called spin-cast process (see Angel and Hill, 1982; Angel et al., 1983, 1990; Angel 
+and Wangsness, 1986; Cheng and Angel, 1986; Goble et al., 1988a,b) involves casting the 
+mirror substrate in a furnace that rotates slowly. Centrifugal force causes the molten glass 
+to assume concave parabolic contour. Pockets in the back of the substrate are created by 
+many strategically located void former inserts. Figure 2.26 shows a partial section of a 8.4 m 
+diameter mirror in the furnace. The finished mirror is shown again in Figure 2.27 . It is one 
+of a matched pair of mirrors made for the Large Binocular Telescope atop Mount Graham 
+in Arizona (see Martin et al., 1996).
+In August 2013, the third of seven 8.4 m diameter mirrors needed for the 24.5 m primary 
+of the Giant Magellan Telescope was completed. Similar 8 m class mirrors are being pro -
+duced from Zerodur by Schott Glaswerke in Mainz, Germany. For early papers on this, see 
+Marker et al. (1985) and Mueller et al. (1990, 1994).
+Lid heater panels
+Tub walls
+Inconel
+bands
+Leak
+Core tops Core boxes
+Wall liner
+Cross pins
+SiC boltsSiC nutsSiC base tilesSiC hearth plates
+FIGURE 2.26
+Cross-sectional drawing of the furnace and mold for an 8.4 m (27.6 ft) diameter spin-cast mirror substrate. (From 
+Hill, J.M. et al., Proc. SPIE, 3352, 172, 1998.)
+FIGURE 2.27
+Photograph of the first 8.4 m (27.6 ft) diameter spin-cast mirror substrate for the Large Binocular Telescope. 
+(From Hill, J.M. et al., Proc. SPIE, 3352, 172, 1998.)
+
+=== BOOK PAGE 102 ===
+78 Opto-Mechanical Systems Design
+2.4 Large Mirror Design Process
+Mirror design is a three-step process comprising predesign, first-order design, and final 
+design analysis. Any mirror design starts with performance specifications. In addition to 
+optical performance parameters such as radius of curvature, diameter, and conic constant, 
+mechanical parameters are also specified. These include self-weight deflection and total 
+weight. Self-weight deflection is normally part of a larger error budget including ther -
+mal distortion and fabrication errors. For dynamic applications, self-weight deflection is 
+derived from the relationship between frequency and static deflection.
+Scaling from previous designs is a common technique used for initial analysis. * Mirror 
+weight can be predicted using scaling laws such as those developed by Valente (1990). † 
+Alternatively, weight is estimated from areal density. A conservative areal density value 
+for lightweight mirrors is 180 kg/m2, which is represented by the Hubble Space Telescope 
+(HST) primary mirror. A state-of-the-art value is about 15 kg/m2 and is represented by the 
+primary mirror for the James Webb Space Telescope (JWST). Application of simple self-
+weight deflection equations is another way to estimate mirror performance rapidly. These 
+equations are discussed in Chapter 1.
+First-order design is the detailed design of the mirror using closed-form or “hand cal -
+culations.” In reality, the nonlinear nature of the detailed equations governing mirror 
+self-weight deflection and stiffness makes use of computer aid highly desirable. During 
+this phase of the design, the stiffness and self-weight of the mirror are determined using 
+parametric analysis. The present chapter provides the basic equations necessary for first-
+order design. It is possible to develop a mirror design using only first-order analysis. This 
+practice was common before the widespread application of finite element analysis (FEA).
+After first-order design, the candidate mirror configuration is subjected to detailed analy-
+sis using FEA. There are often large differences in estimated performance between FEA 
+and first-order analysis. The latter serves as a good check for preliminary FEA. Good agree-
+ment is usually defined as agreement between these results within about 20%. Final design 
+is guided by the FEA, although it may be necessary to iterate between the parametric first-
+order analysis and the FEA to achieve an optimal design. Skipping first-order analysis and 
+going directly to FEA is often unproductive in that it can take a long time to converge to a 
+design solution using just FEA. How to use FEA is outside the scope of this book. A good 
+introduction to the use of FEA in mirror design analysis is provided in Doyle et al. (2012).
+2.5 Design of Thin Mirrors
+2.5.1 Thin, Flat Back Mirrors
+A thin mirror is defined as one with an aspect ratio (diameter/thickness) greater than the 
+classical 6:1. This definition is somewhat imprecise because the aspect ratios of a number 
+of large classical telescope primary mirrors exceed 6:1. For example, the aspect ratio of 
+the primary mirror of the Hooker 2.5 m telescope is about 8:1. Generally, a mirror with an 
+aspect ratio of 10:1 or more is considered thin.
+* This topic is discussed in Chapter 6.
+† See Section 2.9.
+
+=== BOOK PAGE 103 ===
+79Large Mirror Design
+Thin mirrors are used to reduce cost, improve thermal equilibrium time, and lower 
+overall system weight. Availability of material for the primary mirror also affects thick -
+ness. Some fabrication methods limit the thickness of the mirror, with large aspect ratios 
+required for larger mirrors.
+The sizes of current amateur and professional telescopes overlap, with many amateur 
+telescope primary mirror diameters exceeding 500 mm (19.7 in.). In the recent past, instru-
+ments of this size were restricted to professional observatories. Low thermal expansion 
+borosilicate glasses such as Pyrex are used in the primary mirrors of most of the larger 
+amateur telescopes. Kriege and Berry (2001) indicated that, because the thicknesses of 
+borosilicate glass blanks are generally limited to 54 mm (2.13 in.), the aspect ratios of ama-
+teur mirrors of 300–625 mm (11.8–24.6 in.) diameter range from 5.6 to 11.6.
+Modern telescopes are made with relatively fast primary focal ratios, typically about 
+f/2. Since the radius of curvature of a mirror with a fast focal ratio is relatively short, the 
+sagittal depth is large. The combination of a fast focal ratio and thin mirror leads to a large 
+change in thickness of the mirror from center to edge. For instance, with a focal ratio of 
+f/2, the thickness varies by a factor of two from center to edge when the mirror aspect 
+ratio is about 16:1. The limit on aspect ratio is set by the sagittal depth. When the sagittal 
+depth equals the mirror edge thickness, the center thickness is zero. Further reductions in 
+the focal ratio create a hole in the center of the mirror; the sagittal depth then exceeds the 
+mirror thickness. The maximum aspect ratio for a given focal ratio is given approximately 
+by ζ = 16 ( fno). This relationship is accurate to better than 2% for focal ratios as fast as f/1. 
+Figure 2.28 gives the maximum aspect ratio as a function of focal ratio using a more accu-
+rate equation than the approximation given here.
+The deep sagittal depth associated with a fast focal ratio further reduces the weight of 
+a thin mirror because the amount of material removed by the optical curvature is large 
+in comparison with the mirror’s total volume. For example, at f/2, the weight of a mir -
+ror with an aspect ratio of ζ = 12 is 45% of that of a mirror with an aspect ratio of ζ = 6. 
+10
+Focal ratio
+Maximum aspect ratio
+8642
+0
+50
+100
+150
+200
+FIGURE 2.28
+Relationship between maximum aspect ratio and a focal ratio for a thin, flat-back mirror.
+
+=== BOOK PAGE 104 ===
+80 Opto-Mechanical Systems Design
+The approximate weight WTHIN of a thin mirror as a function of both aspect ratio ζ and 
+focal ratio (fno) is given by
+ 
+WD f
+THIN
+no
+≅− /uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239Fπ ρ ζ4
+11
+32
+3  (2.41)
+where
+ρ is the glass density
+D is the mirror diameter
+Because self-weight deflection scales as the square of the aspect ratio, the stiffnesses of 
+thin mirrors are smaller than those of solid mirrors with the classical aspect ratio of ζ = 6. 
+At constant deflection, and ignoring shear effects, the number of point supports required 
+varies as ζ½. A mirror with an aspect ratio of 12 requires about 1.4 times more point sup -
+ports than a mirror with an aspect ratio of 6. Support complexity is further increased by 
+the large variation in thickness for a thin mirror with a fast focal ratio.
+The mirror thermal time constant is proportional to the square of the mirror thickness. 
+As shown earlier, there is a significant variation in mirror thickness in thin mirrors with 
+fast focal ratios. For a thin mirror with ζ = 12 and fno of 2, the mirror center thickness is 
+about 62% of the edge thickness. Therefore, the thermal time constant at the mirror cen -
+ter is only about 39% that at the edge. The large change in thermal time constant in the 
+radial direction increases the magnitudes of thermal gradients in the mirror when the 
+temperature changes. Thus, increased sensitivity to temperature gradients is an inherent 
+drawback of thin, flat-back mirrors.
+The 3.8 m, f/2.5 primary mirror for the UKIRT telescope is an example of a thin, flat-back 
+mirror. The mirror diameter is 3.802 m (150 in.) and the central hole diameter is 1.028 m 
+(40.5 in.). The thickness at the edge is 287 mm (9.3 in.) and the thickness at the edge of the 
+central hole is 192 mm (7 .6 in.). Low stiffness of this thin mirror is indicated by the need 
+for 80 axial supports. There are 12 radial supports around the mirror’s circumference. For 
+comparison, the 5 m Hale telescope uses 36 axial supports and there are 64 axial supports 
+for the 6 m BTA-6.
+For the UKIRT, Bely’s stiffness parameter (Bely, 2003) h3/D2 = (0.287 m) 3/(3.802 m)2 = 
+1.64 × 10 −3 m so that primary mirror is in Bely’s low rigidity class. It should have 1–10 
+supports per square meter. In actuality, there are about seven supports per square meter 
+for this mirror, putting it toward the upper end of Bely’s category. Bely’s low rigidity 
+category also assumes some level of active control of mirror figure. The UKIRT uses its 
+radial supports to correct low-order deformation (astigmatism) in the optical surface.
+2.5.2 Thin Meniscus Mirrors
+Meniscus mirrors are defined as curved mirrors with constant thickness. For constant 
+thickness, the magnitude of the radius of curvature of the back of the mirror must be 
+greater than that of the front by an amount equivalent to the center thickness of the mirror. 
+If the radius of curvature at the front and back are the same, there will be slight change 
+in thickness from center to edge. Thin meniscus mirrors are defined as meniscus mirrors 
+when the ratio of diameter to central thickness is greater than about six. This definition is 
+imprecise for the same reasons as for a thin, flat-back mirror.
+Like the thin, flat-back mirror, thin meniscus mirrors are used to reduce cost, lower 
+weight, and minimize thermal effects. Because the meniscus mirror does not vary in 
+
+=== BOOK PAGE 105 ===
+81Large Mirror Design
+thickness, it is less sensitive to thermal gradient effects than a thin solid flat-back mirror. 
+Constant thickness is also the reason why the support system for a thin meniscus can be 
+simpler than one for a thin, flat-back mirror of the same diameter. Table 2.5 gives the char-
+acteristics of several thin meniscus mirrors. Included in the table is the Russian Bolshoi 
+Teleskop Alt-azimutal’ny (BTA-6) 6 m primary mirror, which is a meniscus with ζ = 10. 
+That mirror is often classed as a classical solid design. Note that the Keck mirror charac -
+teristics are for one of the segments, not for the entire mirror.
+The surface curvature of a thin, meniscus mirror slightly increases the weight in com -
+parison to a right-circular cylinder mirror of the same diameter. Even for a relatively fast 
+mirror with fno of 2, the increase in weight is less than 2% when compared to a thin plane-
+parallel mirror. The weight WMS of a thin meniscus mirror is given approximately by
+ 
+W D
+f
+MS
+no
+≅+ /uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239Fπ ρ ζ4 1 1
+128
+3
+()  (2.42)
+All terms here have been defined earlier.
+At constant weight, the stiffness of a thin meniscus mirror is smaller than that of a thin, 
+flat-back mirror of the same size. For instance, at a focal ratio of f/2, a 500 mm meniscus 
+mirror with a constant thickness of 28 mm has about 1.3 times more self-weight deflection 
+than a thin, flat-back mirror of the same diameter and an edge thickness of 36 mm. Both 
+mirrors in this case are of identical weight.
+For variable orientation applications, such as terrestrial telescope mirrors, the curved 
+shape of a thin meniscus mirror induces additional problems. When the mirror is moved 
+away from the zenith or axis-vertical position, gravity induces bending in the vertical 
+direction of the mirror surface, while the horizontal direction is not affected. The verti -
+cal bending changes the radius of curvature in the vertical direction with respect to the 
+horizontal direction. This gravity bending induces astigmatism into the optical surface of 
+the mirror.
+The approximate location of the center of gravity CGMS of a thin concave meniscus mir -
+ror without a central hole is given by the following equation:
+ 
+CG MS
+no
+no
+D f
+f≅ /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
++/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F2
+16
+16
+()
+()
+ζ
+ζ  (2.43)
+The presence of a central hole in this mirror would shift the location of the CG. This 
+effect is small for most mirrors with central hole diameters <25% of the mirror diam -
+eter. Design Example 2.7 considers this effect. Schwessinger (1991) defined the actual CG 
+TABLE 2.5
+Characteristics of Some Large Thin Meniscus Mirrors for Astronomical Telescopes
+Mirror Diameter, D (m) Thickness, h (mm) Aspect Ratio, ζ Focal Ratio, fno Material 
+Keck (segment) 1.8 m hexagon 76 24 20 Zerodur
+ESO NTT 3.58 240 15 2.2 Zerodur
+BTA-6 6 600 10 4 Borosilicate
+ESO VLT 8.2 175 47 1.8 Zerodur
+Gemini 8.1 200 41 1.8 ULE
+Subaru 8.4 200 42 1.8 ULE
+
+=== BOOK PAGE 106 ===
+82 Opto-Mechanical Systems Design
+location for the same mirror as in that example to be 232 mm from the mirror edge. This 
+indicates that the accuracy of Equation 2.43 is about ±1%.
+As a general rule, the gravity-induced astigmatism of a mirror is minimized by support-
+ing the mirror through the plane of its CG (see Mack, 1980). Iraninejad et al. (1987) showed 
+that the axial supports for the Keck 10 m telescope primary mirror segments should be 
+placed in central pockets in the mirror backs that are deep enough to reach the neutral 
+plane passing through the segment’s CG. If the aspect ratio of the meniscus mirror is large 
+and it has a fast focal ratio, the CG may lie forward of the vertex of the mirror surface as 
+shown in the example earlier. In this situation, the CG may not be accessible so the mirror 
+support may need to be at the mirror’s edge. For very thin mirrors with fast focal ratios, the 
+position of the mirror center of curvature may be between the optical surface vertex and 
+rear circumferential edge of the mirror. In this situation, edge support through the CG of 
+the mirror is not possible. If the mirror is supported at the edge in this situation and the 
+support does not act through the CG, shear forces and bending moments are delivered to 
+the mirror. These forces and moments induce astigmatism and other aberrations into the 
+mirror surface.
+The requirement for a passive CG support limits the focal ratio of a thin meniscus mir -
+ror. If the focal ratio is too fast, the CG is not accessible, either by a central hole or edge 
+support. Figure 2.29 defines the limiting focal ratio for the plane of the CG to pass through 
+the edge of the mirror. The centers of gravity for the mirrors in this figure are coincident 
+with the rear of the mirror edge and are therefore the limiting case. This analysis does not 
+include the effect of a central hole.
+Referring once again to Table 2.5, we see that the focal ratios of many modern large 
+telescope mirrors are as fast as f/1.8 and that their aspect ratios lie between 41 and 47 . 
+According to Figure 2.29, this means that radial support through the plane of the mirror 
+CG is not possible. Schwesinger (1988) developed a sophisticated type of passive support 
+DESIGN EXAMPLE 2.7 LOCATION OF THE CG 
+OF A CONCAVE MENISCUS MIRROR
+The ESO VLT mirror diameter is 8.2 m. Its axial thickness is 175 mm and its focal 
+ratio is f/1.76. There is a 1 m diameter central hole. The mirror aspect ratio is ζ = 
+8200  mm/175  mm = 46.9. Ignore the central hole and locate the CG location with 
+respect to the front edge of the mirror. Where is it with respect to the mirror vertex?
+From Equation 2.43,
+ 
+CG MS ≅ /uni23A1
+/uni23A3/uni23A2
+/uni23A4
+/uni23A6/uni23A5
++/uni23A1
+/uni23A3/uni23A2
+/uni23A4
+/uni23A6/uni23A5=8200
+2
+16 17 64 69
+16 17 64 69 233() (. ).
+() (. )( .) .00m mf romt he mi rrore dg e
+The focal length of the mirror is
+ ( fno)(diameter) = (1.76)(8.2) = 14.43 m
+Its radius is then twice this or 28.86 m.
+The sagittal depth of the concave surface of the mirror is approximately
+ r 2/2R = (4.12)/[(2)(28.86)] = 0.2912 m = 291.2 mm
+The CG is then 291.2 − 233.0 = 58.2 mm in front of the mirror vertex.
+
+=== BOOK PAGE 107 ===
+83Large Mirror Design
+to minimize astigmatism for these thin mirrors. Varying tangential support forces around 
+the edge of the mirror corrects the astigmatism and other aberrations induced by placing 
+the supports away from the plane of the CG. This is discussed in Chapter 3.
+2.6 Contoured-Back Solid Mirrors
+The baseline configuration for mirrors with flat, concave, and convex first (reflecting) sur-
+faces is the regular solid having a flat second surface. Reduction of weight by thinning 
+the baseline substrate reduces stiffness, increases self-weight deflection, and increases 
+susceptibility to acceleration forces. Hence, this technique can be used only within speci -
+fied limits. A better way to reduce the weights of front-surface mirrors is to contour the 
+second (back) surface. Figure 2.30 illustrates this approach for a series of six concave mir -
+rors with the same diameter DG = 2r2 and radius of curvature of the reflecting surface (R1). 
+Fabrication complexity increases from left to right in views (a) through (f). View (g) shows, 
+for comparison, a double-concave version that is not lightweighted.
+Yoder (2008) discussed each variation of contoured-back mirrors in turn and showed how 
+to calculate mirror volume, which, when multiplied by the appropriate density, gives the 
+mirror weight. In that reference, typical examples were given in which the mirror diameters, 
+axial thicknesses, radii of curvature of the reflecting surfaces, and material types were all the 
+same, but their R2 surfaces were variously contoured. Included were mirrors with the base-
+line flat back, a tapered back, a concentric meniscus, a meniscus with R2 < R1, a single arch 
+with a Y-axis parabolic back, a single arch with an X-axis parabolic back, a double-arch back, 
+and a double concave with R2 = −R1. Note that the latter configuration was not lightweighted; 
+it was included for comparison only. The two types of parabolic single-arch contours are 
+shown in Figure 2.31. They differ with regard to the location of the vertex of the parabola.
+5040
+Mirror aspect ratio (ζ)
+Maximum focal ratio
+3020
+1.0
+1.5
+2.0
+2.5
+3.0
+3.5
+FIGURE 2.29
+Relationship between maximum focal ratio and mirror aspect ratio.
+
+=== BOOK PAGE 108 ===
+84 Opto-Mechanical Systems Design
+The last referenced calculations allow direct comparisons of relative weights for the 
+different designs for one particular set of opto-mechanical parameters. Table 2.6 summa -
+rizes the results of this analysis by showing the volumes, weights, and weights relative to 
+the baseline configuration for these optically equivalent mirrors. The data indicate that 
+a single-arch mirror with an X-axis parabolic back surface (vertex at the mirror’s rim) 
+(e) (f) (g)
+Y
+X
+X3
+R2
+S2S1 tA
+R1R1
+R1
+r1
+y2
+S1S1
+r1
+Y2
+rM
+tE
+tZtA
+tEtE
+X2X2
+y3
+tA
+Parabolic
+arch
+Parabolic
+arch
+Parabolic
+arch
+DG =2 r2
+(a) (b) (c) (d)
+Y
+X
+R1R1R1
+DG =2 r2
+R2
+R2
+r1
+t1 S2S2
+R1
+S1
+tA
+tE
+S1
+tA
+tE
+S1
+tA
+tE
+S1
+tA
+tE
+FIGURE 2.30
+Examples of concave mirrors with weight reduced by contouring the rear surface. (a) Baseline with flat rear sur-
+face, (b) tapered (conical) rear surface, (c) concentric spherical front and rear surfaces with R2 = R1 + tA, (d) spheri-
+cal rear surface with R2 < R1, (e) single-arch configuration, (f) double-arch configuration, and (g) double-concave 
+configuration (not lightweighted) for comparison. (From Yoder, P .R., Jr., Mounting Optics in Optical  Instruments, 
+2nd edn., SPIE Press, Bellingham, WA, 2008.)
+
+=== BOOK PAGE 109 ===
+85Large Mirror Design
+is  lighter in weight than all other configurations listed. Its weight advantage over the 
+Y-axis single-arch version is, however, minimal.
+The reader is referred to the detailed treatment by Cho and Richard (1990) for informa -
+tion about the effect of changing rear surface contours on the mirror’s opto-mechanical 
+performance, including variations of axis orientation with respect to the gravity vector. 
+One relationship of particular interest allows the self-weight axial deflection of a con -
+toured-back mirror to be scaled to a new version as the mirror size (but not configuration) 
+is varied. This relationship is
+ 
+δ ρ
+ρ δ= /uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F()
+REF
+REF
+REF
+REF
+E
+E
+A
+A  (2.44)
+where δREF, EREF, AREF, and ρREF are the rms deflection, Young’s modulus, cross-sectional 
+area, and density of the initial (reference) mirror, respectively. The same parameters with-
+out subscripts pertain to the new mirror.
+tA =3 .000
+y2 =7 .500
+X2 =3 .065tE =0 .500
+R1 = 72.000
+r1 =1 .500
+P2
+P1
+Y
+X
+9.000
+1.226
+1.149
+A
+Circle
+6.187
+6.000
+B
+X-axis
+parabola
+Centroid-X par.
+Centroid-Y par.
+Y-axis
+parabola
+Axis
+FIGURE 2.31
+Three possible contours ( X-axis parabola, Y-axis parabola, and circle) for the single-arch mirror plotted to the 
+same scale. Dimensions are inches and apply to the designs summarized in Table 2.11. (From Yoder, P .R., Jr., 
+Mounting Optics in Optical Instruments , 2nd edn., SPIE Press, Bellingham, WA, 2008.)
+
+=== BOOK PAGE 110 ===
+86 Opto-Mechanical Systems Design
+Meinel (1971) indicated that single-arch mirrors offer minimum mass telescope designs 
+when combined with Meinel type structures in Cassegrain telescopes. In this configura -
+tion, structure is reduced to a minimum by center hub mounting of the primary mirror 
+with the primary baffle forming part of the structure. Vanes connect the primary to the 
+secondary baffle. Single-arch mirrors with Meinel structures are used in several space 
+telescopes such as the 850 mm Spitzer Space Telescope.
+According to Anderson et  al. (1982), the self-weight deformation of the single-arch 
+mirror when subjected to gravity normal to the mirror surface, that is, parallel to the 
+optical axis, is almost entirely radial and produces primarily focus shift. Gravity deflec -
+tion of the single arch is easy to predict (see Steir et al., 1998). By testing the mirror face 
+up and face down, it is possible to subtract out gravity deflections. This type of testing 
+is relatively straightforward because the center hub mirror support is stiff and sim -
+ple. Thermal response of the single arch also is simple; a radial temperature gradient 
+produces mostly focus. Telkamp and Applewhite (1992) showed that a simple central 
+heater can provide a highly reliable means of adjusting focus in a space telescope with 
+a single-arch primary.
+Materials used for single-arch mirrors include beryllium, aluminum, metal matrix com-
+posites, as well as low-CTE glasses and glass ceramics. Single-arch mirrors in diameters 
+up to about 1.5 m are used in terrestrial observatories (see Carter, 1972). Single-arch mir -
+rors used in space applications are smaller; for instance, 350 mm for the Mars Observer 
+Camera, 400 mm for the STAR-LITE, and 850 mm for the Spitzer. The latter is an example 
+of an ultra-lightweight single arch. It has an outer diameter of 850 mm, a central hole diam-
+eter of 290 mm, and a central thickness of 40 mm. Weight of the mirror is 14 kg (30.8 in.). 
+The mirror material is O-30 beryllium.
+Research reported by Duncan (1970) indicated that the double-arch shape provided opti-
+mum stiffness to weight. Further research refined the design and a patent was issued in 
+1978 to Talapatra on the basic concept. Few double-arch mirrors are in use despite the 
+superior stiffness-to-weight when compared to other contoured-back shapes.
+Duncan (1970) showed that the double-arch mirror configuration provided optimum 
+stiffness to weight. Talapatra (1975) and Meinel et al. (1980) refined the design. A patent 
+on the basic concept was issued in 1978 to Talapatra. Few double-arch mirrors are in use 
+TABLE 2.6
+Comparison of Volumes and Weights of Contoured-Back Mirrors of Equal Overall Dimensions 
+and Concave Radius,a but with Back Surfaces Contoured as Depicted in Figure 2.30
+Configuration Figure View Volume (in.3) Weight (lb) Relative Weight (%) Pearson’s Ratiob 
+Flat back (baseline) (a) 835.2 66.6 100 4.9
+Tapered back (b) 456.0 36.3 55 8.9
+Concentric meniscus (c) 766.3 61.1 92 5.3
+Meniscus (R2 < R1) (d) 460.3 36.7 55 8.8
+Single-arch (Y-axis parabolic) (e) 257.4 20.5 31 15.8
+Single-arch (X-axis parabolic) (e) 239.4 19.1 29 16.9
+Double-arch (f) 389.2 31.0 47 10.4
+Double concave 
+(not lightweighted)
+(g) 906.9 72.3 109 4.5
+Source: Volume and weight data from Yoder, P .R., Jr., Mounting Optics in Optical Instruments , 2nd  edn., SPIE 
+Press, Bellingham, WA, 2008.
+a DG = 18.0 in., tA = 3.0 in., R1 = 72.0 in., Corning ULE.
+b Defined in Section 2.9.
+
+=== BOOK PAGE 111 ===
+87Large Mirror Design
+despite their superior stiffness-to-weight when compared to other contoured-back shapes. 
+Some space systems, such as a 920 mm UV telescope described by Muffoleto (1979) and the 
+0.5 m HiRISE (Ebben et al., 2007), do employ double-arch primary mirrors.
+2.7 Structured Lightweight Mirrors
+2.7.1 Sandwich Mirrors
+A mirror lightweighted with a cellular or a cored cross section is structurally more efficient 
+than its equivalent-sized solid version. Mirrors of this type are frequently called honeycomb 
+structures. Provision of axial supports (parallel to the axis), radial supports (normal to the 
+axis), and defining supports pose major design issues. Some designs have the supporting 
+forces applied within the interior of the substrate at or near the neutral surface where grav-
+itational moments of the localized volumes are balanced. Gross material density near the 
+neutral surface of the mirror that contributes little to bending stiffness is usually reduced 
+by lightweighting. Shear deflections are then increased. They may then partially offset the 
+bending stiffness improvement. Since mirror weight is reduced, the net stiffness-to-weight 
+ratio generally improves.
+Five basic built-up structures used for lightweight cellular mirrors were shown in 
+Figure 2.2. In some designs, the core (here frequently referred to as the web) is integral 
+with the front face sheet and unneeded material is machined away. In others, the core is 
+made as a separate part and completely or partially attached to those sheets. Attachment 
+means for the latter types of construction include fusion bonding, frit bonding, adhesive 
+bonding, and (for metal mirrors) brazing and welding. The geometric parameters avail -
+able to the designer for lightweighting a mirror are material characteristics; face-sheet 
+thickness; rib height, spacing, and thickness; and cell size and pattern. Referring back to 
+Figure 2.4, we see in views (b) through (d) the three commonly used cell patterns for most 
+cellular mirrors. View (a) of that figure shows the key cross-sectional dimensions of any 
+cell in the models. These dimensions are as follows: tF is the front face-sheet thickness, tFB is 
+the back face-sheet thickness, tW is the core wall thickness, hC is the core height, and NA is 
+the distance from the front of the mirror to the neutral surface.
+For any cell shape, the mirror’s rib solidity ratio η and the effective thickness TM are 
+defined as
+ 
+η≈ 2 t
+B tBW
+W, ≪  (2.45)
+ Tt th ttMFFB CF FB== +≠η for  (2.46a)
+ Tt ht ttMC FF B=+ ==2 η for  (2.46b)
+Given these parameters, the location of the neutral surface can be estimated as
+ 
+N
+t t t ht h h t
+T ttA
+F
+FB
+FB
+CF C
+C
+F
+M
+F=
+++ +/uni239B
+/uni239D/uni239C /uni239E
+/uni23A0/uni239F++ /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+/uni23A1
+/uni23A3/uni23A2
+/uni23A4
+/uni23A6/uni23A5
+≠
+2
+22 2η
+for FFB  (2.47a)
+
+=== BOOK PAGE 112 ===
+88 Opto-Mechanical Systems Design
+If tF equals tFB,
+ 
+N h tA
+C
+F= /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F+2  (2.47b)
+Figures of merit used for lightweight mirror design include the unit volume V0, stiffness 
+EI0, and structural efficiency V0/I0. Mirror weight is determined by unit volume V0, while 
+self-weight deflection is proportional to V0/I0 (at least for mirrors where shear deformations 
+are small). The use of a lightweight mirror structure usually reduces the stiffness EI0. This 
+effect is offset in many designs by reduced unit volume V0. The reduction in mirror stiffness 
+associated with lightweight designs may mean additional difficulty in mounting and fabri-
+cation. Lightweight mirrors are normally specified by weight, by self-weight deflection, or by 
+fundamental frequency (which is related to self-weight deflection). The reduction in stiffness 
+associated with achieving these specifications is often an unwelcome feature of the design.
+The stiffness and structural efficiency of sandwich mirrors are the highest of any type of 
+mirror configuration. At constant weight, the structural efficiency of sandwich mirrors of 
+optimum design can be a factor of three or more better than solid mirrors. At constant thick-
+ness, sandwich mirrors of optimum design can be more than twice as stiff as solid mirrors.
+Structural efficiency of a sandwich mirror is calculated using the equivalent bending 
+stiffness. Equivalent bending stiffness is the thickness of a solid mirror of the same flex -
+ural rigidity. The equivalent bending stiffness tB is related to the flexural rigidity DLW of a 
+lightweight mirror by
+ 
+D Et
+LW
+B=
+−()
+3
+212 1 ν
+ (2.48)
+For a conventional sandwich mirror with a ribbed shear core, the design parameters are 
+the thickness of the face and back sheets, rib thickness, and cell size. Cell size is specified 
+by size of the largest circle than can be inscribed inside the cell, with the cell walls tan -
+gential to the circle. Diameter B is related to the length of one side of the shear core cell for 
+triangular, square, and hexagonal cell geometries by
+ 
+B L
+triangular =
+3
+ (2.49a)
+ BLsquare =  (2.49b)
+ BLhexagonal = 3  (2.49c)
+According to Sheng (1988), the relative efficiencies of the different shear core cell geom-
+etries are controversial. It is usually assumed that mirror stiffness is independent of the core 
+geometry for constant weight shear cores. The rib solidity ratio η is a dimensionless relation-
+ship between the rib thickness tW and the inscribed circle diameter B. Use of this dimension-
+less ratio simplifies analysis of the complex structure of a sandwich mirror. It is given by
+ 
+η= +()
++()
+tB t
+Bt
+WW
+W
+2
+2  (2.50)
+
+=== BOOK PAGE 113 ===
+89Large Mirror Design
+Figure 2.32 depicts the rib solidity ratio for various values of B and tW. When tW is much 
+smaller than B, the rib solidity ratio is given approximately by η ≈ 2tW/B. This approxima-
+tion is often used for preliminary design or for quick estimates of mirror stiffness. With 
+today’s technology, a reasonable lower limit for the rib solidity ratio is about 0.04. This cor-
+responds to B/tW = 50. When the inscribed circle diameter equals the rib thickness, the rib 
+solidity ratio is 0.75; this is a nominal upper limit for a lightweight mirror. Alternatively, the 
+shear core of a light mirror is specified by the core pitch. The core pitch PC is defined as the 
+center-to-center spacing of the unit cells. Core pitch is given by PC = B + tW.
+Symmetry is an important simplification factor in analysis of lightweight sandwich 
+mirrors. Symmetry for a lightweight sandwich mirror means that the face and back 
+sheets are of the same thickness, that the inscribed circle diameter is constant, and that 
+the rib thickness also is constant. Analysis of nonsymmetric sandwich mirrors is sig -
+nificantly more complex than that for symmetric mirrors. Moreover, mirror performance 
+is not improved with nonsymmetric design. Manufacturing constraints sometimes are 
+responsible for lack of symmetry. For example, it may be desirable to make the face-sheet 
+thickness greater than that of the back sheet to allow for greater material removal during 
+grinding and polishing of the optical surface to remove subsurface defects or to reduce 
+potential quilting effects.
+B =7
+Cell wall thickness, t W (in.)
+tW
+tW
+tW
+B
+B
+B
+0.06
+0
+0.1
+0.2
+0.3
+0.4
+Rib solidarity ratio, η
+0.5
+0.6
+0.7
+0.8
+1.0 2.0
+B =6
+B =5
+B =4
+B =3
+B =2
+B =6
+FIGURE 2.32
+Variation of web solidity ratio η as a function of cell wall thickness tW and inscribed circle diameter B. (From 
+Vukobratovich, D., Lightweight mirror design, in Handbook of Optomechanical Engineering, Ahmad, A., Ed., CRC 
+Press, Boca Raton, FL, 1997 , Chapter 5.)
+
+=== BOOK PAGE 114 ===
+90 Opto-Mechanical Systems Design
+For a symmetrical sandwich mirror, the equivalent bending thickness is given by
+ 
+tt hhBF CC
+3 3 321 2=+() −−/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+η  (2.51)
+where
+tF is the face-sheet thickness
+hC is the depth of the shear core, measured from back of the face to front of the back sheet
+Using the aforementioned definition, the structural efficiency V0/I0 of a sandwich mirror 
+is given by
+ 
+V
+I
+th
+t
+FC
+B
+0
+0
+3
+12 2= +() η  (2.52)
+The weight of a sandwich mirror is given by the product of the unit volume, face area, 
+and density. The unit volume V0 for a lightweight sandwich mirror, assuming both face 
+and back sheets are the same thickness is
+ Vt hFC0 2=+ η  (2.53)
+The stiffness of a sandwich mirror is EI0, where I0 is given by
+ 
+I
+th hFC C
+0
+3 321 2
+12=
++() −−/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+η
+ (2.54)
+Optimum face-sheet thickness for maximum stiffness is given by equations from Mehta 
+(1987). These relationships give the best tF for a given mirror size, weight, and rib solidity 
+value and are as follows:
+ 
+t W
+A ffF = () () =
+()
+/uni23A1
+/uni23A3
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+ρ ηη
+− η −− η
+− η −− η
+wh ere
+1 2 1
+21 2 1
+3
+ (2.55)
+All terms in these equations have been defined earlier. Figure 2.33 shows the variation of 
+function f(η) for 0.04 ≤ η ≤ 0.75. Note that the optimum face-sheet thickness for one value 
+of the rib solidity ratio does not necessarily imply the best stiffness-to-weight. It is usually 
+necessary to evaluate the mirror geometry parametrically, varying rib solidity ratio as well 
+as face-sheet thickness, to arrive at the best stiffness-to-weight.
+For some values of face-sheet thickness and rib solidity ratio, the structural efficiency of 
+a sandwich mirror is superior to that of a solid mirror of the same thickness. Figure 2.34 
+gives the ratio of structural efficiency for solid and sandwich mirrors of comparable 
+thickness for values of the rib solidity ratio of 0.04 ≤ η ≤ 0.75 and for face-sheet thickness 
+ratios that are between 0.05 and 0.25 of the mirror thickness. That figure shows that the 
+
+=== BOOK PAGE 115 ===
+91Large Mirror Design
+structural efficiency of sandwich mirrors can be as much as 2.5 times greater than that of 
+a solid mirror of the same height; it also shows that some sandwich mirrors can be inferior 
+in stiffness to solid mirrors of the same height. This analysis neglects shear effects, which 
+can be substantial in lightweight mirrors.
+Shear deformations in lightweight mirrors can be larger than deformations from bend -
+ing. It is necessary to include shear corrections in any analysis of lightweight mirror per -
+formance. Shear corrections will vary with the type of mirror support, as well as with 
+the geometry of the lightweight mirror. An approximation for the maximum self-weight 
+0.80.6
+Rib solidity ratio (η)
+Function, f (η)
+0.40.2
+0.10
+0.15
+0.20
+0.25
+0
+0
+FIGURE 2.33
+Relationship between function f(η) and rib solidity ratio η for 0.4 ≤ η ≤ 0.75.
+0.8
+0.25
+0.20
+0.05
+0.6
+Rib solidity ratio
+Structural eﬃciency sandwich/solid (V0/I0)
+tF
+0.40.20
+0.5
+1.0
+1.5
+2.0
+2.5
+0.10
+0.15
+FIGURE 2.34
+Ratio of structural efficiency, V0/I0, sandwich mirror/solid mirror, for rib solidity ratios 0.04 ≤ η ≤ 0.75 and face-
+sheet thickness 0.05–0.25 of overall mirror thickness. Both sandwich and solid mirrors are of the same height, tM.
+
+=== BOOK PAGE 116 ===
+92 Opto-Mechanical Systems Design
+deflection δ including bending effects (the first term) and shear effects (the second term) 
+for a right-circular mirror on N point supports is given in the following:
+ 
+δ= /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F+ /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+/uni239B
+/uni239D
+/uni239C
+/uni239E0 025 3 06 5
+4 2 2
+0
+.. W
+A
+r
+DN
+W
+A
+r
+SG AFC /uni23A0/uni23A0
+/uni239F/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+3
+N  (2.56)
+where
+W is the mirror weight
+A is the mirror face area
+r is the mirror radius
+DF is the mirror flexural rigidity
+SC is the shear coefficient
+G is the shear modulus
+A0 is the unit cross-sectional area/unit width
+For a conventional solid mirror, the shear and area parameters are
+ 
+SC = +()
++
+10 1
+12 11
+ν
+ν  (2.57a)
+ Ah0 =  (2.57b)
+For a lightweight sandwich mirror, the area parameter is
+ 
+A Bt th t
+Bt
+Wf CW
+W
+0
+2= +() +
++  (2.58)
+The shear parameter is given by the following equations:
+ 
+S t
+h
+C
+f
+c
+=
++
+1
+1 4
+η  
+(2.59)
+Shear deflections in lightweight mirrors can greatly exceed bending deflections, depend-
+ing on the mirror aspect ratio and core geometry. In designing lightweight mirrors, meth-
+ods based on bending are at best a rough approximation. More complex models including 
+shear effects are necessary for accurate design. Doyle et al. (2012) indicate that accurate 
+FEA requires care when adding shear effects to the mirror model.
+Figures 2.35 and 2.36 are the results of parametric studies of a 1 m diameter lightweight 
+sandwich fused silica mirror. A shear core rib thickness of tW = 6 mm is assumed and 
+the shear core depth hC is varied from 25 to 200 mm for both figures. In Figure 2.35, the 
+inscribed circle diameter B ranges from 25 to 100  mm, while the face-sheet thickness 
+
+=== BOOK PAGE 117 ===
+93Large Mirror Design
+0.20
+Shear core height, hC (m)
+0.150.100.050
+0
+0.10
+0.20
+Deﬂection ratio, sandwich/solid
+0.30
+0.40 25
+50
+75
+100
+B
+0.50
+FIGURE 2.35
+Deflection ratio of a lightweight sandwich mirror compared to that of a solid mirror of identical weight, for a 
+1 m diameter fused silica mirror on a three-point support. The face-sheet thickness tF of the sandwich mirror 
+is 6 mm and its shear core rib thickness tW is 6 mm. The shear core height hC is varied from 25 to 200 mm. The 
+inscribed circle diameter B is varied from 25 to 100 mm.
+Shear core height, hC (m)
+0.20
+6
+12
+18
+24
+tF
+0.150.100.050
+0
+0.20
+0.40
+0.60
+0.80
+Deflection ratio, sandwich/solid
+FIGURE 2.36
+Deflection ratio of a lightweight sandwich mirror compared to that of a solid mirror of identical weight, for a 
+1 m diameter fused silica mirror on a three-point support. The face-sheet thickness tF varied from 6 to 24 mm, 
+the shear core rib thickness tW is 6 mm, and the shear core height hC is varied from 25 to 200 mm. The inscribed 
+circle diameter B is 75 mm.
+
+=== BOOK PAGE 118 ===
+94 Opto-Mechanical Systems Design
+tF is kept constant at 6 mm. In Figure 2.36, the inscribed circle diameter is kept constant at 
+75 mm, while the face-sheet thickness tF is varied from 6 to 24 mm. Shear corrections are 
+included in analyzing mirror self-weight deflections. In both referenced figures, the self-
+weight deflection of the lightweight mirror on three-point supports is compared to that 
+of a solid mirror of identical weight. A deflection ratio smaller than unity implies that the 
+deflection of the lightweight is smaller than that of the solid. Figures 2.37 and 2.38 show 
+that shear limits the improvement in self-weight deflection achieved by increasing the mir-
+ror depth. For both figures, the self-weight deflection curves either flatten out or increase 
+when the mirror aspect ratio is approximately 10:1.
+Figure 2.39 shows the ratio of shear to bending deformations for the same 1 m diam -
+eter fused silica sandwich mirror as considered in regard to Figures 2.34 and 2.35. Here, 
+the shear core thickness is held constant at tW = 6 mm, while the shear core depth hC 
+is varied from 25 to 200 mm. Four different combinations of face-sheet thickness and 
+inscribed circle diameter are considered, as indicated by the labels attached to the 
+curves. This figure shows that shear deformations are comparable to or greater than 
+bending deformations for almost all sandwich mirror geometries. It is therefore neces -
+sary to include shear corrections in any design analysis of a sandwich mirror. In prac -
+tice, the magnitude of shear deformation, like bending deflection, is dependent on the 
+support geometry.
+Design of lightweight mirrors is also constrained by manufacturing limits. Two of the 
+most important manufacturing limits are the width or thickness of the ribs in the shear 
+core, and quilting. Rib thickness is an important parameter in minimizing mirror weight 
+and stiffness. Quilting is associated with the deflection of the face sheet under polishing 
+pressure, affecting both face-sheet thickness and shear core pocket size.
+Shear core height, hC (m)
+0.20
+B
+25 24
+100 6
+100 24
+25 6
+0.150.100.050
+0
+2
+Shear/bending deﬂection
+4
+6
+8
+tF
+FIGURE 2.37
+Ratio of shear to bending deflections for a fused silica 1 m diameter lightweight sandwich mirror on a three-
+point support. The face-sheet thicknesses tF are 6 and 24 mm, shear core rib thickness tW is 6 mm, and shear core 
+height is varied from 25 to 200 mm. The inscribed circle diameters B are 25 and 100 mm.
+
+=== BOOK PAGE 119 ===
+95Large Mirror Design
+0.200.150.100.050
+Shear core height, hC (m)
+Mirror weight (kg)
+250
+200
+150
+100
+50
+0
+100
+100
+25
+25
+B tF
+24
+6
+24
+6
+FIGURE 2.38
+Weight of a fused silica 1 m diameter lightweight sandwich mirror. The face-sheet thicknesses tF are 6 and 
+24 mm, shear core rib thickness tW is 6 mm, and shear core height is varied from 25 to 200 mm. Inscribed circle 
+diameters B are 25 and 100 mm.
+0.75
+Rib solidity ratio
+0.400.05
+0.2
+0.4
+0.6
+0.8
+1.0
+5% 10%
+15%
+20%
+25%
+Stiﬀness ratio
+FIGURE 2.39
+Ratio of stiffness, open back/solid, for mirrors of equal total thickness; 0.05 ≤ η ≤ 0.075, and for face-sheet thick-
+ness ranging from 5% to 25% of the mirror thickness.
+
+=== BOOK PAGE 120 ===
+96 Opto-Mechanical Systems Design
+Design of a lightweight sandwich mirror usually begins by selecting a minimum rib 
+thickness, tW, set by manufacturing limits. In general, the lowest weight is obtained with 
+minimum rib thickness. Table 2.7 gives minimum rib thickness for a variety of materials 
+and manufacturing processes.
+After selecting the minimum rib thickness, the next concerns are the sizes of the pock -
+ets (assumed to all be the same size) and the face-sheet thickness. For standard optical 
+production processes, under polishing pressure, the face sheet between the ribs deflects 
+more than directly over the ribs. A permanent periodic pattern of deflections is pro -
+duced in the mirror, corresponding to the shear core pocket geometry. Under optical 
+testing, this periodic pattern of deflection resembles the squares of a quilt and hence use 
+of the term quilting. The magnitude of the maximum deflection δC produced by polish -
+ing pressure P depends on the pocket size, face-sheet thickness, and core geometry and 
+is given by
+ 
+δ
+ψν
+C
+F
+PB
+Et=
+−()12 1 24
+3  (2.60)
+where ψ is a mirror cell or pocket geometry parameter. Values are listed in Table 2.3 and 
+are repeated here as follows: ψtriangular  = 0.00151, ψsquare = 0.00126, and ψhexagonal = 0.00111.
+Quilting errors are relatively small and periodic, acting similar to a diffraction grat -
+ing. These periodic errors scatter light from the central maximum of the diffraction disk. 
+Quilting degrades the Strehl ratio, SR, which is the ratio of the actual to the theoretical 
+energy in the central maximum of the diffraction disk. According to Krim and Russo 
+(1983), with quilting, the Strehl ratio, SR, is given by
+ 
+sR
+C
+CC
+=−
+/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+− /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+− /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F
+1
+4 2
+12 2 14 2
+2
+2
+2
+2
+2
+π δ
+λ
+π δ
+λ π δ
+λ
+22/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+ (2.61)
+where λ is the pertinent wavelength of light and all other terms have been defined earlier.
+TABLE 2.7
+Minimum Shear Core Rib Thickness for Mirrors Made by Various 
+Technologies and from Various Materials
+Technology Material Rib Thickness (mm) 
+Pressure fusion molded 
+(HEXTEK process)
+Borosilicate 0.5–1.3
+Cast Borosilicate 12
+Spin cast Borosilicate, ULE, Zerodur 12
+Machined open back Zerodur 2–5
+Gas fused boules/water jet ULE 0.5–1
+Machined open back Beryllium 0.5
+Machined open back Chemical-vapor-deposited- or 
+reaction-bonded silicon carbide
+2
+
+=== BOOK PAGE 121 ===
+97Large Mirror Design
+2.7.2 Open-Back Configurations
+Open-back mirrors consist of a thin face sheet reinforced or stiffened with a regular array of 
+perpendicular ribs forming open pockets or cells in the back of the mirror. Pocket geometry 
+can be triangular, square, or hexagonal. Open-back mirrors are more common than sand -
+wich mirrors because fabrication is usually less difficult than the more complex sandwich 
+structure. One of the most famous applications of an open-back mirror is the primary mirror 
+for the 5 m Hale telescope at Mt. Palomar observatory. That mirror is shown in Figure 2.8.
+Bending stiffness of an open-back mirror is analyzed using methods similar to those 
+employed for sandwich mirrors. Key parameters in the design of an open-back mirror are 
+the face-sheet thickness, rib thickness, and cell size. The rib solidity ratio for an open-back 
+mirror is determined using the same equation as for a sandwich mirror. Similarly, the 
+stiffness of an open-back mirror is determined using the concept of equivalent bending 
+thickness in the flexural rigidity equation. The lack of a back sheet changes the equation 
+for equivalent bending thickness with respect to that of a sandwich mirror. For an open-
+back mirror, the equivalent bending thickness tB is given by
+ 
+t
+t h th
+t hB
+F
+C
+FC
+F
+C
+3
+4
+4 4
+1 22 2
+2
+=
+−/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F−/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F++ ()
++
+ηη η
+η  (2.62)
+where
+tB is the equivalent bending thickness of the lightweight mirror
+η is the rib solidity ratio
+tF is the face-sheet thickness
+hC is the rib height from the mirror back to the back of the face sheet
+The unit volume V0 of an open-back lightweight mirror is given by
+ Vt hFC0 =+ η  (2.63)
+The stiffness of an open-back mirror is EI0, where I0 is given by
+ 
+I
+t h th
+t h
+F
+C
+FC
+F
+C
+0
+4
+4 4
+1 22 2
+12 2
+=
+−/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F−/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F++ ()
++/uni239B
+/uni239D/uni239C /uni239E
+/uni23A0/uni239F
+ηη η
+η  (2.64)
+Combining these equations, the structural efficiency V0/I0 of an open-back mirror is
+ 
+V
+I
+th t h
+t h t
+FC F
+C
+F
+C
+F
+0
+0 4
+4
+12 2
+1 22 2
+=
++() +/uni239B
+/uni239D/uni239C /uni239E
+/uni23A0/uni239F
+−/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F−/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F+
+η η
+ηη η ++() hC
+4
+ (2.65)
+The stiffness of open-back mirrors is lower than those of sandwich lightweight mir -
+rors. This is simply because they lack a back sheet. At constant height, the stiffness of 
+an open-back mirror is inferior to that of a solid mirror. This is shown in Figure 2.39 for 
+
+=== BOOK PAGE 122 ===
+98 Opto-Mechanical Systems Design
+representative values of the rib solidity ratio 0.04 ≤ η ≤ 0.075 and for face-sheet thickness 
+of 5%–25% of the total mirror thickness. Maximum stiffness is about 80% of that of a solid 
+mirror with the same thickness.
+The low stiffness of the open-back mirror is partially offset by a large reduction in unit 
+volume. The structural efficiency of an open-back mirror can be favorable because it is the 
+ratio of unit volume divided by the unit cross section moment of inertia. Very low areal 
+densities can be achieved with open-back mirrors, while, at the same time, the favorable 
+structural efficiency minimizes self-weight deflection. These attributes are offset by the 
+poor stiffness of the open-back structure, making support and fabrication difficult. Under 
+some circumstances, the open-back mirror is an example of the single property fallacy  in 
+engineering, where optimization of a single parameter (such as areal density) leads to 
+significant complications in other aspects of the design.
+Lack of symmetry in the structure of an open-back mirror makes optimization more 
+difficult than for a symmetric sandwich mirror. The relationship for optimum face-sheet 
+thickness, rib solidity ratio, and core depth is given in Equation 2.72. This equation is 
+solved numerically to determine the optimum mirror structure parameters:
+4 2 1 22
+1
+2
+3
+3 3
+t h t h th
+f
+C
+f
+C fC
++/uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F+/uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F−/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F+ −() +()/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4η η η
+/uni23A6/uni23A6
+/uni23A5
+/uni23A5
+−− /uni239B
+/uni239D/uni239C/uni239E
+/uni23A0/uni239F−/uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F+ +
+()/uni23A1
+/uni23A3
+/uni23A2
+/uni23A2
+/uni23A4
+/uni23A6
+/uni23A5
+/uni23A5
+=1
+2 1 22 2
+04
+4 4
+η η ηt h th
+f
+C fC
+  
+  (2.66)
+0.200.150.100.050
+Deflection ratio, open back/solid
+Shear core height, hC (m)
+100
+75
+50
+25
+B (mm)
+0.05
+0.10
+0.15
+0
+FIGURE 2.40
+Deflection ratio of a lightweight open-back mirror to a solid mirror of identical weight, for 1 m diameter 
+fused silica mirror on a three-point support. The face-sheet thickness tF is 6 mm, shear core rib thickness tW 
+is 6 mm, and shear core heights hC is varied  from 25 to 200 mm. Inscribed circle diameter B is varied from 
+25 to 100 mm.
+
+=== BOOK PAGE 123 ===
+99Large Mirror Design
+As for the sandwich mirror, shear deformations in an open-back mirror are significant, 
+often being larger than the mirror’s bending deformations. The same approximation 
+equation used for sandwich mirrors (Equation 2.59) can be used for open-back mirrors. 
+Different shear and area parameters are necessary for the open-back mirror in comparison 
+with the sandwich mirror. According to Barnes (1969), the area parameter A0 for the open-
+back mirror is somewhat similar to that of a sandwich mirror:
+ 
+A Bt th t
+Bt
+Wf CW
+W
+0 = +() +
++  (2.67)
+The shear parameter for the open-back mirror is given by
+ 
+S u
+DD DD
+C = ++ +12 34
+ (2.68)
+ um=+ () +()10 11 4
+2
+ν  (2.69)
+ Dm mm10
+2312 96 276 192=+ ++  (2.70)
+ 
+Dm mm2
+2311 88 248 216=+ ++()ν  (2.71)
+ 
+Dn mm3
+2230=+ ()  (2.72)
+ 
+Dn mm m4
+22 310 45=+ +()ν  (2.73)
+ 
+m Bt t
+tt h
+Wf
+Wf C
+= +()
++()
+ (2.74)
+ 
+n Bt
+th
+W
+fC
+= +
++  (2.75)
+Figures 2.41 and 2.42 are the results of parametric studies of a 1 m diameter lightweight 
+open-back fused silica mirror. A shear core rib thickness of tW = 6 mm is assumed and 
+the shear core depth hC is varied from 25 to 200 mm in both figures. In Figure 2.41, the 
+inscribed circle diameter B is constant at 75 mm,  while the face-sheet thickness tF is kept 
+constant at 6 mm. In Figure 2.42, the inscribed circle diameter B is kept constant at 75 mm, 
+while the face-sheet thickness tF is varied from 6 to 24 mm. Shear corrections are included 
+in analyzing mirror self-weight deflections. In both figures, the self-weight deflection of 
+the lightweight mirror on a three-point support is compared to that of a solid mirror of 
+identical weight. A deflection ratio smaller than unity implies that the deflection of the 
+lightweight is smaller than that of the solid mirror. Figures 2.41 and 2.42 show that shear 
+limits the improvement in self-weight deflection achieved by increasing mirror depth.
+Figure 2.43 gives the ratio of shear to bending deformations for the same 1 m diameter 
+fused silica open-back mirror, as in Figures 2.41 and 2.42. Here, the shear core thickness 
+is held constant at tW = 6 mm, while the shear core depth hC is varied from 25 to 200 mm. 
+
+=== BOOK PAGE 124 ===
+100 Opto-Mechanical Systems Design
+0.20.150.10.050
+0
+0.1
+0.2
+0.3
+0.4
+Shear core height, hC (m)
+Deﬂection ratio, open back/solid
+tF (mm)
+24
+18
+12
+6
+FIGURE 2.41
+Deflection ratios for lightweight open-back and solid configurations for 1 m diameter fused silica mirrors of  identical 
+weight on a three-point support. The face-sheet thicknesses tF are varied from 6 to 24 mm, shear core rib thickness tW 
+is 6 mm, and shear core depths hC are varied from 25 to 200 mm. The inscribed circle diameter B is 75 mm.
+0.20
+100  6
+100  24
+25    6
+25    24
+0.20
+0.15
+0.15
+0.10
+0.01
+0.05
+0.05
+0
+0
+Shear core height, hC (m)
+B,   t (mm)
+Ratio of shear to bending deﬂections
+FIGURE 2.42
+Ratio of shear to bending deflections in a fused silica 1 m diameter open-back mirror on a three-point support. 
+The face-sheet thicknesses tF are 6 and 24 mm, the shear core rib thickness tW is 6 mm, and the shear core heights 
+hC varied from 25 to 200 mm. The inscribed circle diameters B are 25 and 100 mm.
+
+=== BOOK PAGE 125 ===
+101Large Mirror Design
+Four different combinations of face-sheet thickness and inscribed circle diameter are 
+considered: B = 25 mm and tF = 6 mm, B = 100 mm and tF = 6 mm, B = 25 mm and tF = 
+24 mm, and finally B = 100 mm and tF = 24 mm. This figure shows that shear deformations 
+are comparable to or greater than bending deformations for almost all open-back mirror 
+geometries. It is therefore necessary to include shear corrections in any design analysis of 
+a sandwich mirror. In practice, the magnitude of shear deformation, like bending deflec -
+tion, is dependent upon the support geometry.
+Holes are sometimes placed in the junctions of the ribs in the shear core of an open-back 
+mirror. This practice reduces the overall stiffness of the mirror by interrupting the conti -
+nuity of the ribs (see Schwessinger, 1968). These holes are often introduced as a means of 
+reducing weight. Any weight saving is usually offset by increased thickness of rib mate -
+rial around the hole. Another reason for holes in the rib intersections is to reduce wall 
+thicknesses in order to reduce their thermal time constants. There are also comparable 
+thickness areas in the junctions of the ribs with the face sheet. These holes do not affect the 
+thermal time constants in these areas.
+2.8 Semirigid/Active Ultra-Lightweight Mirrors
+Following the development of the HST, there was substantial interest in larger space opti-
+cal systems for a variety of missions. The size and weight of Hubble was set by the payload 
+capacity of then contemporary launch vehicles, therefore restricting the size and weight of 
+future space optical systems to not much more than that of the Hubble Optical Telescope 
+Assembly (OTA). Further, the Hubble primary mirror was considered to then be at the 
+Shear core height, hC (m)
+Mirror weight (kg)
+0.200.150.100.050
+25    24
+200
+150
+100
+50
+0
+25    6
+100  24
+100  6
+B,    tF  (mm)
+FIGURE 2.43
+Weight of a fused silica 1 m diameter lightweight open-back mirror. The face-sheet thicknesses tF are 6 and 
+24 mm, the shear core rib thickness tW is 6 mm, the shear core heights hC varied from 25 to 200 mm. The inscribed 
+circle diameters B are 25 and 100 mm as noted.
+
+=== BOOK PAGE 126 ===
+102 Opto-Mechanical Systems Design
+limit of the then current lightweight mirror technology. Primary mirrors for future large 
+space optical systems in the range of 4–8 m in aperture would require new technology.
+For these new large space optical systems, two new technologies were envisioned. These 
+were (1) segmented mirrors that could be deployed on orbit to overcome launch vehicle 
+diameter constraints and (2) ultra-lightweight mirrors using active control to maintain 
+optical figure. New optical fabrication methods were needed to make and test the mirror 
+segments. Means for sensing segment relative position as well as optical figure had to be 
+developed. Finally, lightweight, space-qualified actuators would be needed for both seg -
+ment position and optical figure control.
+Using Bely’s stiffness criteria from Table 2.2, the stiffness parameter of the proposed 
+ultra-lightweight mirrors would be between 10 −6 and 10 −9 m, requiring 10–100 actuators 
+per square meter. Such low stiffness means that conventional passive supports are imprac-
+tical. Therefore, the optical figure must be sensed and actively controlled. Mirrors of this 
+type are sometimes called semirigid since their stiffnesses are higher than those of small 
+deformable mirrors used for fast correction of optical wave front errors induced by atmo -
+spheric seeing and other effects. An important discriminator is that the bandwidth of the 
+control system associated with semirigid mirrors is on the order of a few Hertz, versus 
+hundreds of Hertz for deformable mirrors.
+In 1988, even before the launch of the HST in 1990, DARPA in the United States began the 
+LAMP at ITEK (see Plante, 1991). LAMP was intended to demonstrate new lightweight mir-
+ror technology using very thin face sheets combined with active optical figure control. The 
+mirror embodied several new technologies: a very thin face sheet with active figure control, 
+segmented design, and a graphite epoxy backup or reaction structure. Mirror diameter for 
+the LAMP was 4 m, with an f/1.25 focal ratio. Seven mirror segments made up the mirror; 
+one central hexagonal segment surrounded by six petal-shaped segments (see Figure 2.3). 
+Corning ULE was used for the face sheets, which were only 17 mm thick. Each segment 
+rested on an array of fine figure actuators. These in turn were connected to a stiff graphite 
+epoxy backup structure. The individual segments were positioned relative to each other 
+using active bipods. Although advancing large active mirror technology, the LAMP areal 
+density of about 140 kg/m2 was not a large reduction over that of the HST (ρA ≈ 180 kg/m2).
+A similar mirror demonstration project was the Adaptive Large Optics Technology 
+(ALOT) also developed at ITEK and completed in 1994 (see Cox and Ferber, 1996). ALOT 
+was a 4 m, f/1.7 circular segmented mirror. With a central circular segment and six sur -
+rounding petal-shaped segments, the configuration of ALOT was similar to that of LAMP . 
+Unlike LAMP , the ALOT demonstration comprised only the central segment and one petal. 
+All segments were open-back, machined lightweight mirror structures made of ULE, con-
+nected using fine figure actuators to a graphite epoxy composite reaction structure. Each 
+actuator used a combination of a coarse lead screw and a fine control with an electro -
+static positioner. The ranges of travel and resolution of the coarse motion were 1.5 mm and 
+170 nm, while the range of travel of the fine motion was 4 μm with a resolution of 6 nm. 
+Areal density of ALOT was reduced by a about a factor of two from LAMP to 70 kg/m2.
+In 1996 and 1997 , proposals were submitted to NASA for a Next Generation Space 
+Telescope (NGST) as a follow on to the HST (see Next Generation Space Telescope, 1997). 
+The proposed NGST would be an IR telescope that would be diffraction limited at wave -
+lengths of 2 μm and longer. The primary mirror diameter was to be between 6 and 8 m. 
+Suppression of instrumental IR background required cryogenic telescope operation 
+at <70  K. Because the maximum payload fairing diameter of existing launch vehicles 
+(Ariane) was about 4.5 m, a segmented primary mirror, deployed on orbit, would be nec -
+essary. Launch vehicle payload capacity limited primary mirror weight to about 1000 kg, 
+
+=== BOOK PAGE 127 ===
+103Large Mirror Design
+which meant that the maximum areal density would be about 20 kg/m 2 for an 8 m aper -
+ture. According to Coulter and Jacobson (2000), NASA sought to reduce the areal density 
+to about 15 kg/m2 to provide design margin. Both aperture and areal density were well 
+beyond the technology of the HST; the aperture being 2.5–3.3 times bigger and the areal 
+density 12 times smaller. Development of mirror technology for the NGST led ultimately 
+to the JWST primary mirror. Although the JWST design is not yet confirmed by on-orbit 
+performance, it represents the current state-of-the-art in lightweight mirror technology.
+Development of the JWST proceeded via a series of demonstration mirrors: Next 
+Generation Mirror System Demonstrator (NMSD) and Advanced Mirror System 
+Demonstrator (AMSD). These demonstration mirrors were not full size primary mirrors 
+for JWST, but were full size segments of the planned primary. A wide variety of tech -
+nologies were tested including active and passive glass/composite hybrids. Table 2.8 gives 
+some key parameters of the NMSD and AMSD mirrors.
+According to Stahl (2004), cryogenic performance requirements led to beryllium being 
+selected as the mirror material for JWST. The final design of the JWST segments is close to 
+that of the Ball Aerospace AMSD demonstration mirror, as shown by Table 2.9. Inasmuch 
+as it is representative of current large aperture, beryllium mirror technology, the JWST is 
+discussed further in Chapter 6.
+Optimization of a lightweight semirigid mirror with active optical figure control involves 
+selecting the number of actuators as well as weight distribution among the actuators, face 
+sheet, and backup structure. An additional consideration is the type of face sheet; both 
+solid and lightweight sections are possible.
+TABLE 2.8
+Developers and Key Parameters for NMSD and AMSD Mirror Projects
+Program/Developer 
+Diameter 
+(m hex) 
+Areal Density 
+(kg/m2) Material 
+Actuator 
+Technology 
+NMSD—University 
+of Arizona
+2 13 2 mm borosilicate—composite backup 166—displacement
+NMSD—COI 2 15 3 mm Zerodur—composite backup Passive
+AMSD—Kodak 1.4 15 ULE sandwich—composite backup 16—force
+AMSD—Goodrich 1.4 15 Fused silica—composite backup 37—bipod/axial 
+flexure
+ANSD—Ball Aerospace 1.4 15 Beryllium 0–30—open back 4—displacement
+TABLE 2.9
+Comparison of Design Parameters for AMSD and JWST Mirror Segments
+Design Parameter AMSD JWST 
+Material Beryllium O-30 Beryllium O-30
+Point-to-point dimension 1.4 m 1.52 m
+Number of pockets 864 600
+Substrate thickness 60 mm 59 mm
+Fundamental frequency 180 Hz 260 Hz
+Substrate areal density 10.4 kg/m2 13.8 kg/m2
+Assembly area density 
+(includes backup structure and actuators)
+19.1 kg/m2 26.2 kg/m2
+Surface figure accuracy 22 nm rms 24 nm rms
+Source: Stahl, H.P ., Proc. SPIE, 7796, 779604, 2010.
+
+=== BOOK PAGE 128 ===
+104 Opto-Mechanical Systems Design
+Optical figure errors are corrected by the superposition of the deformations produced 
+by an array of actuators. A key parameter is the actuator influence function δA, which 
+gives the surface deformation associated with a single actuator. Ealy and Wellman (1989) 
+indicated that, because the actuators nominally are all identical, superposition gives the 
+surface deformation δM(x, y, t) as a function of position X and Y as well as time t:
+ 
+δδMi jA
+j
+N
+i
+N
+xy tS tx y,, ,() = () ()
+==
+∑∑
+11
+ (2.76)
+where Sij(t) is the signal applied to the ith and jth actuator at time t.
+Actuators most commonly used are force and displacement actuators. For the latter, the 
+displacement of the face sheet is proportional to that of the actuator. This assumes that the 
+actuator stiffness is much higher compared to that of the face sheet. If the actuator stiffness 
+is low compared with that of the face sheet, displacement is determined by the amount of 
+force applied by the actuator. According to Bushnell (1979), the displacement δ0 immedi-
+ately above the actuator is given by
+ 
+δ π
+0
+2
+1 2=+ /uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239FC FA
+D
+t
+A
+A
+AA
+F
+B
+A
+ (2.77)
+where
+CA is the actuator array constant
+FA is the actuator force
+AA is the area per actuator
+DF is the face-sheet flexural rigidity
+tB is the effective bending thickness of the face sheet
+Actuators are arranged in uniform triangular, square, and/or hexagonal patterns. The 
+closest distance between actuators is here defined as a. The area per actuator and actuator 
+array constants for different patterns are given in Table 2.10.
+According to Garcia and Brooks (1978), at some distance rA from the center of the actua-
+tor, the face-sheet deformation δA(rA) is given approximately by a Gaussian function:
+ δδAA
+r
+are
+A
+() ≅
+() /uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F
+0
+01 5
+2
+ln .
+ (2.78)
+TABLE 2.10
+Active Mirror Actuator Parameters Used in Equation 2.83
+Actuator Pattern Area per Actuator, AA Array Constant, CA 
+Triangular 3
+2
+2a 5.89 × 10−3
+Square a2 7.71 × 10−3
+Hexagonal 33
+4
+2a 0.0306
+Source: Bushnell, D., AIAA J., 17(1), 71, 1979.
+
+=== BOOK PAGE 129 ===
+105Large Mirror Design
+A plot of this relationship is given in Figure 2.44. The radius is normalized to the actua -
+tor spacing as rA/a and the deflection is normalized to the maximum deflection over the 
+actuator δA/δ0.
+Baiocchi and Burge (2004) indicate that the minimum weight for an active mirror is 
+obtained when the face-sheet weight equals that of the combined mass of back up struc -
+ture and actuators. The number of actuators N required to maintain optical figure is given 
+by Seibert (1990) as
+ 
+N D
+tf a
+L
+Bn o
+A
+=
+/uni239B
+/uni239D/uni239C
+/uni239E
+/uni23A0/uni239F
+15 5
+2
+.  (2.79)
+where
+D is the mirror diameter
+fno is the mirror focal ratio
+LA is the actuator effective length
+The latter is given by
+ 
+L Rt
+A
+B=
+−()/uni23A1/uni23A3 /uni23A4/uni23A612 1 2 14
+ν
+/  (2.80)
+where R is the mirror optical radius of curvature.
+1.51.0
+Normalized radius
+0.50
+0
+0.2
+0.4
+0.6
+Normalized displacement
+0.8
+1.0
+FIGURE 2.44
+Variation of normalized actuator displacement δA/δ0 with respect to normalized radius rA/a.
+
+=== BOOK PAGE 130 ===
+106 Opto-Mechanical Systems Design
+Baiocchi and Burge (2004) further indicate an alternative relationship for the number of 
+actuators N as a function of the rms surface deformation δrms for mirrors subject to thermal 
+deflection:
+ 
+δ
+−ν Δα π
+rms
+B
+T
+at
+D
+N= () () /uni239B
+/uni239D
+/uni239C
+/uni239E
+/uni23A0
+/uni239F
+00 11
+4
+2
+2
+2 2
+.
+ (2.81)
+where Δ(αT) is the change in thermal expansion and/or temperature across the mirror.
+Equation 2.80 has been modified from its original form in that the blister semidiameter or 
+radius of the area on the mirror affected by the actuator is replaced by the actuator spac -
+ing. Because the actuators are fixed to the mirror surface, the actuator influence function is 
+limited to the area just inside the actuator spacing. Also, this relationship is for thin shell 
+type face sheets in which the diameter to thickness ratio is on the order of 10 3 or greater.
+2.9 Scaling Relationships for Lightweight Mirrors
+Pearson (1980) defined lightweight monolithic mirrors as those with diameter-to-thickness 
+ratios greater than 8. He also suggested that the ratio (surface area)1.5/(mirror volume) > 7 
+could be used to define a lightweight mirror. The latter ratio applies equally well to sub -
+strates with uniform thickness and those with variable thickness. As an example of the 
+use of this criterion, let us consider the series of contoured-back mirrors listed in Table 2.6. 
+In each case, the surface area is π(GD/2)2 = π(18.2/2)2 = 254.4 in. 2 Dividing by the mirror 
+volumes from the third column of the table, we obtain the Pearson ratios listed in the last 
+column of that table. The configurations that meet Pearson’s criterion are the tapered back, 
+the meniscus with R2 > R1, both single- and double-arch mirrors. The mirror with a flat 
+back, the concentric-meniscus, and the double-concave mirror would not be considered 
+lightweight. Parametric analysis of Pearson’s ratio shows that, for constant f-number and 
+DG/tA, the ratio is independent of mirror diameter. Further, it varies slowly with f-number.
+A direct comparison of open-back, nearly symmetrical sandwich, and single- and double-
+arch contoured-back mirrors (see Figure 2.45) was reported by Valente and Vukobratovich 
+(1989). Mirror diameter of 40 in. (~1 m) and material type (fused silica) were held constant. 
+Self-weight deflection, overall thickness, weight, and efficiency (defined as the ratio of sur-
+face deflection to thickness) for each mirror type oriented with gravity parallel to the mir-
+ror axis were computed. Certain reasonable assumptions were made by those authors with 
+regard to various mirror parameters such as sandwich mirror core solidity, * face-sheet 
+thickness, rib thickness, etc.
+The results of this parametric analysis were plotted in various ways, so the mirror 
+designer could easily visualize the consequences of parameter variations. One figure from 
+this study especially pertinent to the present topic is shown in Figure 2.46.
+In the same study, fabrication issues and case of mounting were considered. The quali -
+tative comparisons made there provide meaningful guidance to the mirror designer and 
+user alike. The cost impact of critical decisions can be recognized even though specific 
+numerical relationships are not included.
+* Mehta (1987) defined core solidity η as (2B + tW)(tW)/(B + tW)2, where B is the diameter of the circle inscribed in 
+the cell and tW is the web wall thickness.
+
+=== BOOK PAGE 131 ===
+107Large Mirror Design
+Single-arch mirror 0.50
+0.50
+0.50
+Parabola
+Parabola vertex
+2r1
+Ring support
+2r1
+Ring support
+Ø24
+Ring support
+Ø40
+Ø40
+Ø26
+Ø22
+Ø40
+Ø8
+Ø40
+Ø4
+Ring support
+Double-arch mirror
+Parabola
+Parabola
+vertex
+Symmetric sandwich mirror
+tW
+tW
+tF
+tF
+hC
+hC
+tF
+Open-back mirror
+Variable
+height (h)
+Variable
+height (h)
+Variable
+height (h)
+Variable
+height (h)
+FIGURE 2.45
+Mirror geometry for single-arch, double-arch, symmetric sandwich, and open-back mirrors studied by Valente 
+and Vukobratovich. All dimensions are in inches. (From Valente, T.M. and Vukobratovich, D., Proc. SPIE, 1167, 
+20, 1989.)
+
+=== BOOK PAGE 132 ===
+108 Opto-Mechanical Systems Design
+Cho et al. (1989) presented a comparative analysis of the surface deformations under self-
+weight conditions at zenith and horizon orientations for various mirror types (contoured 
+back and foam core) with various support types. The results were presented graphically. 
+A few general conclusions were drawn: (1) optical performance depends on material char-
+acteristics, contoured-back mirror shape, and support location; (2) structural deflection 
+over the optical surface does not always indicate optical performance; (3) optimum shape 
+of a double-arch metal foam core (SXA material) mirror is a ring support at the 50% radial 
+zone; and (4) the optimum support location for three equally spaced support points is 
+inside the 50% radial zone regardless of contoured-back shape.
+A cubic relationship between diameter and weight was applied to conventional (non-
+lightweighted) mirrors for many years. Vukobratovich (1989) refined this expression to
+ WD G= 246 29 2.  (2.82)
+where
+W is mirror’s weight in kg
+DG is the mirror’s diameter in m
+DG/tA is the aspect ratio 6:1. He also stated that the mount for such a mirror probably 
+weighs about as much as the mirror itself. That same publication gave two approximate 
+expressions for weight versus diameter as
+ WD G= 120 28 2.  (2.83)
+Optimized lightweighted mirror shapes
+40 in. diameter fused silica ﬂat mirror
+Single arch
+10 –4
+10 –5
+10 –6
+Open back (η=0.1)  
+Solid
+Double arch
+Sandwich (η=0.3) 
+Maximum mechanical deflection (in.)
+Weight, W (lb)
+175 200 225 250 275 300
+FIGURE 2.46
+Graphs of maximum self-weight mechanical deflections with axis-vertical versus mirror weight for various 
+mirror configurations. (From Valente, T.M. and Vukobratovich, D., Proc. SPIE, 1167 , 20, 1989.)
+
+=== BOOK PAGE 133 ===
+109Large Mirror Design
+for conventional lightweighted mirrors (weight approximately 30%–40% of that of a con -
+ventional solid mirror) and
+ WD G= 53 26 7.  (2.84)
+for state-of-the-art lightweighted designs (weight approximately 20% of that of a conven -
+tional mirror). These relationships were based on the analysis of several existing mirror 
+designs. Since those designs were almost all different, no single relationship applies.
+On the other hand, Hamill (1979) suggested the following single equation for all light -
+weighted mirrors:
+ 
+W kD
+Dt
+G
+GA
+=
+26.
+(/ )  (2.85)
+where k is a constant and the other parameters are as defined previously.
+Valente (1990) reported an extensive analysis of weight and diameter data for both solid 
+mirrors (13 examples) and various types of lightweighted mirrors (48 examples). Solid mir-
+rors with an aspect ratio <0.1 were considered in the lightweight class. A series of 19 differ-
+ent curve-fitting expressions were tried in order to obtain a best fit to the data in various 
+groupings. In each case, the goodness of fit was calculated to determine the optimum 
+expression. The following expressions were found to apply to the indicated groups:
+WD G= 246 29 2. fora llsolidmi rrors (2.86)
+ WD G= 82 29 5. fora lllightwe ightmi rrors (2.87)
+WD G= 68 29 0. fora llstructured mi rrors (2.88)
+WD G= 106 27 1. fora llcontou redm irrors (2.89)
+WD G= 26 23 1. forb erylliumm irrors (2.90)
+Hamill’s relationship (Equation 2.84) was also used by Valente to analyze these data. She 
+grouped all the solid mirrors and the heavier lightweights together, called them traditional 
+mirrors, and calculated the value of k for this group. The average k was then substituted into 
+the power function equation to determine the applicable average exponent. The same was done 
+for groups of lightweight mirrors and ultra-lightweight mirrors. The results were as follows:
+WD kG AVG==192 256027 6. ()fortraditionalmi rrors  (2.91)
+WD kG AVG==120 80228 2. ()for lightwe ight mi rrors  (2.92)
+ WD kG AVG==53 38726 7. ()foru ltra-lightwe ight mi rrors  (2.93)
+Note that the results for all solid mirrors  and for ultra-lightweight mirrors are the same as 
+reported by Vukobratovich (1993).
+
+=== BOOK PAGE 134 ===
+110 Opto-Mechanical Systems Design
+Valente plotted graphical representations of the various relationships along with the 
+data from which the curves were derived. For example, Figure 2.47 represents the relation-
+ships of Equations 2.90 through 2.92. To the eye, the curves fit the data remarkably well. 
+The goodness-of-fit calculations reported by Valente verify this observation.
+References
+Anderson, D., Parks, R.E., Hansen, Q.M., and Melugin, R., Gravity deflections of lightweighted mir-
+rors, Proc. SPIE, 332, 424, 1982.
+Angel, J.R.P ., Davison, W.B., Hill, J.M., Mannery, E.J., and Martin, H.M., Progress toward making 
+lightweight 8-m mirrors of short focal length, Proc. SPIE, 1236, 636, 1990.
+Angel, J.R.P . and Hill, J.M., Manufacture of large glass honeycomb mirrors, Proc. SPIE, 332, 298, 1982.
+Angel, J.R.P . and Wangsness, P .A.A., Heating tubes and end plates to bond while suppling gas pres-
+sure differential, U.S. Patent 4606960, 1986.
+Angel, J.R.P ., Woolf, N.J., Hill, J.M., and Gable, L., Steps toward 8 m honeycomb mirror blanks: IV: 
+Some aspects of design and fabrication, Proc. SPIE, 444, 194, 1983.
+Baiocchi, D. and Burge, J.H., Optimized active, lightweight space mirrors, Proc. SPIE, 5166, 49, 2004.
+Barnes, W.P ., Jr., Optimal design of cored mirror structures, Appl. Opt., 8(6), 1191, 1969.
+Baumer, V . and Sacre, P ., Operational mode for VLT temperature and flow control, Proc. SPIE, 2871, 
+657, 1997.
+Traditional
+(wt. dependent)
+Lightweight
+(wt. dependent)
+Ultra-lightweight
+(wt. dependent)
+Mirror weight (kg)
+Mirror diameter (m)
+0 0.5 1.0 1.5 2.0 2.53 .0 3.54 .0 4.5
+105
+104
+103
+102
+10
+1
+0.1
+FIGURE 2.47
+Weight versus diameter for traditional (solid), lightweight, and ultra-lightweight mirrors fitting Equations 9.15 
+through 9.17 of Volume 1. (From Valente, T.M., Proc. SPIE, 1340, 47 , 1990.)
+
+=== BOOK PAGE 135 ===
+111Large Mirror Design
+Bely, P .Y., The design and construction of large optical telescopes, Proc. SPIE, 332, 212, 1982.
+Bely, P .Y., The Design and Construction of Large Optical Telescopes, Springer, New York, 2003.
+Bohannan, B., Pearson, E.T., and Hagelbarger, D., Thermal control of classical astronomical primary 
+mirrors, Proc. SPIE, 4003, 406, 2000.
+Bowen, I.S., The 200-inch Hale Telescope, in Telescopes, Kuiper, G. and Middlehurst, B., Eds., 
+University of Chicago Press, Chicago, IL, 1960, p. 1.
+Bushnell, D., Control of surface configuration by application of concentrated loads, AIAA J., 17, 
+71, 1979.
+Cannon, J.E. and Wortley, R.W., Gas fusion center-plane-mounted secondary mirror, Proc. SPIE, 966, 
+309, 1988.
+Carter, W.E., Lightweight center-mounted 152-cm f/2.5 Cer-vit mirror, Appl. Opt., 11(2), 467, 1972.
+Cheng, A.Y.S. and Angel, J.R.P ., Steps toward 8 m honeycomb mirrors VIII: Design and demonstra-
+tion of a system of thermal control, Proc. SPIE, 628, 536, 1986.
+Cheng, A.Y.S. and Angel, J.R.P ., Thermal stabilization of honeycomb mirrors, in Proceedings of the ESO 
+Conference on Very Large Telescopes and Their Instrumentation, Garching, Germany, March 21–24, 
+1988, pp. 467–477.
+Cho, M.K. and Richard, R.M., Structural and optical properties for typical solid mirror shapes, Proc. 
+SPIE, 1303, 78, 1990.
+Cho, M.K., Richard, R.M., and Vukobratovich, D., Optimum mirror shapes and supports for light 
+weight mirrors subjected to self-weight, Proc. SPIE, 1167, 2, 1989.
+Cox, C.D. and Furber, M.E., 4-meter diameter adaptive optical system technology demonstration, 
+Proc. SPIE, 2807, 132, 1996.
+Coulter, D.R. and Jacobson, D.N., Technology for the next generation space telescope, Proc. SPIE, 
+4013, 784, 2000.
+Daniel, J., Mueller, U., Peters, T., Sporer, S., and Hull, T., Tinsley progress on stress mirror polish -
+ing (SMP) for the thirty meter telescope (TMT) primary mirror segments II, Proc. SPIE, 7733, 
+773328, 2010.
+Danjon, A. and Couder, A., Lunettes et Telescopes, Blanchard, Paris, France, 1935.
+Dietz, R.W. and Bennett, J.M., Smoothness and thermal stability of Cer-Vit optical material, Appl. Opt., 
+7, 1275, 1967.
+Doyle, K.B. et al., Integrated Optomechanical Analysis, 2nd  edn.,  SPIE Press, Bellingham, WA, 2012.
+Doyle, K.B., Genberg, V .L., and Michels, G.J., Integrated Optomechanical Analysis, SPIE Press, 
+Bellingham, WA, 2002.
+Duncan, J.P ., Self-weight loaded structures in the context of lightweight mirror applications, MSFC 
+Workshop, Optical Telescope Technology, NASA SP-233, Scientific and Technical Information 
+Division, National Aeronautics and Space Administration, Washington, DC, 1970.
+Ealey, M.A. and Wellman, J., Fundamentals of deformable mirror design and analysis, Proc. SPIE, 
+1167, 66, 1989.
+Ebben, T.H., Bergstrom, J., Spuhler, P ., Delamere, A., and Gallagher, D., Mission to Mars: The HiRISE 
+camera on-board MRO, Proc. SPIE, 6690, 66900B, 2007.
+Edwards, M.J., Current fabrication techniques for ULE TM and fused silica lightweight mirrors, Proc. 
+SPIE, 3356, 702, 1998.
+Erdmann, M., Bittner, H., and Haberler, P ., Development and construction of the optical system for 
+the airborne observatory SOFIA, Proc. SPIE, 4014, 309, 2000.
+Feinberg, L., Cohen, L., Dean, B., Hayden, W., Howard, J., and Keski-Kuha, R., Space telescope design 
+considerations, Opt. Eng., 51(1), 011006, 2012.
+Fitzsimmons, T.C. and Crowe, D.A., Ultra-Lightweight Mirror Manufacturing and Radiation Response 
+Study, RADC-TR-81-226, Rome Air Development Center, Rome, NY, 1981.
+Florence, R., The Perfect Machine, Harper-Collins, New York, 1995.
+Garcia, H.R. and Brooks, L.D., Characterization techniques for deformable metal mirrors, Proc. SPIE, 
+141, 74, 1978.
+Goble, L., Ford, R., and Kenagy, K., Large honeycomb mirror molding methods, Proc. SPIE, 966, 291, 
+1988a.
+
