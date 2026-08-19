@@ -549,7 +549,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
           const cy = r * stepY + yShift;
           const d = Math.hypot(cx, cy);
           const rMin = Math.min(maxR, Math.max(0.0, d - pocketSide));
-          const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + conicK) * (rMin * rMin) / (R_curv * R_curv))));
+          const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (rMin * rMin) / (R_curv * R_curv))));
           const zMin = (rMin * rMin) / denom_p;
           const hPkt = H - faceplate + zMin;
 
