@@ -61,12 +61,18 @@ function loadImportedJSONIfExists() {
     });
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initApp);
-} else {
+let appInitialized = false;
+function bootstrapApp() {
+  if (appInitialized) return;
+  appInitialized = true;
   initApp();
 }
-window.addEventListener('load', initApp);
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrapApp);
+} else {
+  bootstrapApp();
+}
 
 function initEventListeners() {
   const safeAddListener = (id, event, fn) => {
@@ -100,25 +106,25 @@ function initEventListeners() {
   });
 
   document.querySelectorAll('[data-pattern]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const button = e.target.closest('[data-pattern]') || btn;
-      const patternName = button.getAttribute('data-pattern');
+    btn.onclick = function() {
+      const patternName = this.getAttribute('data-pattern');
       if (!patternName) return;
       document.querySelectorAll('[data-pattern]').forEach(b => b.classList.remove('active'));
-      button.classList.add('active');
+      this.classList.add('active');
       state.pattern = patternName;
       updateCalculation();
-    });
+    };
   });
 
   document.querySelectorAll('[data-support]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
+    btn.onclick = function() {
+      const supportName = this.getAttribute('data-support');
+      if (!supportName) return;
       document.querySelectorAll('[data-support]').forEach(b => b.classList.remove('active'));
-      const target = e.currentTarget;
-      target.classList.add('active');
-      state.supportType = target.getAttribute('data-support');
+      this.classList.add('active');
+      state.supportType = supportName;
       updateCalculation();
-    });
+    };
   });
 
   safeAddListener('sel-material', 'change', (e) => {
