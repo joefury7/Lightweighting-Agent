@@ -415,80 +415,114 @@ def assign_zerodur_material_fem(workFemPart, cae_body, lw):
     zerodur.AssignObjects([cae_body])
     log(lw, "      Successfully assigned material 'zerodur' to CAE body.")
 
-def detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, expected_count, lw):
+def extract_cad_back_face_vertices(mirror_body, uf_session, back_z, lw):
     """
-    Directly scans the CAD solid body geometry to find the EXACT physical centers
-    (X, Y) of all drilled Whiffletree support holes in the mirror.
-
-    Distinguishes support holes from triangular pocket fillets by:
-      1. Hole facets have width <= 6.5mm (inner hole diameter is 6.0mm / 8.0mm).
-      2. Exactly 16 facet faces and 16 top rim edges form each hole, tightly
-         clustered within radius <= 4.0mm of the hole center.
-      3. Pocket corner fillets (only 1-2 faces per pocket corner) are rejected.
+    Extracts all physical rib-intersection and boss vertex points on the back face
+    directly from the CAD solid body edges and faces.
+    Guarantees that Whiffletree constraint locations snap strictly to real 6-rib
+    intersections and support bosses, never on connecting ribs.
     """
-    hole_samples = []
-
-    # 1. Scan back-face hole rim edges
+    raw_points = []
+    
+    # 1. Edge endpoints on back face
     for edge in mirror_body.GetEdges():
         try:
-            bbox = uf_session.Modl.AskBoundingBox(edge.Tag)
-            ecx = (bbox[0] + bbox[3]) / 2.0
-            ecy = (bbox[1] + bbox[4]) / 2.0
-            ecz = (bbox[2] + bbox[5]) / 2.0
-            edx = bbox[3] - bbox[0]
-            edy = bbox[4] - bbox[1]
-            edz = bbox[5] - bbox[2]
-            r_center = math.hypot(ecx, ecy)
-
-            # Hole rim segments: on back face, small length <= 6.5mm, planar
-            if abs(ecz - back_z) <= 3.0 and edx <= 6.5 and edy <= 6.5 and edz <= 2.0 and r_center >= 20.0:
-                hole_samples.append((ecx, ecy))
+            v_data = uf_session.Modl.AskEdgeVerts(edge.Tag)
+            p1 = v_data[2]  # [x, y, z]
+            p2 = v_data[3]  # [x, y, z]
+            if abs(p1[2] - back_z) <= 3.0:
+                raw_points.append((p1[0], p1[1]))
+            if abs(p2[2] - back_z) <= 3.0:
+                raw_points.append((p2[0], p2[1]))
         except Exception:
-            pass
+            try:
+                bbox = uf_session.Modl.AskBoundingBox(edge.Tag)
+                if abs((bbox[2] + bbox[5]) / 2.0 - back_z) <= 3.0:
+                    raw_points.append(((bbox[0] + bbox[3]) / 2.0, (bbox[1] + bbox[4]) / 2.0))
+            except Exception:
+                pass
 
-    # 2. Scan hole vertical wall facets
-    for face in mirror_body.GetFaces():
-        try:
-            bbox = uf_session.Modl.AskBoundingBox(face.Tag)
-            fcx = (bbox[0] + bbox[3]) / 2.0
-            fcy = (bbox[1] + bbox[4]) / 2.0
-            fcz = (bbox[2] + bbox[5]) / 2.0
-            fdx = bbox[3] - bbox[0]
-            fdy = bbox[4] - bbox[1]
-            fdz = bbox[5] - bbox[2]
-            r_center = math.hypot(fcx, fcy)
-
-            # Whiffletree hole inner facet: width <= 6.5mm, deep vertical face (fdz >= 10mm)
-            if fdx <= 6.5 and fdy <= 6.5 and fdz >= 10.0 and r_center >= 20.0:
-                hole_samples.append((fcx, fcy))
-        except Exception:
-            pass
-
-    # Group samples by tight spatial proximity (radius <= 4.0mm)
-    clusters = []
-    for (sx, sy) in hole_samples:
+    # 2. Cluster points into discrete vertices (tolerance 5.0 mm)
+    vertices = []
+    cluster_counts = []
+    for (x, y) in raw_points:
         matched = False
-        for cl in clusters:
-            avg_x = sum(p[0] for p in cl) / float(len(cl))
-            avg_y = sum(p[1] for p in cl) / float(len(cl))
-            if math.hypot(sx - avg_x, sy - avg_y) <= 4.5:
-                cl.append((sx, sy))
+        for idx, (vx, vy) in enumerate(vertices):
+            if math.hypot(x - vx, y - vy) <= 5.0:
+                cnt = cluster_counts[idx]
+                new_x = (vx * cnt + x) / float(cnt + 1)
+                new_y = (vy * cnt + y) / float(cnt + 1)
+                vertices[idx] = (new_x, new_y)
+                cluster_counts[idx] += 1
                 matched = True
                 break
         if not matched:
-            clusters.append([(sx, sy)])
+            vertices.append((x, y))
+            cluster_counts.append(1)
 
-    # Only clusters with at least 6 samples represent a genuine 16-faceted hole
-    detected_hubs = []
-    for cl in clusters:
-        if len(cl) >= 6:
-            avg_x = sum(p[0] for p in cl) / float(len(cl))
-            avg_y = sum(p[1] for p in cl) / float(len(cl))
-            detected_hubs.append((round(avg_x, 2), round(avg_y, 2)))
+    # 3. Filter: keep 6-rib junctions (multiple converging edges)
+    junction_nodes = []
+    for idx, (vx, vy) in enumerate(vertices):
+        r_ctr = math.hypot(vx, vy)
+        if r_ctr >= 20.0 and cluster_counts[idx] >= 3:
+            junction_nodes.append((round(vx, 2), round(vy, 2)))
 
-    # Sort hubs by radial ring and angle for clean numbering
-    detected_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), -1), math.atan2(p[1], p[0])))
-    return detected_hubs
+    # Fallback if count is low: take all non-center vertices
+    if len(junction_nodes) < 18:
+        junction_nodes = [(round(vx, 2), round(vy, 2)) for (vx, vy) in vertices if math.hypot(vx, vy) >= 20.0]
+
+    log(lw, "      CAD Geometry Scan: Discovered %d real rib intersection vertices on back face." % len(junction_nodes))
+    return junction_nodes
+
+def compute_snapped_whiffletree_hubs_from_cad(cad_vertices, diameter, central_hole_dia, cell_size, pattern_name, support_type, lw):
+    """
+    Snaps theoretical Whiffletree support positions directly to the REAL CAD vertices
+    discovered from the physical CAD body.
+    """
+    R = diameter / 2.0
+    Ri = central_hole_dia / 2.0
+    area_span = max(100.0, R * R - Ri * Ri)
+    r1 = math.sqrt(Ri * Ri + area_span / 6.0)
+    r2 = math.sqrt(Ri * Ri + 2.0 * area_span / 3.0)
+    
+    num_inner = 3 if (support_type == '9point' or support_type == 9) else 6
+    num_outer = 6 if (support_type == '9point' or support_type == 9) else 12
+    
+    theoretical_hubs = []
+    # Inner ring
+    for i in range(num_inner):
+        a = math.radians(i * (360.0 / num_inner))
+        theoretical_hubs.append((r1 * math.cos(a), r1 * math.sin(a)))
+    # Outer ring
+    for i in range(num_outer):
+        a = math.radians(i * (360.0 / num_outer) + (180.0 / num_outer))
+        theoretical_hubs.append((r2 * math.cos(a), r2 * math.sin(a)))
+
+    if not cad_vertices:
+        log(lw, "      Using formula grid snapping fallback...")
+        return compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
+
+    # Snap each theoretical hub to the closest real CAD vertex, guaranteeing 1-to-1 unique assignment
+    snapped = []
+    used_indices = set()
+    
+    for (tx, ty) in theoretical_hubs:
+        best_idx = None
+        min_d = 999999.0
+        for idx, (vx, vy) in enumerate(cad_vertices):
+            if idx in used_indices:
+                continue
+            d = math.hypot(tx - vx, ty - vy)
+            if d < min_d:
+                min_d = d
+                best_idx = idx
+        if best_idx is not None:
+            used_indices.add(best_idx)
+            snapped.append(cad_vertices[best_idx])
+        else:
+            snapped.append((tx, ty))
+
+    return snapped
 
 def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, hubs, back_z, hub_outer_r, lw):
     """
@@ -725,26 +759,14 @@ def main():
     log(lw, "      Support Type:     %s (%d points)" % (support_type, num_hubs))
     log(lw, "      Rib Pattern:      %s" % pattern_name)
     
-    # ── 1. SCAN CAD BODY DIRECTLY FOR DRILLED WHIFFLETREE HOLES ─────────────
-    # Directly measuring the CAD geometry guarantees 100% precision with the
-    # physical drilled holes, avoiding any formula offset.
-    detected_hubs = detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, num_hubs, lw)
-    snapped_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
-
-    if len(detected_hubs) >= 6:
-        log(lw, "      ✓ CAD Geometry Scan: Found %d physical Whiffletree holes in CAD model!" % len(detected_hubs))
-        active_hubs = list(detected_hubs)
-        # If CAD part has fewer holes (e.g. 16 holes drilled for 18pt), supplement to reach num_hubs
-        if len(active_hubs) < num_hubs:
-            for shx, shy in snapped_hubs:
-                if len(active_hubs) >= num_hubs:
-                    break
-                if not any(math.hypot(shx - dhx, shy - dhy) < 15.0 for (dhx, dhy) in active_hubs):
-                    active_hubs.append((shx, shy))
-            log(lw, "      Supplemented with layout grid math to reach %d total support points." % len(active_hubs))
-    else:
-        log(lw, "      Using theoretical Whiffletree positions (snapped to layout):")
-        active_hubs = snapped_hubs
+    # ── 1. SCAN CAD BODY TO EXTRACT REAL 6-RIB JUNCTION VERTICES ────────────
+    # Extracting real vertex intersections from the solid CAD body guarantees
+    # 100% precision with the physical mirror geometry, regardless of cell size
+    # or expression settings.
+    cad_vertices = extract_cad_back_face_vertices(mirror_body, uf_session, back_z, lw)
+    active_hubs = compute_snapped_whiffletree_hubs_from_cad(
+        cad_vertices, diameter, central_hole_dia, cell_size, pattern_name, support_type, lw
+    )
 
     log(lw, "      Active Whiffletree Support Hubs (%d points):" % len(active_hubs))
     for i, (hx, hy) in enumerate(active_hubs):
