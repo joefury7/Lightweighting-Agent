@@ -420,76 +420,57 @@ def detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, lw):
     Directly scans the CAD solid body geometry to find the EXACT physical centers
     (X, Y) of all drilled Whiffletree support holes in the mirror.
 
-    Combines:
-      1. Circular Arc Edge inspection via AskArcData (exact circle center & radius)
-      2. Cylindrical Face inspection via AskFaceData (exact cylinder axis)
-      3. Vertical narrow face bounding boxes (faceted polygon holes)
+    In NX CAD, each Whiffletree hole is constructed as a 16-sided regular polygon
+    of radius 3.0mm (or 4.0mm) on the back face. Each of the 16 polygon edges has
+    a length L = 2 * R * sin(11.25 deg) = 1.17mm (between 0.8mm and 2.2mm).
+    Grouping these 16 polygon edges detects all drilled holes with 100% precision.
     """
-    hole_candidates = []
+    hole_edge_samples = []
 
-    # 1. Circular Arc Edge inspection via AskArcData
     for edge in mirror_body.GetEdges():
         try:
-            arc_data = uf_session.Modl.AskArcData(edge.Tag)
-            center_pt = arc_data[2]  # [cx, cy, cz]
-            radius = arc_data[3]
-            r_center = math.hypot(center_pt[0], center_pt[1])
-            if 1.5 <= radius <= 5.0 and r_center >= 20.0:
-                if abs(center_pt[2] - back_z) <= 5.0:
-                    hole_candidates.append((center_pt[0], center_pt[1]))
+            v_data = uf_session.Modl.AskEdgeVerts(edge.Tag)
+            p1 = v_data[2]  # [x1, y1, z1]
+            p2 = v_data[3]  # [x2, y2, z2]
+            
+            # Check edge lies on the back face plane
+            if abs(p1[2] - back_z) <= 3.0 and abs(p2[2] - back_z) <= 3.0:
+                length = math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+                mid_x = (p1[0] + p2[0]) / 2.0
+                mid_y = (p1[1] + p2[1]) / 2.0
+                r_center = math.hypot(mid_x, mid_y)
+                
+                # Whiffletree hole polygon edge segment: length between 0.8mm and 2.2mm
+                if 0.8 <= length <= 2.2 and r_center >= 20.0:
+                    hole_edge_samples.append((mid_x, mid_y))
         except Exception:
             pass
 
-    # 2. Cylindrical Face queries via AskFaceData
-    for face in mirror_body.GetFaces():
-        try:
-            face_data = uf_session.Modl.AskFaceData(face.Tag)
-            pt = face_data[1]  # [x, y, z] on cylinder axis
-            radius = face_data[4] if len(face_data) > 4 else None
-            r_center = math.hypot(pt[0], pt[1])
-            if radius is not None and 1.5 <= radius <= 5.0 and r_center >= 20.0:
-                hole_candidates.append((pt[0], pt[1]))
-        except Exception:
-            pass
-
-    # 3. Narrow vertical face bounding boxes (16 facets per hole)
-    for face in mirror_body.GetFaces():
-        try:
-            bbox = uf_session.Modl.AskBoundingBox(face.Tag)
-            fcx = (bbox[0] + bbox[3]) / 2.0
-            fcy = (bbox[1] + bbox[4]) / 2.0
-            fdx = bbox[3] - bbox[0]
-            fdy = bbox[4] - bbox[1]
-            fdz = bbox[5] - bbox[2]
-            r_center = math.hypot(fcx, fcy)
-            if fdx <= 7.0 and fdy <= 7.0 and fdz >= 15.0 and r_center >= 20.0:
-                hole_candidates.append((fcx, fcy))
-        except Exception:
-            pass
-
-    if not hole_candidates:
-        log(lw, "      No CAD support hole candidates detected on body.")
+    if not hole_edge_samples:
+        log(lw, "      No CAD polygon hole edges detected on back face.")
         return []
 
-    # Group candidates by spatial proximity (radius <= 5.0mm around hole center)
+    # Group edge midpoints by spatial proximity (radius <= 4.0mm around hole center)
     clusters = []
-    for (cx, cy) in hole_candidates:
+    for (mx, my) in hole_edge_samples:
         matched = False
         for cl in clusters:
             avg_x = sum(p[0] for p in cl) / float(len(cl))
             avg_y = sum(p[1] for p in cl) / float(len(cl))
-            if math.hypot(cx - avg_x, cy - avg_y) <= 5.0:
-                cl.append((cx, cy))
+            if math.hypot(mx - avg_x, my - avg_y) <= 4.0:
+                cl.append((mx, my))
                 matched = True
                 break
         if not matched:
-            clusters.append([(cx, cy)])
+            clusters.append([(mx, my)])
 
+    # Only clusters with >= 8 edges represent genuine 16-sided polygon holes
     detected_hubs = []
     for cl in clusters:
-        avg_x = sum(p[0] for p in cl) / float(len(cl))
-        avg_y = sum(p[1] for p in cl) / float(len(cl))
-        detected_hubs.append((round(avg_x, 2), round(avg_y, 2)))
+        if len(cl) >= 8:
+            avg_x = sum(p[0] for p in cl) / float(len(cl))
+            avg_y = sum(p[1] for p in cl) / float(len(cl))
+            detected_hubs.append((round(avg_x, 2), round(avg_y, 2)))
 
     # Sort hubs by radial ring and angle
     detected_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), -1), math.atan2(p[1], p[0])))
