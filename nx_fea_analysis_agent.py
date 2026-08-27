@@ -420,51 +420,80 @@ def detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, lw):
     Directly scans the CAD solid body geometry to find the EXACT physical centers
     (X, Y) of all drilled Whiffletree support holes in the mirror.
 
-    Each support hole in NX CAD is a 16-faceted vertical extrusion of radius 3-4mm
-    and depth >= 15mm. Clustering these narrow vertical facets isolates the
-    genuine holes with 100% precision.
+    Combines:
+      1. Cylindrical face queries via AskFaceData (exact hole axis)
+      2. Vertical narrow face bounding boxes (faceted polygon holes)
+      3. Back-face hole rim edge loops
     """
-    hole_faces = []
+    hole_candidates = []
+
+    # 1. Cylindrical face queries via AskFaceData
+    for face in mirror_body.GetFaces():
+        try:
+            face_data = uf_session.Modl.AskFaceData(face.Tag)
+            pt = face_data[1]  # [x, y, z] on cylinder axis
+            radius = face_data[4] if len(face_data) > 4 else None
+            r_center = math.hypot(pt[0], pt[1])
+            if radius is not None and 1.5 <= radius <= 6.0 and r_center >= 20.0:
+                hole_candidates.append((pt[0], pt[1]))
+        except Exception:
+            pass
+
+    # 2. Narrow vertical face bounding boxes
     for face in mirror_body.GetFaces():
         try:
             bbox = uf_session.Modl.AskBoundingBox(face.Tag)
             fcx = (bbox[0] + bbox[3]) / 2.0
             fcy = (bbox[1] + bbox[4]) / 2.0
-            fcz = (bbox[2] + bbox[5]) / 2.0
             fdx = bbox[3] - bbox[0]
             fdy = bbox[4] - bbox[1]
             fdz = bbox[5] - bbox[2]
             r_center = math.hypot(fcx, fcy)
-
-            # Whiffletree hole facets: narrow in XY (<= 8.0mm), deep in Z (>= 15.0mm), not center bore
-            if fdx <= 8.0 and fdy <= 8.0 and fdz >= 15.0 and r_center >= 20.0:
-                hole_faces.append((fcx, fcy))
+            if fdx <= 10.0 and fdy <= 10.0 and fdz >= 15.0 and r_center >= 20.0:
+                hole_candidates.append((fcx, fcy))
         except Exception:
             pass
 
-    # Group facet centers by spatial proximity (radius <= 5.0mm)
+    # 3. Back-face hole rim edges
+    for edge in mirror_body.GetEdges():
+        try:
+            bbox = uf_session.Modl.AskBoundingBox(edge.Tag)
+            ecx = (bbox[0] + bbox[3]) / 2.0
+            ecy = (bbox[1] + bbox[4]) / 2.0
+            ecz = (bbox[2] + bbox[5]) / 2.0
+            edx = bbox[3] - bbox[0]
+            edy = bbox[4] - bbox[1]
+            r_center = math.hypot(ecx, ecy)
+            if abs(ecz - back_z) <= 3.0 and edx <= 10.0 and edy <= 10.0 and r_center >= 20.0:
+                hole_candidates.append((ecx, ecy))
+        except Exception:
+            pass
+
+    if not hole_candidates:
+        log(lw, "      No CAD support hole candidates detected on body.")
+        return []
+
+    # Group candidates by spatial proximity (radius <= 6.0mm)
     clusters = []
-    for (fcx, fcy) in hole_faces:
+    for (cx, cy) in hole_candidates:
         matched = False
         for cl in clusters:
             avg_x = sum(p[0] for p in cl) / float(len(cl))
             avg_y = sum(p[1] for p in cl) / float(len(cl))
-            if math.hypot(fcx - avg_x, fcy - avg_y) <= 5.0:
-                cl.append((fcx, fcy))
+            if math.hypot(cx - avg_x, cy - avg_y) <= 6.0:
+                cl.append((cx, cy))
                 matched = True
                 break
         if not matched:
-            clusters.append([(fcx, fcy)])
+            clusters.append([(cx, cy)])
 
-    # Only clusters with at least 4 facets represent genuine 16-faceted drilled holes
     detected_hubs = []
     for cl in clusters:
-        if len(cl) >= 4:
-            avg_x = sum(p[0] for p in cl) / float(len(cl))
-            avg_y = sum(p[1] for p in cl) / float(len(cl))
-            detected_hubs.append((round(avg_x, 2), round(avg_y, 2)))
+        avg_x = sum(p[0] for p in cl) / float(len(cl))
+        avg_y = sum(p[1] for p in cl) / float(len(cl))
+        detected_hubs.append((round(avg_x, 2), round(avg_y, 2)))
 
-    # Sort hubs by radial ring and angle for clean numbering
+    # Sort hubs by radial ring and angle
     detected_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), -1), math.atan2(p[1], p[0])))
     return detected_hubs
 
