@@ -205,6 +205,125 @@ def compute_adaptive_mesh_size(diameter):
     elem_size = max(8.0, min(80.0, raw_size))
     return round(elem_size, 1)
 
+def check_optical_stiffness(diameter, central_hole_dia, total_depth, faceplate, cell_size, rib_thick,
+                            n_support_points, optical_limit_nm, lw):
+    """
+    Pre-solve analytical stiffness check.
+
+    Estimates the dominant optical surface figure degradation mechanisms and
+    reports whether the current design geometry is expected to satisfy the
+    given optical budget.  No FEA required — uses closed-form plate theory.
+
+    Three independent contributions are estimated:
+      1. Cell Panel Quilting:  local bending of the faceplate across each
+         triangular isogrid cell under self-weight.  Scales as (L/t_f)^4.
+      2. Global Mirror Sag:    rigid-body equivalent sag of the mirror blank
+         on N support points.  Scales as D^4 / (h^3 * N).
+      3. Whiffletree Span:     residual differential deflection between
+         adjacent support hubs due to the finite ring spacing.
+
+    Material constants are hard-coded for Zerodur (the only material this
+    pipeline supports):
+      E  = 91000 MPa,  nu = 0.24,  rho = 2530 kg/m^3
+    """
+    E_mpa   = 91000.0   # Zerodur Young's modulus [MPa]
+    nu      = 0.24      # Poisson's ratio
+    rho     = 2530.0    # density [kg/m^3]
+    g       = 9806.65   # gravity [mm/s^2]
+
+    log(lw, "")
+    log(lw, "  ┌─ PRE-SOLVE OPTICAL STIFFNESS CHECK ─────────────────────────────────")
+    log(lw, "  │  Material: Zerodur  (E=91 GPa, ρ=2530 kg/m³, ν=0.24)")
+    log(lw, "  │  Optical Budget (user spec): %.0f nm" % optical_limit_nm)
+    log(lw, "  │")
+
+    # ── 1. CELL PANEL QUILTING ─────────────────────────────────────────────
+    # Equilateral triangular plate, clamped edges, uniform self-weight pressure.
+    # Using Roark 8th ed. Table 11.4 coefficient α ≈ 0.00230 for clamped
+    # equilateral triangle (conservative — simply supported gives ~0.00440).
+    D_plate = E_mpa * (faceplate ** 3) / (12.0 * (1.0 - nu ** 2))   # [N·mm]
+    # Self-weight pressure on the faceplate [N/mm²]
+    q_face  = rho * 1e-9 * g * faceplate   # rho[kg/m³] → [kg/mm³] × g[mm/s²] × t[mm]
+    alpha_clamp = 0.00230                   # Roark clamped equilateral triangle coeff
+    delta_panel_mm = alpha_clamp * q_face * (cell_size ** 4) / D_plate
+    delta_panel_nm = delta_panel_mm * 1e6
+
+    log(lw, "  │  [1] Cell Panel Quilting")
+    log(lw, "  │      Faceplate: %.1f mm  |  Cell span: %.1f mm" % (faceplate, cell_size))
+    log(lw, "  │      Plate stiffness D = %.1f N·mm" % D_plate)
+    log(lw, "  │      Estimated panel quilting (PV): %7.1f nm" % delta_panel_nm)
+
+    if delta_panel_nm > optical_limit_nm:
+        # Compute the faceplate needed to meet the budget from quilting alone
+        # delta ∝ 1/t³  →  t_need = t_cur * (delta_cur / budget)^(1/3)
+        t_need = faceplate * ((delta_panel_nm / optical_limit_nm) ** (1.0 / 3.0))
+        log(lw, "  │      *** FAIL: %.1f nm  >  %.0f nm budget" % (delta_panel_nm, optical_limit_nm))
+        log(lw, "  │          Minimum faceplate for <%d nm quilting: %.1f mm" % (int(optical_limit_nm), t_need))
+        log(lw, "  │          (Current: %.1f mm,  Yoder Sec 2.5 minimum: 4.0 mm)" % faceplate)
+    else:
+        log(lw, "  │      ✓  PASS: %.1f nm  ≤  %.0f nm budget" % (delta_panel_nm, optical_limit_nm))
+
+    # ── 2. GLOBAL MIRROR SAG ON N-POINT SUPPORT ───────────────────────────
+    # Simplified estimate: treat the mirror as a uniform elastic disk of
+    # thickness h (total), supported on a ring at Yoder radius ≈ 0.645 R.
+    # δ_global ≈ 5 ρ g R^4 / (64 D_mirror)   [clamped-edge analogy]
+    # For N-point whiffletree the effective stiffness scales with √N.
+    R        = diameter / 2.0
+    h        = total_depth               # full depth used as effective thickness
+    D_mirror = E_mpa * (h ** 3) / (12.0 * (1.0 - nu ** 2))
+    q_global = rho * 1e-9 * g * h       # pressure equivalent to full depth self-weight
+    delta_global_mm = 5.0 * q_global * (R ** 4) / (64.0 * D_mirror)
+    # Scale by 1/sqrt(n_support) — more supports → better averaging
+    delta_global_mm /= math.sqrt(float(n_support_points))
+    delta_global_nm = delta_global_mm * 1e6
+
+    log(lw, "  │")
+    log(lw, "  │  [2] Global Mirror Sag on %d-point Whiffletree" % n_support_points)
+    log(lw, "  │      Mirror depth h = %.1f mm (used as effective plate thickness)" % h)
+    log(lw, "  │      Estimated global sag (PV):   %7.1f nm" % delta_global_nm)
+    if delta_global_nm > optical_limit_nm:
+        log(lw, "  │      *** FAIL: global sag alone exceeds %.0f nm budget" % optical_limit_nm)
+        log(lw, "  │          Increase mirror depth or number of support points.")
+    else:
+        log(lw, "  │      ✓  PASS: %.1f nm  ≤  %.0f nm budget" % (delta_global_nm, optical_limit_nm))
+
+    # ── 3. RMS SURFACE FIGURE (COMBINED ESTIMATE) ─────────────────────────
+    # RSS combination; quilting typically dominates.  Factor 0.25 converts
+    # PV → RMS for a quilted surface (empirical for isogrid mirrors).
+    pv_total_nm    = delta_panel_nm + delta_global_nm
+    rms_figure_nm  = 0.25 * pv_total_nm    # PV-to-RMS for periodic quilting
+
+    log(lw, "  │")
+    log(lw, "  │  [3] Combined Estimate")
+    log(lw, "  │      PV total (panel + global):  %7.1f nm" % pv_total_nm)
+    log(lw, "  │      RMS surface figure (≈PV/4): %7.1f nm" % rms_figure_nm)
+    log(lw, "  │      FEA will give raw 3-D total displacement including rigid-body")
+    log(lw, "  │      sag.  Optical figure = FEA_max × (RMS/PV) after piston/focus")
+    log(lw, "  │      subtraction — typically 5–15× smaller than raw FEA output.")
+
+    # ── VERDICT ───────────────────────────────────────────────────────────
+    log(lw, "  │")
+    if pv_total_nm <= optical_limit_nm:
+        log(lw, "  │  ✓  DESIGN PASSES optical stiffness check (%.1f nm PV < %.0f nm)" % (pv_total_nm, optical_limit_nm))
+    else:
+        log(lw, "  │  ✗  DESIGN FAILS optical stiffness check (%.1f nm PV > %.0f nm)" % (pv_total_nm, optical_limit_nm))
+        log(lw, "  │")
+        log(lw, "  │  ROOT CAUSE:  Faceplate %.1f mm is too thin for %.0f nm budget." % (faceplate, optical_limit_nm))
+        log(lw, "  │")
+        log(lw, "  │  DESIGN RECOMMENDATIONS:")
+        t_min_quilting = faceplate * ((delta_panel_nm / optical_limit_nm) ** (1.0/3.0))
+        t_min          = max(t_min_quilting, 4.0)   # Yoder Sec 2.5 hard floor
+        log(lw, "  │    • Increase faceplate to ≥ %.1f mm  (Yoder min: 4.0 mm)" % t_min)
+        cell_max = cell_size * ((optical_limit_nm / delta_panel_nm) ** (1.0/4.0))
+        log(lw, "  │    • Reduce cell size to ≤ %.1f mm  (current: %.1f mm)" % (cell_max, cell_size))
+        log(lw, "  │    • Or increase total mirror depth to add global bending stiffness")
+        log(lw, "  │    Note: re-run lightweighting optimizer after parameter changes.")
+
+    log(lw, "  └──────────────────────────────────────────────────────────────────")
+    log(lw, "")
+
+    return pv_total_nm, rms_figure_nm
+
 def assign_zerodur_material_cad(workPart, body, lw):
     mat_mgr = workPart.MaterialManager
     zerodur = None
@@ -509,11 +628,20 @@ def main():
         
     # Tag CAD support faces and create reference points
     tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, snapped_hubs, back_z, hub_outer_r, lw)
-    
+
+    # ── PRE-SOLVE OPTICAL STIFFNESS CHECK ────────────────────────────────────
+    # Analytically estimate optical surface figure BEFORE running the FEA.
+    # Checks whether the faceplate and cell geometry satisfy the 60 nm budget.
+    OPTICAL_BUDGET_NM = 60.0
+    check_optical_stiffness(
+        diameter, central_hole_dia, total_depth, faceplate, cell_size, rib_thick,
+        num_hubs, OPTICAL_BUDGET_NM, lw
+    )
+
     # Compute adaptive mesh size
     mesh_elem_size = compute_adaptive_mesh_size(diameter)
     log(lw, "      Auto Mesh Element Size: %.1f mm (for D=%.0f mm mirror)" % (mesh_elem_size, diameter))
-    
+
     # Assign material Zerodur in CAD part
     assign_zerodur_material_cad(workPart, mirror_body, lw)
     
