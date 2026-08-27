@@ -420,11 +420,33 @@ def detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, expected_cou
     Directly scans the CAD solid body geometry to find the EXACT physical centers
     (X, Y) of all drilled Whiffletree support holes in the mirror.
 
-    Because CAD hole features exist as 16-faceted or cylindrical vertical faces
-    drilled through the ribs/bosses, their bounding boxes give the true physical
-    location with micrometer accuracy, avoiding any analytical grid offset.
+    Distinguishes support holes from triangular pocket fillets by:
+      1. Hole facets have width <= 6.5mm (inner hole diameter is 6.0mm / 8.0mm).
+      2. Exactly 16 facet faces and 16 top rim edges form each hole, tightly
+         clustered within radius <= 4.0mm of the hole center.
+      3. Pocket corner fillets (only 1-2 faces per pocket corner) are rejected.
     """
-    hole_faces = []
+    hole_samples = []
+
+    # 1. Scan back-face hole rim edges
+    for edge in mirror_body.GetEdges():
+        try:
+            bbox = uf_session.Modl.AskBoundingBox(edge.Tag)
+            ecx = (bbox[0] + bbox[3]) / 2.0
+            ecy = (bbox[1] + bbox[4]) / 2.0
+            ecz = (bbox[2] + bbox[5]) / 2.0
+            edx = bbox[3] - bbox[0]
+            edy = bbox[4] - bbox[1]
+            edz = bbox[5] - bbox[2]
+            r_center = math.hypot(ecx, ecy)
+
+            # Hole rim segments: on back face, small length <= 6.5mm, planar
+            if abs(ecz - back_z) <= 3.0 and edx <= 6.5 and edy <= 6.5 and edz <= 2.0 and r_center >= 20.0:
+                hole_samples.append((ecx, ecy))
+        except Exception:
+            pass
+
+    # 2. Scan hole vertical wall facets
     for face in mirror_body.GetFaces():
         try:
             bbox = uf_session.Modl.AskBoundingBox(face.Tag)
@@ -436,38 +458,35 @@ def detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, expected_cou
             fdz = bbox[5] - bbox[2]
             r_center = math.hypot(fcx, fcy)
 
-            # Whiffletree support hole facets:
-            # - Small cross-section in XY (fdx, fdy <= 30.0 mm)
-            # - Substantial vertical depth in Z (fdz >= 8.0 mm)
-            # - Not the center mirror hole (r_center >= 20.0 mm)
-            if fdx <= 30.0 and fdy <= 30.0 and fdz >= 8.0 and r_center >= 20.0:
-                hole_faces.append((fcx, fcy, fcz, face))
+            # Whiffletree hole inner facet: width <= 6.5mm, deep vertical face (fdz >= 10mm)
+            if fdx <= 6.5 and fdy <= 6.5 and fdz >= 10.0 and r_center >= 20.0:
+                hole_samples.append((fcx, fcy))
         except Exception:
             pass
 
-    # Group faces by spatial proximity in XY (faces belonging to the same hole are within 10mm)
+    # Group samples by tight spatial proximity (radius <= 4.0mm)
     clusters = []
-    for (fcx, fcy, fcz, face) in hole_faces:
+    for (sx, sy) in hole_samples:
         matched = False
         for cl in clusters:
             avg_x = sum(p[0] for p in cl) / float(len(cl))
             avg_y = sum(p[1] for p in cl) / float(len(cl))
-            if math.hypot(fcx - avg_x, fcy - avg_y) <= 10.0:
-                cl.append((fcx, fcy))
+            if math.hypot(sx - avg_x, sy - avg_y) <= 4.5:
+                cl.append((sx, sy))
                 matched = True
                 break
         if not matched:
-            clusters.append([(fcx, fcy)])
+            clusters.append([(sx, sy)])
 
-    # Only clusters with multiple facet faces represent actual drilled holes
+    # Only clusters with at least 6 samples represent a genuine 16-faceted hole
     detected_hubs = []
     for cl in clusters:
-        if len(cl) >= 2:
+        if len(cl) >= 6:
             avg_x = sum(p[0] for p in cl) / float(len(cl))
             avg_y = sum(p[1] for p in cl) / float(len(cl))
             detected_hubs.append((round(avg_x, 2), round(avg_y, 2)))
 
-    # Sort hubs by radial ring and angle
+    # Sort hubs by radial ring and angle for clean numbering
     detected_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), -1), math.atan2(p[1], p[0])))
     return detected_hubs
 
