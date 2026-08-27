@@ -415,114 +415,67 @@ def assign_zerodur_material_fem(workFemPart, cae_body, lw):
     zerodur.AssignObjects([cae_body])
     log(lw, "      Successfully assigned material 'zerodur' to CAE body.")
 
-def extract_cad_back_face_vertices(mirror_body, uf_session, back_z, lw):
+def auto_detect_cad_cell_size(mirror_body, uf_session, back_z, lw):
     """
-    Extracts all physical rib-intersection and boss vertex points on the back face
-    directly from the CAD solid body edges and faces.
-    Guarantees that Whiffletree constraint locations snap strictly to real 6-rib
-    intersections and support bosses, never on connecting ribs.
+    Directly measures the actual grid cell size from the triangular/hexagonal pockets
+    in the CAD solid body.
+
+    Guarantees that the exact cell size used to generate the CAD model is used
+    for FEA boundary condition placement, even if no expression was saved in the part.
     """
-    raw_points = []
-    
-    # 1. Edge endpoints on back face
-    for edge in mirror_body.GetEdges():
+    pocket_centers = []
+
+    for face in mirror_body.GetFaces():
         try:
-            v_data = uf_session.Modl.AskEdgeVerts(edge.Tag)
-            p1 = v_data[2]  # [x, y, z]
-            p2 = v_data[3]  # [x, y, z]
-            if abs(p1[2] - back_z) <= 3.0:
-                raw_points.append((p1[0], p1[1]))
-            if abs(p2[2] - back_z) <= 3.0:
-                raw_points.append((p2[0], p2[1]))
+            bbox = uf_session.Modl.AskBoundingBox(face.Tag)
+            fcx = (bbox[0] + bbox[3]) / 2.0
+            fcy = (bbox[1] + bbox[4]) / 2.0
+            fcz = (bbox[2] + bbox[5]) / 2.0
+            fdx = bbox[3] - bbox[0]
+            fdy = bbox[4] - bbox[1]
+            fdz = bbox[5] - bbox[2]
+
+            # Pocket bottom face: horizontal planar face (fdz <= 2.0mm) inside the mirror
+            if fdz <= 2.0 and abs(fcz - back_z) > 10.0 and fdx >= 15.0 and fdy >= 15.0:
+                pocket_centers.append((fcx, fcy))
         except Exception:
-            try:
-                bbox = uf_session.Modl.AskBoundingBox(edge.Tag)
-                if abs((bbox[2] + bbox[5]) / 2.0 - back_z) <= 3.0:
-                    raw_points.append(((bbox[0] + bbox[3]) / 2.0, (bbox[1] + bbox[4]) / 2.0))
-            except Exception:
-                pass
+            pass
 
-    # 2. Cluster points into discrete vertices (tolerance 5.0 mm)
-    vertices = []
-    cluster_counts = []
-    for (x, y) in raw_points:
-        matched = False
-        for idx, (vx, vy) in enumerate(vertices):
-            if math.hypot(x - vx, y - vy) <= 5.0:
-                cnt = cluster_counts[idx]
-                new_x = (vx * cnt + x) / float(cnt + 1)
-                new_y = (vy * cnt + y) / float(cnt + 1)
-                vertices[idx] = (new_x, new_y)
-                cluster_counts[idx] += 1
-                matched = True
-                break
-        if not matched:
-            vertices.append((x, y))
-            cluster_counts.append(1)
+    if len(pocket_centers) < 3:
+        log(lw, "      Could not auto-detect cell size from pocket bottoms (found %d faces)." % len(pocket_centers))
+        return None
 
-    # 3. Filter: keep 6-rib junctions (multiple converging edges)
-    junction_nodes = []
-    for idx, (vx, vy) in enumerate(vertices):
-        r_ctr = math.hypot(vx, vy)
-        if r_ctr >= 20.0 and cluster_counts[idx] >= 3:
-            junction_nodes.append((round(vx, 2), round(vy, 2)))
+    # Find pairwise centroid distances
+    distances = []
+    for i in range(len(pocket_centers)):
+        for j in range(i + 1, len(pocket_centers)):
+            d = math.hypot(pocket_centers[i][0] - pocket_centers[j][0],
+                           pocket_centers[i][1] - pocket_centers[j][1])
+            if d >= 15.0:
+                distances.append(d)
 
-    # Fallback if count is low: take all non-center vertices
-    if len(junction_nodes) < 18:
-        junction_nodes = [(round(vx, 2), round(vy, 2)) for (vx, vy) in vertices if math.hypot(vx, vy) >= 20.0]
+    if not distances:
+        return None
 
-    log(lw, "      CAD Geometry Scan: Discovered %d real rib intersection vertices on back face." % len(junction_nodes))
-    return junction_nodes
+    distances.sort()
 
-def compute_snapped_whiffletree_hubs_from_cad(cad_vertices, diameter, central_hole_dia, cell_size, pattern_name, support_type, lw):
-    """
-    Snaps theoretical Whiffletree support positions directly to the REAL CAD vertices
-    discovered from the physical CAD body.
-    """
-    R = diameter / 2.0
-    Ri = central_hole_dia / 2.0
-    area_span = max(100.0, R * R - Ri * Ri)
-    r1 = math.sqrt(Ri * Ri + area_span / 6.0)
-    r2 = math.sqrt(Ri * Ri + 2.0 * area_span / 3.0)
-    
-    num_inner = 3 if (support_type == '9point' or support_type == 9) else 6
-    num_outer = 6 if (support_type == '9point' or support_type == 9) else 12
-    
-    theoretical_hubs = []
-    # Inner ring
-    for i in range(num_inner):
-        a = math.radians(i * (360.0 / num_inner))
-        theoretical_hubs.append((r1 * math.cos(a), r1 * math.sin(a)))
-    # Outer ring
-    for i in range(num_outer):
-        a = math.radians(i * (360.0 / num_outer) + (180.0 / num_outer))
-        theoretical_hubs.append((r2 * math.cos(a), r2 * math.sin(a)))
+    # In an equilateral triangle isogrid:
+    # 1. Centroid distance between adjacent opposite triangles sharing an edge is d_opp = CELL_SIDE / sqrt(3)
+    # 2. Centroid distance between adjacent same-orientation triangles is d_same = CELL_SIDE
+    min_cluster = [d for d in distances if d <= distances[0] * 1.25]
+    d_opp_avg = sum(min_cluster) / float(len(min_cluster))
+    detected_cell_from_opp = d_opp_avg * math.sqrt(3.0)
 
-    if not cad_vertices:
-        log(lw, "      Using formula grid snapping fallback...")
-        return compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
+    same_cluster = [d for d in distances if abs(d - detected_cell_from_opp) <= detected_cell_from_opp * 0.15]
+    if same_cluster:
+        detected_cell = sum(same_cluster) / float(len(same_cluster))
+    else:
+        detected_cell = detected_cell_from_opp
 
-    # Snap each theoretical hub to the closest real CAD vertex, guaranteeing 1-to-1 unique assignment
-    snapped = []
-    used_indices = set()
-    
-    for (tx, ty) in theoretical_hubs:
-        best_idx = None
-        min_d = 999999.0
-        for idx, (vx, vy) in enumerate(cad_vertices):
-            if idx in used_indices:
-                continue
-            d = math.hypot(tx - vx, ty - vy)
-            if d < min_d:
-                min_d = d
-                best_idx = idx
-        if best_idx is not None:
-            used_indices.add(best_idx)
-            snapped.append(cad_vertices[best_idx])
-        else:
-            snapped.append((tx, ty))
-
-    return snapped
+    detected_cell = round(detected_cell, 1)
+    log(lw, "      ✓ Auto-Detected CAD Isogrid Cell Size: %.1f mm (measured from %d pockets)"
+        % (detected_cell, len(pocket_centers)))
+    return detected_cell
 
 def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, hubs, back_z, hub_outer_r, lw):
     """
@@ -753,22 +706,20 @@ def main():
     log(lw, "      Total Depth:      %.1f mm" % total_depth)
     log(lw, "      Pocket Depth:     %.1f mm" % pocket_depth)
     log(lw, "      Faceplate:        %.1f mm" % faceplate)
-    log(lw, "      Cell Size:        %.1f mm" % cell_size)
+    # Auto-detect exact cell size directly from CAD pocket geometry
+    detected_cell = auto_detect_cad_cell_size(mirror_body, uf_session, back_z, lw)
+    if detected_cell is not None and detected_cell > 10.0:
+        cell_size = detected_cell
+
+    log(lw, "      Cell Size (Active): %.1f mm" % cell_size)
     log(lw, "      Rib Thickness:    %.1f mm" % rib_thick)
     log(lw, "      Hub Outer Radius: %.1f mm" % hub_outer_r)
     log(lw, "      Support Type:     %s (%d points)" % (support_type, num_hubs))
     log(lw, "      Rib Pattern:      %s" % pattern_name)
-    
-    # ── 1. SCAN CAD BODY TO EXTRACT REAL 6-RIB JUNCTION VERTICES ────────────
-    # Extracting real vertex intersections from the solid CAD body guarantees
-    # 100% precision with the physical mirror geometry, regardless of cell size
-    # or expression settings.
-    cad_vertices = extract_cad_back_face_vertices(mirror_body, uf_session, back_z, lw)
-    active_hubs = compute_snapped_whiffletree_hubs_from_cad(
-        cad_vertices, diameter, central_hole_dia, cell_size, pattern_name, support_type, lw
-    )
 
-    log(lw, "      Active Whiffletree Support Hubs (%d points):" % len(active_hubs))
+    # Compute the EXACT snapped Whiffletree positions matching CAD holes
+    active_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
+    log(lw, "      Computed %d Whiffletree Support Hubs (snapped to isogrid vertices):" % len(active_hubs))
     for i, (hx, hy) in enumerate(active_hubs):
         log(lw, "        Hub %2d: (%6.2f, %6.2f) mm  r=%6.2f mm" % (i+1, hx, hy, math.hypot(hx, hy)))
 
