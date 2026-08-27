@@ -428,8 +428,8 @@ def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, h
             fcy = (bbox[1] + bbox[4]) / 2.0
             fdx = bbox[3] - bbox[0]
             fdy = bbox[4] - bbox[1]
-            
-            # Support hole facet or pad face
+
+            # Support hole facet: small face near a hub position
             if fdx <= 50.0 and fdy <= 50.0:
                 for i, (hx, hy) in enumerate(hubs):
                     dist = math.hypot(fcx - hx, fcy - hy)
@@ -439,9 +439,9 @@ def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, h
                         break
         except Exception:
             pass
-            
+
     log(lw, "      Tagged %d Whiffletree support hole faces in CAD Part." % len(tagged_faces))
-    
+
     # Create CAD points at support positions to sync into FEM/SIM
     created_points = []
     for i, (hx, hy) in enumerate(hubs):
@@ -451,18 +451,21 @@ def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, h
             created_points.append(pt)
         except Exception:
             pass
-            
+
     log(lw, "      Created %d Whiffletree reference points in CAD Part." % len(created_points))
 
-def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, hubs, back_z, hub_outer_r, lw):
-    """
-    Find the closest FE mesh node to each Whiffletree hub.
 
-    Returns a list of integer node labels (stable identifiers valid across
-    part contexts). After the SIM part is created, resolve each label through
-    workSimPart.Simulation.Femodel.FenodeLabelMap.GetNode(label) to get the
-    FENode object that lives in the SIM part's own context — that is the object
-    accepted by SetTargetSetMembers(..., CaeSetGroupFilterType.Node, ...).
+def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, hubs, back_z, hub_outer_r, lw):
+
+    """
+    Find the FE mesh node on the BACK FACE of the mirror closest to each
+    Whiffletree hub XY position.
+
+    TWO-PASS APPROACH:
+    Pass 1 - Auto-detect back face Z from node distribution, filter to
+             only nodes within a narrow Z band of that face.
+    Pass 2 - Pure XY nearest-neighbour search among back-face nodes only.
+             Rib-wall nodes at interior Z depths are never considered.
     """
     smart_sel_mgr = workFemPart.SmartSelectionMgr
     try:
@@ -473,8 +476,8 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
     all_nodes = related_node_method.GetNodes()
     log(lw, "      Retrieved %d FE mesh nodes from body via SmartSelectionMgr..." % len(all_nodes))
 
-    # Build coordinate + label lookup in one pass
-    node_data = []   # list of (label, x, y, z)
+    # Build (label, x, y, z) list in one pass
+    node_data = []
     for node in all_nodes:
         try:
             c = node.Coordinates
@@ -484,44 +487,77 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
 
     log(lw, "      Resolved coordinates for %d of %d nodes..." % (len(node_data), len(all_nodes)))
 
+    # ── PASS 1: AUTO-DETECT BACK FACE & FILTER ─────────────────────────────
+    all_z   = [nz_ for (_, _, _, nz_) in node_data]
+    z_min   = min(all_z)
+    z_max   = max(all_z)
+    z_range = z_max - z_min
+
+    # The back face is whichever extreme is closer to the hint back_z.
+    # If back_z is not available or wrong, the distribution extremum still
+    # correctly identifies the face the pockets open on.
+    if abs(z_min - back_z) <= abs(z_max - back_z):
+        z_face = z_min
+    else:
+        z_face = z_max
+
+    # Z tolerance: 8 % of total depth, clamped to [8 mm, 25 mm].
+    # This keeps nodes on the flat back face while rejecting rib-wall nodes
+    # which live 20–80 mm above/below the face in Z.
+    z_tol = max(8.0, min(25.0, 0.08 * z_range))
+
+    back_face_nodes = [
+        (label, nx_, ny_, nz_)
+        for (label, nx_, ny_, nz_) in node_data
+        if abs(nz_ - z_face) <= z_tol
+    ]
+
+    log(lw, "      Back face auto-detected at Z = %.2f mm  (hint back_z=%.2f mm)" % (z_face, back_z))
+    log(lw, "      Back-face Z band: [%.2f, %.2f] mm  (tol = %.1f mm)" % (z_face - z_tol, z_face + z_tol, z_tol))
+    log(lw, "      Nodes on back face: %d of %d total" % (len(back_face_nodes), len(node_data)))
+
+    if len(back_face_nodes) < len(hubs):
+        log(lw, "      WARNING: Fewer back-face nodes (%d) than hubs (%d). Widening Z band to 2x..."
+            % (len(back_face_nodes), len(hubs)))
+        z_tol *= 2.0
+        back_face_nodes = [
+            (label, nx_, ny_, nz_)
+            for (label, nx_, ny_, nz_) in node_data
+            if abs(nz_ - z_face) <= z_tol
+        ]
+        log(lw, "      Extended back-face nodes: %d" % len(back_face_nodes))
+
+    # ── PASS 2: XY-ONLY NEAREST-NEIGHBOUR SEARCH ────────────────────────────
     hub_node_labels = []
-    used_labels = set()   # Prevents two hubs from sharing a node. When two hub
-                          # positions snap to the same grid vertex (e.g. both at
-                          # (0, 241.62)), the second hub is forced to pick the
-                          # next-nearest distinct node.
+    used_labels = set()
 
     for i, (hx, hy) in enumerate(hubs):
-        best_label = None
-        min_dist = 999999.0
+        best_label  = None
+        min_d_xy    = 999999.0
         best_coords = (0.0, 0.0, 0.0)
-        for (label, nx_, ny_, nz_) in node_data:
+
+        for (label, nx_, ny_, nz_) in back_face_nodes:
             if label in used_labels:
-                continue   # already claimed by an earlier hub
+                continue        # already claimed by an earlier hub
             d_xy = math.hypot(nx_ - hx, ny_ - hy)
-            d_z  = abs(nz_ - back_z)
-            total_d = d_xy + d_z * 1.5
-            if total_d < min_dist:
-                min_dist = total_d
-                best_label = label
+            if d_xy < min_d_xy:
+                min_d_xy    = d_xy
+                best_label  = label
                 best_coords = (nx_, ny_, nz_)
 
-        # No distance threshold — always accept the nearest available node.
-        # This guarantees exactly len(hubs) constraints are created even when
-        # the CAD only has 16 physical holes (the 2 extra hubs land on nearby
-        # rib nodes at the correct theoretical support positions).
         if best_label is not None:
             hub_node_labels.append(best_label)
             used_labels.add(best_label)
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm: Node label %d at (%6.1f, %6.1f, %6.1f) mm (dist=%.2f mm)"
+            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm → Node %d at (%6.1f, %6.1f, %6.1f) mm  d_xy=%.2f mm"
                 % (i + 1, hx, hy, best_label,
-                   best_coords[0], best_coords[1], best_coords[2], min_dist))
+                   best_coords[0], best_coords[1], best_coords[2], min_d_xy))
         else:
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm: ERROR – mesh has no remaining unclaimed nodes!"
+            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm → ERROR: no unclaimed back-face node!"
                 % (i + 1, hx, hy))
 
-    log(lw, "      Located %d of %d Whiffletree hub node labels." % (len(hub_node_labels), len(hubs)))
+    log(lw, "      Located %d of %d Whiffletree hub node labels on back face." % (len(hub_node_labels), len(hubs)))
     if len(hub_node_labels) < len(hubs):
-        log(lw, "      WARNING: Only %d nodes found for %d hubs — mesh may be too coarse." % (len(hub_node_labels), len(hubs)))
+        log(lw, "      WARNING: Only %d nodes found for %d hubs." % (len(hub_node_labels), len(hubs)))
     return hub_node_labels
 
 def main():
