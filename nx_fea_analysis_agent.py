@@ -774,24 +774,40 @@ def main():
     # Compute the theoretical snapped Whiffletree positions with the exact cell size
     snapped_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
     
-    # ── PRIMARY: locate the REAL drilled hole positions directly from CAD ──
-    cad_hub_positions = find_hub_positions_from_cad_geometry(
-        mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, num_hubs, lw
-    )
+    # ── 1. PRIMARY: READ EXPLICIT MARKER POINTS CREATED BY CAD GENERATOR ────
+    cad_marked_hubs = []
+    for pt in workPart.Points:
+        try:
+            p_name = pt.Name
+            if "WHIFFLETREE_SUPPORT_PT" in p_name or "WHIFFLETREE_PT" in p_name:
+                coords = pt.Coordinates
+                cad_marked_hubs.append((round(coords.X, 2), round(coords.Y, 2)))
+        except Exception:
+            pass
 
-    if len(cad_hub_positions) >= 6:
-        log(lw, "      ✓ Using %d ACTUAL hole positions scanned from CAD geometry." % len(cad_hub_positions))
-        hubs = list(cad_hub_positions[:num_hubs])
-        if len(hubs) < num_hubs:
-            for shx, shy in snapped_hubs:
-                if len(hubs) >= num_hubs:
-                    break
-                if not any(math.hypot(shx - dhx, shy - dhy) < 15.0 for (dhx, dhy) in hubs):
-                    hubs.append((shx, shy))
+    if len(cad_marked_hubs) >= 6:
+        log(lw, "      ✓ Found %d EXPLICIT Whiffletree Support Marker Points in CAD Part!" % len(cad_marked_hubs))
+        cad_marked_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), 1), math.atan2(p[1], p[0])))
+        hubs = cad_marked_hubs[:num_hubs]
     else:
-        log(lw, "      WARNING: CAD scan found %d hole cluster(s), expected %d. Falling back to theoretical positions."
-            % (len(cad_hub_positions), num_hubs))
-        hubs = snapped_hubs
+        # ── 2. SECONDARY: LOCATE DRILLED HOLE CYLINDERS FROM CAD BODY ───────
+        cad_hub_positions = find_hub_positions_from_cad_geometry(
+            mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, num_hubs, lw
+        )
+
+        if len(cad_hub_positions) >= 6:
+            log(lw, "      ✓ Using %d ACTUAL hole positions scanned from CAD geometry." % len(cad_hub_positions))
+            hubs = list(cad_hub_positions[:num_hubs])
+            if len(hubs) < num_hubs:
+                for shx, shy in snapped_hubs:
+                    if len(hubs) >= num_hubs:
+                        break
+                    if not any(math.hypot(shx - dhx, shy - dhy) < 15.0 for (dhx, dhy) in hubs):
+                        hubs.append((shx, shy))
+        else:
+            log(lw, "      WARNING: CAD scan found %d hole cluster(s), expected %d. Falling back to theoretical positions."
+                % (len(cad_hub_positions), num_hubs))
+            hubs = snapped_hubs
 
     log(lw, "      Final %d Whiffletree Hub Positions in use for tagging/FEM:" % len(hubs))
     for i, (hx, hy) in enumerate(hubs):
