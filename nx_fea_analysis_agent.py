@@ -908,11 +908,14 @@ def main():
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
     unit_mm = workFemPart.UnitCollection.FindObject("MilliMeter")
-    mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
+    mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
     try:
         mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", str(mesh_elem_size), unit_mm)
     except Exception:
-        pass
+        try:
+            mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("mesh overall edge size", str(mesh_elem_size), unit_mm)
+        except Exception:
+            pass
 
     mesh_builder.SelectionList.Add(cae_body)
     mesh_builder.CommitMesh()
