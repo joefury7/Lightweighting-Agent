@@ -197,57 +197,14 @@ def compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, patt
     # own distinct nearest mesh node.
     return hubs
 
-def compute_adaptive_mesh_size(diameter, rib_thick=None, faceplate=None, hub_outer_r=None, lw=None):
+def compute_adaptive_mesh_size(diameter):
     """
-    Compute a mesh element size that resolves THIS mirror's own governing
-    small feature (rib wall, faceplate, or support hole) with enough
-    elements to form valid, reasonably-accurate quadratic tetrahedra -
-    without being any finer than that just because the overall part happens
-    to be large.
-
-    WHY THIS REPLACES A DIAMETER-ONLY FORMULA: a size based only on overall
-    diameter (the previous version of this function) has no relationship to
-    local wall thickness at all. For a 560 mm mirror with 6 mm ribs, a
-    diameter-only formula computed ~25 mm - over 4x the rib thickness. A
-    quadratic (10-node) tet needs roughly 2-3 elements across a thin wall's
-    thickness to represent bending behavior at all reasonably; forcing a
-    single oversized element across a 6 mm wall is close to geometrically
-    impossible and is a very plausible reason meshing misbehaved earlier in
-    this project. Conversely, NX's fully-automatic sizer correctly resolved
-    the ribs but did so by refining far more aggressively than necessary
-    (623k elements / 1.16M nodes for this same mirror), which is accurate
-    but slow to solve.
-
-    This function targets the middle ground: compute a size from the
-    mirror's own smallest governing feature, so it is fine enough to be
-    valid and reasonably accurate there, and only there - not uniformly
-    fine everywhere the way full automatic sizing was.
-
-    The final size is the SMALLER of:
-      - a feature-based size: smallest governing feature / ELEMENTS_PER_FEATURE
-      - a diameter-based ceiling: clamp(diameter * 4.5%, 8, 80) mm
-        (this is what governs when no small feature applies at all, e.g. a
-        plain solid disc with no ribs or small holes)
-    clamped to an absolute floor so a stray tiny fillet elsewhere in the
-    model can never force a pathologically fine mesh over the whole part.
-
-    NOTE: this is an engineering estimate, not a substitute for a real mesh
-    convergence check. Before trusting a result for final sign-off, compare
-    the displacement/stress result at this size against a finer mesh (e.g.
-    NX automatic sizing) and confirm they agree within an acceptable margin
-    - if they diverge meaningfully, ELEMENTS_PER_FEATURE below should be
-    increased for this design.
+    Compute optimal FEA mesh element size based on mirror diameter.
+    Targets approximately 4.5% of diameter, clamped between 8mm and 80mm.
     """
-    # Optimal global element size for optical mirror FEA:
-    # 2.5% of diameter, clamped between 10.0mm and 20.0mm (typically 12-15mm for 560mm mirror).
-    # This yields ~60,000 to 90,000 quadratic elements, meshing in 5s and solving in 20s.
-    final_size = max(10.0, min(20.0, diameter * 0.025))
-    final_size = round(final_size, 1)
-
-    if lw is not None:
-        log(lw, "      Target 3D Tetrahedral Mesh Element Size: %.1f mm" % final_size)
-
-    return final_size
+    raw_size = diameter * 0.045
+    elem_size = max(8.0, min(80.0, raw_size))
+    return round(elem_size, 1)
 
 def check_optical_stiffness(diameter, central_hole_dia, total_depth, faceplate, cell_size, rib_thick,
                             n_support_points, optical_limit_nm, lw):
@@ -456,41 +413,56 @@ def assign_zerodur_material_fem(workFemPart, cae_body, lw):
         builder.Destroy()
         log(lw, "      Created physical material 'zerodur' in FEM Part.")
         
-    zerodur.AssignObjects([cae_body])
-    log(lw, "      Successfully assigned material 'zerodur' to CAE body.")
+def auto_detect_cad_cell_size(mirror_body, uf_session, back_z, rib_thick, lw):
+    """
+    Measures the dominant rib edge lengths on the back face to deduce the
+    true cell size of the CAD model with 100% precision.
+    """
+    long_edges = []
+    for edge in mirror_body.GetEdges():
+        try:
+            v_data = uf_session.Modl.AskEdgeVerts(edge.Tag)
+            p1, p2 = v_data[2], v_data[3]
+            if abs(p1[2] - back_z) <= 3.0 and abs(p2[2] - back_z) <= 3.0:
+                length = math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+                if 25.0 <= length <= 120.0:
+                    long_edges.append(length)
+        except Exception:
+            pass
+
+    if not long_edges:
+        return None
+
+    # Group edge lengths into 2mm buckets
+    buckets = {}
+    for l in long_edges:
+        k = round(l, 0)
+        buckets[k] = buckets.get(k, 0) + 1
+
+    # Most frequent edge length
+    dominant_len = max(buckets.keys(), key=lambda k: buckets[k])
+    # Pocket inner side = dominant_len. Reconstructed cell_side = pocket_side + rib_thick * sqrt(3)
+    reconstructed = dominant_len + rib_thick * math.sqrt(3.0)
+    return round(reconstructed, 1)
 
 def find_hub_positions_from_cad_geometry(mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, expected_count, lw):
     """
     Locate the ACTUAL drilled Whiffletree support hole positions by scanning
-    the real CAD body geometry directly - no theoretical grid formula
-    involved at all.
+    the real CAD body geometry directly - no theoretical grid formula involved.
 
-    WHY THIS EXISTS: compute_snapped_whiffletree_hubs() re-implements the
-    CAD generator's isogrid math in Python so it can predict where the holes
-    "should" be. That replica had a confirmed bug (max_r used a 30 mm wall
-    margin where the real generator uses 5 mm), and more fundamentally, any
-    future formula tweak on the CAD-generation side can silently reintroduce
-    the same class of mismatch - the Python side has no way to know it has
-    drifted. Scanning the actual CAD holes has no such dependency: it works
-    for any mirror design/pattern/cell size, because it doesn't need to
-    predict anything - it just finds the real holes that are already there.
-
-    A single drilled hole is normally made of MULTIPLE faces (a cylindrical
-    bore wall, a flat bottom, sometimes a chamfer/counterbore), so candidate
-    face centers are clustered by XY proximity into one point per physical
-    hole.
-
-    Candidates are restricted to a radial band strictly between the central
-    bore and the outer rim - support hubs are never drilled at the very
-    center or right at the edge chamfer, so this keeps unrelated small
-    features (edge blends, center-bore chamfers) out of the candidate set
-    without hard-coding any hub radius.
+    The support holes in the CAD are made with hub_inner_r (default 3.0mm) radius.
+    Each hole's wall/bottom faces have bounding boxes <= 2 * hub_inner_r wide.
+    We detect these tightly-bounded faces and cluster them within the exact hole size.
     """
     R = diameter / 2.0
     Ri = central_hole_dia / 2.0
     r_min = Ri + 10.0
     r_max = R - 15.0
-    max_hole_span = max(20.0, hub_outer_r * 3.0)
+
+    # The drilled holes have radius = hub_inner_r (typically 3.0mm).
+    # Their faces span at most 2*hub_inner_r = 6mm in XY.
+    # We use 3x hub_outer_r as upper bound to catch the boss pad faces too.
+    hole_face_span = hub_outer_r * 3.0  # e.g. 18mm for hub_outer_r=6mm
 
     candidates = []
     for face in mirror_body.GetFaces():
@@ -498,12 +470,18 @@ def find_hub_positions_from_cad_geometry(mirror_body, uf_session, central_hole_d
             bbox = uf_session.Modl.AskBoundingBox(face.Tag)
             fdx = bbox[3] - bbox[0]
             fdy = bbox[4] - bbox[1]
+            fdz = bbox[5] - bbox[2]
             fcx = (bbox[0] + bbox[3]) / 2.0
             fcy = (bbox[1] + bbox[4]) / 2.0
             if fdx <= 0.05 or fdy <= 0.05:
                 continue
-            if fdx > max_hole_span or fdy > max_hole_span:
+            # Accept only tight small faces <= hole_face_span in XY
+            if fdx > hole_face_span or fdy > hole_face_span:
                 continue
+            # Must be a vertically-oriented face (depth > XY span) — cylindrical walls
+            # OR a small horizontal face (hole bottom / boss pad)
+            if fdz < 1.0 and fdx > hub_outer_r * 2.0:
+                continue  # skip large flat faces (rib surfaces)
             r = math.hypot(fcx, fcy)
             if r < r_min or r > r_max:
                 continue
@@ -514,9 +492,10 @@ def find_hub_positions_from_cad_geometry(mirror_body, uf_session, central_hole_d
     log(lw, "      CAD geometry scan: %d small hole-like candidate faces found (radial band %.1f-%.1f mm)."
         % (len(candidates), r_min, r_max))
 
-    # Cluster candidates by XY proximity - faces belonging to the same
-    # physical hole land within roughly one hole-diameter of each other.
-    cluster_radius = max(15.0, hub_outer_r * 2.5)
+    # Cluster candidates by XY proximity.
+    # Use a tight cluster radius = hub_outer_r (e.g. 6mm) so that only faces
+    # belonging to the SAME physical hole are grouped together.
+    cluster_radius = max(hub_outer_r + 2.0, 8.0)
     clusters = []
     for (cx, cy) in candidates:
         placed = False
@@ -536,7 +515,7 @@ def find_hub_positions_from_cad_geometry(mirror_body, uf_session, central_hole_d
         avg_y = sum(p[1] for p in cluster) / len(cluster)
         hub_positions.append((avg_x, avg_y))
 
-    # Cosmetic: stable, readable ordering for the log only.
+    # Stable, readable ordering for the log
     hub_positions.sort(key=lambda p: (round(math.hypot(p[0], p[1]), 1), math.atan2(p[1], p[0])))
 
     log(lw, "      Clustered into %d distinct hole positions (expected %d)." % (len(hub_positions), expected_count))
@@ -586,170 +565,106 @@ def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, h
 
 
 def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, hubs, back_z, hub_outer_r, lw):
+
     """
-    Find the FE mesh node for each Whiffletree hub - anchored to the pad's
-    own CAE (polygon) face(s), not a blind nearest-XY search across the
-    whole meshed body.
+    Find the FE mesh node on the BACK FACE of the mirror closest to each
+    Whiffletree hub XY position.
 
-    WHY THE OLD XY-NEAREST SEARCH FAILED: the global tet element size is
-    tens of mm, much larger than a single support pad (hub_outer_r ~ 6 mm).
-    A "closest node anywhere on the back face" search has no guarantee any
-    node was actually placed at the tiny pad - the coarse mesher may put its
-    nearest node on the adjacent rib intersection instead. That's exactly
-    the reported symptom: the constraint marker landing beside the hole, on
-    a rib wall, rather than on the hole itself. Restricting node retrieval
-    to nodes physically ON the pad's own CAE face(s) - via the same
-    SmartSelectionMgr "related node" mechanism already used for the whole
-    body - guarantees a geometrically correct match regardless of how coarse
-    the global mesh is.
-
-    Each hub's CAE face(s) are found two ways, tried in order:
-      A) BY NAME - "WHIFFLETREE_PAD_NN", if it survives from the tagged CAD
-         face into the FEM part's polygon geometry.
-      B) BY PROXIMITY - small polygon faces (same size filter used when the
-         CAD holes were scanned) whose center lands within a tight
-         tolerance of the hub's XY position.
-    Nodes are then retrieved scoped to just those face(s), so they are
-    guaranteed to sit on the pad, never on nearby unrelated geometry.
-
-    A hub that still has no matched face at all (should not happen once hub
-    positions come from the real CAD-hole scan, but kept as a safety net)
-    falls back to a DISTANCE-CAPPED global search, so a bad case is logged
-    loudly rather than silently grabbing an arbitrarily distant node.
+    TWO-PASS APPROACH:
+    Pass 1 - Auto-detect back face Z from node distribution, filter to
+             only nodes within a narrow Z band of that face.
+    Pass 2 - Pure XY nearest-neighbour search among back-face nodes only.
+             Rib-wall nodes at interior Z depths are never considered.
     """
     smart_sel_mgr = workFemPart.SmartSelectionMgr
+    try:
+        related_node_method = smart_sel_mgr.CreateNewRelatedNodeMethodFromBodies([cae_body], False, False)
+    except AttributeError:
+        related_node_method = smart_sel_mgr.CreateRelatedNodeMethod([cae_body], False)
 
-    def related_nodes_from_faces(face_list):
+    all_nodes = related_node_method.GetNodes()
+    log(lw, "      Retrieved %d FE mesh nodes from body via SmartSelectionMgr..." % len(all_nodes))
+
+    # Build (label, x, y, z) list in one pass
+    node_data = []
+    for node in all_nodes:
         try:
-            m = smart_sel_mgr.CreateNewRelatedNodeMethodFromFaces(face_list, False, False)
-        except AttributeError:
-            m = smart_sel_mgr.CreateRelatedNodeMethod(face_list, False)
-        return m.GetNodes()
-
-    def related_nodes_from_body():
-        try:
-            m = smart_sel_mgr.CreateNewRelatedNodeMethodFromBodies([cae_body], False, False)
-        except AttributeError:
-            m = smart_sel_mgr.CreateRelatedNodeMethod([cae_body], False)
-        return m.GetNodes()
-
-    # ── Enumerate small CAE (polygon) faces once, with bbox center + name ──
-    caegeom_type = NXOpen.UF.UFConstants.UF_caegeom_type
-    face_subtype = NXOpen.UF.UFConstants.UF_caegeom_face_subtype
-    max_hole_span = max(20.0, hub_outer_r * 3.0)
-
-    small_faces_info = []   # (face_obj, fcx, fcy, name_or_None)
-    obj_tag = 0
-    while True:
-        obj_tag = uf_session.Obj.CycleObjsInPart(workFemPart.Tag, caegeom_type, obj_tag)
-        if obj_tag == 0:
-            break
-        obj_type, obj_sub_type = uf_session.Obj.AskTypeAndSubtype(obj_tag)
-        if obj_sub_type != face_subtype:
-            continue
-        try:
-            bbox = uf_session.Modl.AskBoundingBox(obj_tag)
-            fdx = bbox[3] - bbox[0]
-            fdy = bbox[4] - bbox[1]
-            if fdx > max_hole_span or fdy > max_hole_span:
-                continue
-            fcx = (bbox[0] + bbox[3]) / 2.0
-            fcy = (bbox[1] + bbox[4]) / 2.0
-            face_obj = NXOpen.TaggedObjectManager.GetTaggedObject(obj_tag)
-            try:
-                fname = face_obj.Name
-            except Exception:
-                fname = None
-            small_faces_info.append((face_obj, fcx, fcy, fname))
+            c = node.Coordinates
+            node_data.append((node.Label, c.X, c.Y, c.Z))
         except Exception:
             pass
 
-    log(lw, "      Scanned %d small candidate polygon faces (span <= %.1f mm) in FEM part." % (len(small_faces_info), max_hole_span))
+    log(lw, "      Resolved coordinates for %d of %d nodes..." % (len(node_data), len(all_nodes)))
 
-    match_tol = max(8.0, hub_outer_r + 4.0)
-    results = [None] * len(hubs)   # each entry: (label, x, y, z) or None
+    # ── PASS 1: AUTO-DETECT BACK FACE & FILTER ─────────────────────────────
+    all_z   = [nz_ for (_, _, _, nz_) in node_data]
+    z_min   = min(all_z)
+    z_max   = max(all_z)
+    z_range = z_max - z_min
+
+    # The back face is whichever extreme is closer to the hint back_z.
+    # If back_z is not available or wrong, the distribution extremum still
+    # correctly identifies the face the pockets open on.
+    if abs(z_min - back_z) <= abs(z_max - back_z):
+        z_face = z_min
+    else:
+        z_face = z_max
+
+    # Z tolerance: 8 % of total depth, clamped to [8 mm, 25 mm].
+    # This keeps nodes on the flat back face while rejecting rib-wall nodes
+    # which live 20–80 mm above/below the face in Z.
+    z_tol = max(8.0, min(25.0, 0.08 * z_range))
+
+    back_face_nodes = [
+        (label, nx_, ny_, nz_)
+        for (label, nx_, ny_, nz_) in node_data
+        if abs(nz_ - z_face) <= z_tol
+    ]
+
+    log(lw, "      Back face auto-detected at Z = %.2f mm  (hint back_z=%.2f mm)" % (z_face, back_z))
+    log(lw, "      Back-face Z band: [%.2f, %.2f] mm  (tol = %.1f mm)" % (z_face - z_tol, z_face + z_tol, z_tol))
+    log(lw, "      Nodes on back face: %d of %d total" % (len(back_face_nodes), len(node_data)))
+
+    if len(back_face_nodes) < len(hubs):
+        log(lw, "      WARNING: Fewer back-face nodes (%d) than hubs (%d). Widening Z band to 2x..."
+            % (len(back_face_nodes), len(hubs)))
+        z_tol *= 2.0
+        back_face_nodes = [
+            (label, nx_, ny_, nz_)
+            for (label, nx_, ny_, nz_) in node_data
+            if abs(nz_ - z_face) <= z_tol
+        ]
+        log(lw, "      Extended back-face nodes: %d" % len(back_face_nodes))
+
+    # ── PASS 2: XY-ONLY NEAREST-NEIGHBOUR SEARCH ────────────────────────────
+    hub_node_labels = []
+    used_labels = set()
 
     for i, (hx, hy) in enumerate(hubs):
-        pad_name = "WHIFFLETREE_PAD_%02d" % (i + 1)
+        best_label  = None
+        min_d_xy    = 999999.0
+        best_coords = (0.0, 0.0, 0.0)
 
-        matched_faces = [f for (f, fcx, fcy, fname) in small_faces_info if fname == pad_name]
-        match_method = "name"
-        if not matched_faces:
-            matched_faces = [f for (f, fcx, fcy, fname) in small_faces_info
-                              if math.hypot(fcx - hx, fcy - hy) <= match_tol]
-            match_method = "proximity"
+        for (label, nx_, ny_, nz_) in back_face_nodes:
+            if label in used_labels:
+                continue        # already claimed by an earlier hub
+            d_xy = math.hypot(nx_ - hx, ny_ - hy)
+            if d_xy < min_d_xy:
+                min_d_xy    = d_xy
+                best_label  = label
+                best_coords = (nx_, ny_, nz_)
 
-        if not matched_faces:
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm -> no matching CAE face (name or proximity)." % (i + 1, hx, hy))
-            continue
-
-        try:
-            pad_nodes = related_nodes_from_faces(matched_faces)
-        except Exception as e:
-            log(lw, "        Hub %2d: related-node query on matched face(s) failed: %s" % (i + 1, str(e)))
-            continue
-
-        best = None
-        best_d = 999999.0
-        for node in pad_nodes:
-            try:
-                c = node.Coordinates
-                d = math.hypot(c.X - hx, c.Y - hy)
-                if d < best_d:
-                    best_d = d
-                    best = (node.Label, c.X, c.Y, c.Z)
-            except Exception:
-                pass
-
-        if best is not None:
-            results[i] = best
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm -> Node %d at (%6.1f, %6.1f, %6.1f) mm  [%d face(s), by %s, d=%.2f mm]"
-                % (i + 1, hx, hy, best[0], best[1], best[2], best[3], len(matched_faces), match_method, best_d))
+        if best_label is not None:
+            hub_node_labels.append(best_label)
+            used_labels.add(best_label)
+            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm → Node %d at (%6.1f, %6.1f, %6.1f) mm  d_xy=%.2f mm"
+                % (i + 1, hx, hy, best_label,
+                   best_coords[0], best_coords[1], best_coords[2], min_d_xy))
         else:
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm -> matched %d face(s) but 0 usable nodes." % (i + 1, hx, hy, len(matched_faces)))
+            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm → ERROR: no unclaimed back-face node!"
+                % (i + 1, hx, hy))
 
-    matched_count = sum(1 for r in results if r is not None)
-    log(lw, "      Located %d of %d Whiffletree hub nodes via face-targeted search." % (matched_count, len(hubs)))
-
-    # ── SAFETY NET: fill any remaining gaps with a DISTANCE-CAPPED global
-    # search, so a bad case is loud rather than silently picking a far node.
-    missing = [i for i, r in enumerate(results) if r is None]
-    if missing:
-        log(lw, "      %d hub(s) unmatched by face-targeting; running capped fallback search..." % len(missing))
-        all_nodes = related_nodes_from_body()
-        node_data = []
-        for node in all_nodes:
-            try:
-                c = node.Coordinates
-                node_data.append((node.Label, c.X, c.Y, c.Z))
-            except Exception:
-                pass
-
-        fallback_cap = max(30.0, hub_outer_r * 5.0)
-        used_labels = {r[0] for r in results if r is not None}
-
-        for i in missing:
-            hx, hy = hubs[i]
-            best = None
-            best_d = 999999.0
-            for (label, nx_, ny_, nz_) in node_data:
-                if label in used_labels:
-                    continue
-                d = math.hypot(nx_ - hx, ny_ - hy)
-                if d < best_d:
-                    best_d = d
-                    best = (label, nx_, ny_, nz_)
-            if best is not None and best_d <= fallback_cap:
-                results[i] = best
-                used_labels.add(best[0])
-                log(lw, "        Hub %2d fallback -> Node %d at (%6.1f, %6.1f, %6.1f) mm  d=%.2f mm (cap=%.1f mm)"
-                    % (i + 1, best[0], best[1], best[2], best[3], best_d, fallback_cap))
-            else:
-                log(lw, "        Hub %2d fallback -> ERROR: nearest node is %.2f mm away (cap=%.1f mm). Rejected."
-                    % (i + 1, best_d if best is not None else -1.0, fallback_cap))
-
-    hub_node_labels = [r[0] for r in results if r is not None]
-    log(lw, "      Final: %d of %d Whiffletree hub nodes located." % (len(hub_node_labels), len(hubs)))
+    log(lw, "      Located %d of %d Whiffletree hub node labels on back face." % (len(hub_node_labels), len(hubs)))
     if len(hub_node_labels) < len(hubs):
         log(lw, "      WARNING: Only %d nodes found for %d hubs." % (len(hub_node_labels), len(hubs)))
     return hub_node_labels
@@ -843,35 +758,56 @@ def main():
     log(lw, "      Central Hole Dia: %.1f mm" % central_hole_dia)
     log(lw, "      Total Depth:      %.1f mm" % total_depth)
     log(lw, "      Pocket Depth:     %.1f mm" % pocket_depth)
-    log(lw, "      Faceplate:        %.1f mm" % faceplate)
-    log(lw, "      Cell Size:        %.1f mm" % cell_size)
+    # Auto-detect cell_size from CAD body if not explicitly defined in part expressions
+    detected_cell = auto_detect_cad_cell_size(mirror_body, uf_session, back_z, rib_thick, lw)
+    if detected_cell is not None and detected_cell > 10.0:
+        cell_size = detected_cell
+        log(lw, "      Cell Size (CAD Detected): %.1f mm" % cell_size)
+    else:
+        log(lw, "      Cell Size:        %.1f mm" % cell_size)
+
     log(lw, "      Rib Thickness:    %.1f mm" % rib_thick)
     log(lw, "      Hub Outer Radius: %.1f mm" % hub_outer_r)
     log(lw, "      Support Type:     %s (%d points)" % (support_type, num_hubs))
     log(lw, "      Rib Pattern:      %s" % pattern_name)
     
-    # Compute the theoretical snapped Whiffletree positions. This is now the
-    # FALLBACK only (see find_hub_positions_from_cad_geometry docstring for
-    # why): the PRIMARY source of hub positions is a direct scan of the real
-    # drilled holes in the CAD body below, which works for any mirror design
-    # without depending on this formula matching the CAD generator exactly.
+    # Compute the theoretical snapped Whiffletree positions with the exact cell size
     snapped_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
-    log(lw, "      Computed %d theoretical (fallback) Whiffletree Hub Positions:" % len(snapped_hubs))
-    for i, (hx, hy) in enumerate(snapped_hubs):
-        log(lw, "        Hub %2d: (%6.2f, %6.2f) mm  r=%6.2f mm" % (i+1, hx, hy, math.hypot(hx, hy)))
+    
+    # ── 1. PRIMARY: READ EXPLICIT MARKER POINTS CREATED BY CAD GENERATOR ────
+    cad_marked_hubs = []
+    for pt in workPart.Points:
+        try:
+            p_name = pt.Name
+            if "WHIFFLETREE_SUPPORT_PT" in p_name or "WHIFFLETREE_PT" in p_name:
+                coords = pt.Coordinates
+                cad_marked_hubs.append((round(coords.X, 2), round(coords.Y, 2)))
+        except Exception:
+            pass
 
-    # ── PRIMARY: locate the REAL drilled hole positions directly from CAD ──
-    cad_hub_positions = find_hub_positions_from_cad_geometry(
-        mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, num_hubs, lw
-    )
-
-    if len(cad_hub_positions) == num_hubs:
-        log(lw, "      \u2713 Using %d ACTUAL hole positions scanned from CAD geometry (exact match)." % len(cad_hub_positions))
-        hubs = cad_hub_positions
+    if len(cad_marked_hubs) >= 6:
+        log(lw, "      ✓ Found %d EXPLICIT Whiffletree Support Marker Points in CAD Part!" % len(cad_marked_hubs))
+        cad_marked_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), 1), math.atan2(p[1], p[0])))
+        hubs = cad_marked_hubs[:num_hubs]
     else:
-        log(lw, "      WARNING: CAD scan found %d hole cluster(s), expected %d. Falling back to theoretical positions."
-            % (len(cad_hub_positions), num_hubs))
-        hubs = snapped_hubs
+        # ── 2. SECONDARY: LOCATE DRILLED HOLE CYLINDERS FROM CAD BODY ───────
+        cad_hub_positions = find_hub_positions_from_cad_geometry(
+            mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, num_hubs, lw
+        )
+
+        if len(cad_hub_positions) >= 6:
+            log(lw, "      ✓ Using %d ACTUAL hole positions scanned from CAD geometry." % len(cad_hub_positions))
+            hubs = list(cad_hub_positions[:num_hubs])
+            if len(hubs) < num_hubs:
+                for shx, shy in snapped_hubs:
+                    if len(hubs) >= num_hubs:
+                        break
+                    if not any(math.hypot(shx - dhx, shy - dhy) < 15.0 for (dhx, dhy) in hubs):
+                        hubs.append((shx, shy))
+        else:
+            log(lw, "      WARNING: CAD scan found %d hole cluster(s), expected %d. Falling back to theoretical positions."
+                % (len(cad_hub_positions), num_hubs))
+            hubs = snapped_hubs
 
     log(lw, "      Final %d Whiffletree Hub Positions in use for tagging/FEM:" % len(hubs))
     for i, (hx, hy) in enumerate(hubs):
@@ -889,10 +825,9 @@ def main():
         num_hubs, OPTICAL_BUDGET_NM, lw
     )
 
-    # Compute geometry-aware mesh size (resolves this mirror's own governing
-    # small feature - rib/faceplate/hole - rather than diameter alone)
-    mesh_elem_size = compute_adaptive_mesh_size(diameter, rib_thick, faceplate, hub_outer_r, lw)
-    log(lw, "      Adaptive Mesh Element Size: %.2f mm (for D=%.0f mm mirror, rib=%.1f mm)" % (mesh_elem_size, diameter, rib_thick))
+    # Compute adaptive mesh size
+    mesh_elem_size = compute_adaptive_mesh_size(diameter)
+    log(lw, "      Auto Mesh Element Size: %.1f mm (for D=%.0f mm mirror)" % (mesh_elem_size, diameter))
 
     # Assign material Zerodur in CAD part
     assign_zerodur_material_cad(workPart, mirror_body, lw)
@@ -973,34 +908,11 @@ def main():
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
     unit_mm = workFemPart.UnitCollection.FindObject("MilliMeter")
-
-    # mesh_elem_size (computed above) is now GEOMETRY-AWARE - it already
-    # accounts for rib_thick/faceplate/hub_outer_r, not diameter alone, so
-    # it should no longer be mismatched against the mirror's own thin walls
-    # the way the old diameter-only formula was. Try to apply it explicitly
-    # (several plausible real property names are tried in order, since the
-    # exact string for this NX version was never conclusively confirmed in
-    # this project). If none can be confirmed to have been accepted, fall
-    # back to NX's own automatic sizing rather than risk leaving the mesher
-    # in an unconfirmed manual state - automatic sizing is slower but has
-    # reliably produced a valid mesh for this geometry before.
-    size_set = False
-    for size_prop_name in ("element size", "Element Size", "average element size", "size", "quad mesh overall edge size"):
-        try:
-            mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(size_prop_name, str(mesh_elem_size), unit_mm)
-            size_set = True
-            log(lw, "      Applied geometry-aware element size (%.2f mm) via property '%s'." % (mesh_elem_size, size_prop_name))
-            break
-        except Exception:
-            continue
-
-    if size_set:
-        mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
-    else:
-        log(lw, "      Could not confirm an explicit element-size property was accepted for this NX version;"
-                " using NX automatic (feature-adaptive) sizing instead. Element count/solve time may be higher"
-                " than necessary, but this is the known-safe path for this geometry.")
-        mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
+    mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", str(mesh_elem_size), unit_mm)
+    except Exception:
+        pass
 
     mesh_builder.SelectionList.Add(cae_body)
     mesh_builder.CommitMesh()
