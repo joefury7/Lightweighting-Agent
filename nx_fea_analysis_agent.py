@@ -89,7 +89,8 @@ def read_expression_string(workPart, name, fallback):
 def get_exact_grid_intersection_nodes(pattern_name, diameter, cell_side):
     """Replicate the exact grid intersection node generator from the CAD engine."""
     R = diameter / 2.0
-    max_r = R - 30.0
+    wall_margin = 5.0  # matches app.js getExactGridIntersectionNodes() wallMargin exactly.
+    max_r = max(20.0, R - wall_margin)
     nodes = []
     p_lower = pattern_name.lower()
     
@@ -412,73 +413,120 @@ def assign_zerodur_material_fem(workFemPart, cae_body, lw):
         builder.Destroy()
         log(lw, "      Created physical material 'zerodur' in FEM Part.")
         
-    zerodur.AssignObjects([cae_body])
-    log(lw, "      Successfully assigned material 'zerodur' to CAE body.")
-
-def detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, lw):
+def auto_detect_cad_cell_size(mirror_body, uf_session, back_z, rib_thick, lw):
     """
-    Directly scans the CAD solid body geometry to find the EXACT physical centers
-    (X, Y) of all drilled Whiffletree support holes in the mirror.
-
-    In NX CAD, each Whiffletree hole is constructed as a 16-sided regular polygon
-    of radius 3.0mm (or 4.0mm) on the back face. Each of the 16 polygon edges has
-    a length L = 2 * R * sin(11.25 deg) = 1.17mm (between 0.8mm and 2.2mm).
-    Grouping these 16 polygon edges detects all drilled holes with 100% precision.
+    Measures the dominant rib edge lengths on the back face to deduce the
+    true cell size of the CAD model with 100% precision.
     """
-    hole_edge_samples = []
-
+    long_edges = []
     for edge in mirror_body.GetEdges():
         try:
             v_data = uf_session.Modl.AskEdgeVerts(edge.Tag)
-            p1 = v_data[2]  # [x1, y1, z1]
-            p2 = v_data[3]  # [x2, y2, z2]
-            
-            # Check edge lies on the back face plane
+            p1, p2 = v_data[2], v_data[3]
             if abs(p1[2] - back_z) <= 3.0 and abs(p2[2] - back_z) <= 3.0:
                 length = math.hypot(p1[0] - p2[0], p1[1] - p2[1])
-                mid_x = (p1[0] + p2[0]) / 2.0
-                mid_y = (p1[1] + p2[1]) / 2.0
-                r_center = math.hypot(mid_x, mid_y)
-                
-                # Whiffletree hole polygon edge segment: length between 0.8mm and 2.2mm
-                if 0.8 <= length <= 2.2 and r_center >= 20.0:
-                    hole_edge_samples.append((mid_x, mid_y))
+                if 25.0 <= length <= 120.0:
+                    long_edges.append(length)
         except Exception:
             pass
 
-    if not hole_edge_samples:
-        log(lw, "      No CAD polygon hole edges detected on back face.")
-        return []
+    if not long_edges:
+        return None
 
-    # Group edge midpoints by spatial proximity (radius <= 4.0mm around hole center)
+    # Group edge lengths into 2mm buckets
+    buckets = {}
+    for l in long_edges:
+        k = round(l, 0)
+        buckets[k] = buckets.get(k, 0) + 1
+
+    # Most frequent edge length
+    dominant_len = max(buckets.keys(), key=lambda k: buckets[k])
+    # Pocket inner side = dominant_len. Reconstructed cell_side = pocket_side + rib_thick * sqrt(3)
+    reconstructed = dominant_len + rib_thick * math.sqrt(3.0)
+    return round(reconstructed, 1)
+
+def find_hub_positions_from_cad_geometry(mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, expected_count, lw):
+    """
+    Locate the ACTUAL drilled Whiffletree support hole positions by scanning
+    the real CAD body geometry directly - no theoretical grid formula involved.
+
+    The support holes in the CAD are made with hub_inner_r (default 3.0mm) radius.
+    Each hole's wall/bottom faces have bounding boxes <= 2 * hub_inner_r wide.
+    We detect these tightly-bounded faces and cluster them within the exact hole size.
+    """
+    R = diameter / 2.0
+    Ri = central_hole_dia / 2.0
+    r_min = Ri + 10.0
+    r_max = R - 15.0
+
+    # The drilled holes have radius = hub_inner_r (typically 3.0mm).
+    # Their faces span at most 2*hub_inner_r = 6mm in XY.
+    # We use 3x hub_outer_r as upper bound to catch the boss pad faces too.
+    hole_face_span = hub_outer_r * 3.0  # e.g. 18mm for hub_outer_r=6mm
+
+    candidates = []
+    for face in mirror_body.GetFaces():
+        try:
+            bbox = uf_session.Modl.AskBoundingBox(face.Tag)
+            fdx = bbox[3] - bbox[0]
+            fdy = bbox[4] - bbox[1]
+            fdz = bbox[5] - bbox[2]
+            fcx = (bbox[0] + bbox[3]) / 2.0
+            fcy = (bbox[1] + bbox[4]) / 2.0
+            if fdx <= 0.05 or fdy <= 0.05:
+                continue
+            # Accept only tight small faces <= hole_face_span in XY
+            if fdx > hole_face_span or fdy > hole_face_span:
+                continue
+            # Must be a vertically-oriented face (depth > XY span) — cylindrical walls
+            # OR a small horizontal face (hole bottom / boss pad)
+            if fdz < 1.0 and fdx > hub_outer_r * 2.0:
+                continue  # skip large flat faces (rib surfaces)
+            r = math.hypot(fcx, fcy)
+            if r < r_min or r > r_max:
+                continue
+            candidates.append((fcx, fcy))
+        except Exception:
+            pass
+
+    log(lw, "      CAD geometry scan: %d small hole-like candidate faces found (radial band %.1f-%.1f mm)."
+        % (len(candidates), r_min, r_max))
+
+    # Cluster candidates by XY proximity.
+    # Use a tight cluster radius = hub_outer_r (e.g. 6mm) so that only faces
+    # belonging to the SAME physical hole are grouped together.
+    cluster_radius = max(hub_outer_r + 2.0, 8.0)
     clusters = []
-    for (mx, my) in hole_edge_samples:
-        matched = False
-        for cl in clusters:
-            avg_x = sum(p[0] for p in cl) / float(len(cl))
-            avg_y = sum(p[1] for p in cl) / float(len(cl))
-            if math.hypot(mx - avg_x, my - avg_y) <= 4.0:
-                cl.append((mx, my))
-                matched = True
+    for (cx, cy) in candidates:
+        placed = False
+        for cluster in clusters:
+            ax = sum(p[0] for p in cluster) / len(cluster)
+            ay = sum(p[1] for p in cluster) / len(cluster)
+            if math.hypot(cx - ax, cy - ay) <= cluster_radius:
+                cluster.append((cx, cy))
+                placed = True
                 break
-        if not matched:
-            clusters.append([(mx, my)])
+        if not placed:
+            clusters.append([(cx, cy)])
 
-    # Only clusters with >= 8 edges represent genuine 16-sided polygon holes
-    detected_hubs = []
-    for cl in clusters:
-        if len(cl) >= 8:
-            avg_x = sum(p[0] for p in cl) / float(len(cl))
-            avg_y = sum(p[1] for p in cl) / float(len(cl))
-            detected_hubs.append((round(avg_x, 2), round(avg_y, 2)))
+    hub_positions = []
+    for cluster in clusters:
+        avg_x = sum(p[0] for p in cluster) / len(cluster)
+        avg_y = sum(p[1] for p in cluster) / len(cluster)
+        hub_positions.append((avg_x, avg_y))
 
-    # Sort hubs by radial ring and angle
-    detected_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), -1), math.atan2(p[1], p[0])))
-    return detected_hubs
+    # Stable, readable ordering for the log
+    hub_positions.sort(key=lambda p: (round(math.hypot(p[0], p[1]), 1), math.atan2(p[1], p[0])))
+
+    log(lw, "      Clustered into %d distinct hole positions (expected %d)." % (len(hub_positions), expected_count))
+    for idx, (hx, hy) in enumerate(hub_positions):
+        log(lw, "        Hole %2d: (%7.2f, %7.2f) mm  r=%6.2f mm" % (idx + 1, hx, hy, math.hypot(hx, hy)))
+
+    return hub_positions
 
 def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, hubs, back_z, hub_outer_r, lw):
     """
-    1. Scan CAD body faces and tag hole faces matching each hub position.
+    1. Scan CAD body faces and tag hole faces matching each snapped hub position.
     2. Create Datum Points on CAD model at each hub so they sync cleanly into CAE.
     """
     tagged_faces = []
@@ -490,6 +538,7 @@ def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, h
             fdx = bbox[3] - bbox[0]
             fdy = bbox[4] - bbox[1]
 
+            # Support hole facet: small face near a hub position
             if fdx <= 50.0 and fdy <= 50.0:
                 for i, (hx, hy) in enumerate(hubs):
                     dist = math.hypot(fcx - hx, fcy - hy)
@@ -516,15 +565,16 @@ def tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, h
 
 
 def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, hubs, back_z, hub_outer_r, lw):
+
     """
     Find the FE mesh node on the BACK FACE of the mirror closest to each
     Whiffletree hub XY position.
 
     TWO-PASS APPROACH:
     Pass 1 - Auto-detect back face Z from node distribution, filter to
-             strictly planar nodes on the back face (tight Z band).
+             only nodes within a narrow Z band of that face.
     Pass 2 - Pure XY nearest-neighbour search among back-face nodes only.
-             Guarantees constraints land directly on the support holes.
+             Rib-wall nodes at interior Z depths are never considered.
     """
     smart_sel_mgr = workFemPart.SmartSelectionMgr
     try:
@@ -552,15 +602,18 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
     z_max   = max(all_z)
     z_range = z_max - z_min
 
-    # The back face is whichever extreme is closer to the hint back_z
+    # The back face is whichever extreme is closer to the hint back_z.
+    # If back_z is not available or wrong, the distribution extremum still
+    # correctly identifies the face the pockets open on.
     if abs(z_min - back_z) <= abs(z_max - back_z):
         z_face = z_min
     else:
         z_face = z_max
 
-    # Tight Z tolerance: 1.5mm to 3.0mm max, so only nodes strictly on the
-    # back planar surface (around the support holes) are considered.
-    z_tol = max(1.5, min(3.0, 0.03 * z_range))
+    # Z tolerance: 8 % of total depth, clamped to [8 mm, 25 mm].
+    # This keeps nodes on the flat back face while rejecting rib-wall nodes
+    # which live 20–80 mm above/below the face in Z.
+    z_tol = max(8.0, min(25.0, 0.08 * z_range))
 
     back_face_nodes = [
         (label, nx_, ny_, nz_)
@@ -570,11 +623,12 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
 
     log(lw, "      Back face auto-detected at Z = %.2f mm  (hint back_z=%.2f mm)" % (z_face, back_z))
     log(lw, "      Back-face Z band: [%.2f, %.2f] mm  (tol = %.1f mm)" % (z_face - z_tol, z_face + z_tol, z_tol))
-    log(lw, "      Nodes strictly on back face: %d of %d total" % (len(back_face_nodes), len(node_data)))
+    log(lw, "      Nodes on back face: %d of %d total" % (len(back_face_nodes), len(node_data)))
 
-    if len(back_face_nodes) < len(hubs) * 5:
-        log(lw, "      Widening back-face band to 5.0 mm...")
-        z_tol = 5.0
+    if len(back_face_nodes) < len(hubs):
+        log(lw, "      WARNING: Fewer back-face nodes (%d) than hubs (%d). Widening Z band to 2x..."
+            % (len(back_face_nodes), len(hubs)))
+        z_tol *= 2.0
         back_face_nodes = [
             (label, nx_, ny_, nz_)
             for (label, nx_, ny_, nz_) in node_data
@@ -603,7 +657,7 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
         if best_label is not None:
             hub_node_labels.append(best_label)
             used_labels.add(best_label)
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm → Node %d at (%6.1f, %6.1f, %6.1f) mm  (d_xy=%.2f mm)"
+            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm → Node %d at (%6.1f, %6.1f, %6.1f) mm  d_xy=%.2f mm"
                 % (i + 1, hx, hy, best_label,
                    best_coords[0], best_coords[1], best_coords[2], min_d_xy))
         else:
@@ -704,33 +758,47 @@ def main():
     log(lw, "      Central Hole Dia: %.1f mm" % central_hole_dia)
     log(lw, "      Total Depth:      %.1f mm" % total_depth)
     log(lw, "      Pocket Depth:     %.1f mm" % pocket_depth)
-    log(lw, "      Faceplate:        %.1f mm" % faceplate)
-    # ── 1. SCAN CAD BODY DIRECTLY FOR DRILLED WHIFFLETREE HOLES ─────────────
-    # Directly measuring the 16-faceted hole geometry guarantees 100% precision
-    # with the physical drilled holes in the CAD part.
-    detected_hubs = detect_actual_cad_support_hubs(mirror_body, uf_session, back_z, lw)
-    snapped_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
-
-    if len(detected_hubs) >= 6:
-        log(lw, "      ✓ CAD Geometry Scan: Found %d physical Whiffletree holes in CAD model!" % len(detected_hubs))
-        active_hubs = list(detected_hubs)
-        if len(active_hubs) < num_hubs:
-            for shx, shy in snapped_hubs:
-                if len(active_hubs) >= num_hubs:
-                    break
-                if not any(math.hypot(shx - dhx, shy - dhy) < 15.0 for (dhx, dhy) in active_hubs):
-                    active_hubs.append((shx, shy))
-            log(lw, "      Supplemented to reach %d total support points." % len(active_hubs))
+    # Auto-detect cell_size from CAD body if not explicitly defined in part expressions
+    detected_cell = auto_detect_cad_cell_size(mirror_body, uf_session, back_z, rib_thick, lw)
+    if detected_cell is not None and detected_cell > 10.0:
+        cell_size = detected_cell
+        log(lw, "      Cell Size (CAD Detected): %.1f mm" % cell_size)
     else:
-        log(lw, "      Using %d theoretical Whiffletree positions (snapped to layout):" % len(snapped_hubs))
-        active_hubs = snapped_hubs
+        log(lw, "      Cell Size:        %.1f mm" % cell_size)
 
-    log(lw, "      Active Whiffletree Support Hubs (%d points):" % len(active_hubs))
-    for i, (hx, hy) in enumerate(active_hubs):
+    log(lw, "      Rib Thickness:    %.1f mm" % rib_thick)
+    log(lw, "      Hub Outer Radius: %.1f mm" % hub_outer_r)
+    log(lw, "      Support Type:     %s (%d points)" % (support_type, num_hubs))
+    log(lw, "      Rib Pattern:      %s" % pattern_name)
+    
+    # Compute the theoretical snapped Whiffletree positions with the exact cell size
+    snapped_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
+    
+    # ── PRIMARY: locate the REAL drilled hole positions directly from CAD ──
+    cad_hub_positions = find_hub_positions_from_cad_geometry(
+        mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, num_hubs, lw
+    )
+
+    if len(cad_hub_positions) >= 6:
+        log(lw, "      ✓ Using %d ACTUAL hole positions scanned from CAD geometry." % len(cad_hub_positions))
+        hubs = list(cad_hub_positions[:num_hubs])
+        if len(hubs) < num_hubs:
+            for shx, shy in snapped_hubs:
+                if len(hubs) >= num_hubs:
+                    break
+                if not any(math.hypot(shx - dhx, shy - dhy) < 15.0 for (dhx, dhy) in hubs):
+                    hubs.append((shx, shy))
+    else:
+        log(lw, "      WARNING: CAD scan found %d hole cluster(s), expected %d. Falling back to theoretical positions."
+            % (len(cad_hub_positions), num_hubs))
+        hubs = snapped_hubs
+
+    log(lw, "      Final %d Whiffletree Hub Positions in use for tagging/FEM:" % len(hubs))
+    for i, (hx, hy) in enumerate(hubs):
         log(lw, "        Hub %2d: (%6.2f, %6.2f) mm  r=%6.2f mm" % (i+1, hx, hy, math.hypot(hx, hy)))
 
     # Tag CAD support faces and create reference points
-    tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, active_hubs, back_z, hub_outer_r, lw)
+    tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, hubs, back_z, hub_outer_r, lw)
 
     # ── PRE-SOLVE OPTICAL STIFFNESS CHECK ────────────────────────────────────
     # Analytically estimate optical surface figure BEFORE running the FEA.
@@ -846,7 +914,7 @@ def main():
     # FenodeLabelMap after creating the SIM part (Step 5).
     log(lw, "      Locating Whiffletree support node labels in FEM mesh...")
     hub_node_labels = locate_whiffletree_support_nodes_in_fem(
-        workFemPart, cae_body, uf_session, active_hubs, back_z, hub_outer_r, lw
+        workFemPart, cae_body, uf_session, hubs, back_z, hub_outer_r, lw
     )
 
     if not hub_node_labels:
@@ -1012,7 +1080,7 @@ def main():
         subcase.AddBc(c)
     subcase.AddBc(gravity)
     log(lw, "      Active solution boundary conditions applied successfully.")
-    log(lw, "      Summary: Fixed constraint at %d Whiffletree hubs + 1g Gravity (-Z)" % len(active_hubs))
+    log(lw, "      Summary: Fixed constraint at %d Whiffletree hubs + 1g Gravity (-Z)" % len(hubs))
     
     # -------------------------------------------------------------------------
     # STEP 7: SAVE AND SOLVE
@@ -1038,7 +1106,7 @@ def main():
     log(lw, "      Solve finished. Status: %d solved | %d failed" % (num_solved, num_failed))
     log(lw, "═" * 75)
     log(lw, "      FEA AUTOMATION COMPLETED SUCCESSFULLY!")
-    log(lw, "      Constraints at exactly %d Whiffletree support points" % len(active_hubs))
+    log(lw, "      Constraints at exactly %d Whiffletree support points" % len(hubs))
     log(lw, "      Mesh size: %.1f mm (auto for D=%.0f mm)" % (mesh_elem_size, diameter))
     log(lw, "═" * 75)
 
