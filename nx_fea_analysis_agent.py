@@ -986,7 +986,18 @@ def main():
             
         solution.PropertyTable.SetNamedPropertyTablePropertyValue("Bulk Data Echo Request", echo_table)
         solution.PropertyTable.SetNamedPropertyTablePropertyValue("Output Requests", output_table)
-        log(lw, "      Enabled standard bulk data echo and structural output requests.")
+        
+        # Enable Multi-Core Parallel Processing for fast Nastran solving
+        try:
+            solution.PropertyTable.SetIntegerPropertyValue("Number of Processors", 8)
+        except Exception:
+            pass
+        try:
+            solution.PropertyTable.SetStringPropertyValue("Solver Command Line Options", "parallel=8 smp=8")
+        except Exception:
+            pass
+            
+        log(lw, "      Enabled standard bulk data echo, structural output requests, and multi-core parallel solving.")
     except Exception as e:
         log(lw, "      Warning: Could not automatically set solution output requests: %s" % str(e))
         
