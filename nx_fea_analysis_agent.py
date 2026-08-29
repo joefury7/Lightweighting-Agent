@@ -980,9 +980,21 @@ def main():
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
     unit_mm = workFemPart.UnitCollection.FindObject("MilliMeter")
-    mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", str(mesh_elem_size), unit_mm)
+        mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
+    except Exception:
+        pass
+
+    for prop_name in ("overall edge size", "mesh overall edge size", "element size", "quad mesh overall edge size"):
+        try:
+            mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(prop_name, str(mesh_elem_size), unit_mm)
+            log(lw, "      Set 3D Tet mesh element size = %.1f mm (%s)" % (mesh_elem_size, prop_name))
+            break
+        except Exception:
+            pass
+
+    try:
+        mesh_builder.PropertyTable.SetDoublePropertyValue("small feature size", 2.0)
     except Exception:
         pass
 
