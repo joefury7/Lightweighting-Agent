@@ -970,7 +970,7 @@ def main():
     fe_model = workFemPart.FindObject("FEModel")
     mesh_mgr = fe_model.Find("MeshManager")
     mesh_builder = mesh_mgr.CreateMesh3dTetBuilder(CAE.Mesh3d.Null)
-    mesh_builder.ElementType.ElementTypeName = "CTETRA(4)"  # Fast linear 4-node elements
+    mesh_builder.ElementType.ElementTypeName = "CTETRA(10)"  # Quadratic 10-node elements (passes Nastran GEOMCHECK without NOGO abort)
     
     cae_bodies = [b for b in workFemPart.Bodies]
     if not cae_bodies:
