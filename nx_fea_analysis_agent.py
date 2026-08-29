@@ -947,7 +947,7 @@ def main():
     sync_options.SynchronizeSketchCurvesFlag = False
     sync_options.SynchronizeDplaneFlag = False
     
-    fem_options.SetCadData(workPart, ideal_path)
+    fem_options.SetCadData(workPart, "")
     
     bodies_to_use = [NXOpen.Body.Null] * 1
     bodies_to_use[0] = mirror_body
@@ -967,7 +967,7 @@ def main():
     fe_model = workFemPart.FindObject("FEModel")
     mesh_mgr = fe_model.Find("MeshManager")
     mesh_builder = mesh_mgr.CreateMesh3dTetBuilder(CAE.Mesh3d.Null)
-    mesh_builder.ElementType.ElementTypeName = "CTETRA(4)"  # Linear 4-node elements: fast meshing (3s) & fast solve (15s)
+    mesh_builder.ElementType.ElementTypeName = "CTETRA(4)"  # Fast linear elements
     
     cae_bodies = [b for b in workFemPart.Bodies]
     if not cae_bodies:
@@ -977,28 +977,18 @@ def main():
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
     unit_mm = workFemPart.UnitCollection.FindObject("MilliMeter")
-
-    unit_mm = workFemPart.UnitCollection.FindObject("MilliMeter")
-    size_set = False
-    for size_prop_name in ("overall edge size", "mesh overall edge size", "element size", "quad mesh overall edge size"):
+    try:
+        mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
+    except Exception:
+        pass
+        
+    for size_prop_name in ("mesh overall edge size", "overall edge size", "element size", "quad mesh overall edge size"):
         try:
             mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(size_prop_name, str(mesh_elem_size), unit_mm)
-            size_set = True
-            log(lw, "      Set 3D Tet mesh size = %.1f mm via property '%s'." % (mesh_elem_size, size_prop_name))
+            log(lw, "      Applied 3D Tet mesh size = %.1f mm via property '%s'." % (mesh_elem_size, size_prop_name))
             break
         except Exception:
             continue
-
-    if size_set:
-        try:
-            mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
-        except Exception:
-            pass
-    else:
-        try:
-            mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
-        except Exception:
-            pass
 
     mesh_builder.SelectionList.Add(cae_body)
     mesh_builder.CommitMesh()
