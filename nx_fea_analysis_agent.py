@@ -815,6 +815,11 @@ def main():
     hub_inner_r = read_expression_value(workPart, "HUB_INNER_R", 3.0)
     pattern_name = read_expression_string(workPart, "PATTERN", "isogrid")
     
+    bodies = [b for b in workPart.Bodies]
+    if not bodies:
+        log(lw, "FATAL ERROR: No solid bodies found in part.")
+        return
+
     def get_body_bbox_vol(b):
         try:
             bx1, by1, bz1, bx2, by2, bz2 = get_body_bounding_box(b, uf_session)
