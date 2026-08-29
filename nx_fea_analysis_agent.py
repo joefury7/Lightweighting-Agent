@@ -1047,14 +1047,14 @@ def main():
     # a visual/quality check on the first successful run.
     try:
         mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
-            "small feature size", str(rib_thick), unit_mm_fem)
+            "small feature size", "3.0", unit_mm_fem)
         mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
-            "small feature percentage", "25", NXOpen.Unit.Null)
+            "small feature percentage", "50", NXOpen.Unit.Null)
         mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
-            "maximum growth rate", "1.5", NXOpen.Unit.Null)
-        log(lw, "      Small-feature size tied to rib thickness (%.1f mm), growth rate loosened to 1.5." % rib_thick)
+            "maximum growth rate", "2.0", NXOpen.Unit.Null)
+        log(lw, "      Small-feature size set to 3.0 mm, growth rate set to 2.0 for fast 3s meshing.")
     except Exception as e:
-        log(lw, "      NOTE: Could not apply small-feature/growth-rate tuning (%s) - continuing with NX defaults." % str(e))
+        log(lw, "      NOTE: Could not apply small-feature/growth-rate tuning (%s) - continuing with defaults." % str(e))
 
     mesh_builder.SelectionList.Add(cae_body)
 
