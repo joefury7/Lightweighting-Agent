@@ -859,22 +859,25 @@ def main():
     # why): the PRIMARY source of hub positions is a direct scan of the real
     # drilled holes in the CAD body below, which works for any mirror design
     # without depending on this formula matching the CAD generator exactly.
+    # Compute theoretical snapped Whiffletree positions
     snapped_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
-    log(lw, "      Computed %d theoretical (fallback) Whiffletree Hub Positions:" % len(snapped_hubs))
-    for i, (hx, hy) in enumerate(snapped_hubs):
-        log(lw, "        Hub %2d: (%6.2f, %6.2f) mm  r=%6.2f mm" % (i+1, hx, hy, math.hypot(hx, hy)))
 
-    # ── PRIMARY: locate the REAL drilled hole positions directly from CAD ──
-    cad_hub_positions = find_hub_positions_from_cad_geometry(
-        mirror_body, uf_session, central_hole_dia, diameter, hub_outer_r, num_hubs, lw
-    )
+    # ── 1. PRIMARY: READ EXPLICIT MARKER POINTS CREATED BY CAD GENERATOR ────
+    cad_marked_hubs = []
+    for pt in workPart.Points:
+        try:
+            if "WHIFFLETREE_SUPPORT_PT" in pt.Name or "WHIFFLETREE_PT" in pt.Name:
+                coords = pt.Coordinates
+                cad_marked_hubs.append((round(coords.X, 2), round(coords.Y, 2)))
+        except Exception:
+            pass
 
-    if len(cad_hub_positions) == num_hubs:
-        log(lw, "      \u2713 Using %d ACTUAL hole positions scanned from CAD geometry (exact match)." % len(cad_hub_positions))
-        hubs = cad_hub_positions
+    if len(cad_marked_hubs) >= 6:
+        log(lw, "      ✓ Found %d EXPLICIT Whiffletree Support Marker Points in CAD Part!" % len(cad_marked_hubs))
+        cad_marked_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), 1), math.atan2(p[1], p[0])))
+        hubs = cad_marked_hubs[:num_hubs]
     else:
-        log(lw, "      WARNING: CAD scan found %d hole cluster(s), expected %d. Falling back to theoretical positions."
-            % (len(cad_hub_positions), num_hubs))
+        log(lw, "      Using theoretical snapped Whiffletree positions (%d points)." % len(snapped_hubs))
         hubs = snapped_hubs
 
     log(lw, "      Final %d Whiffletree Hub Positions in use for tagging/FEM:" % len(hubs))
