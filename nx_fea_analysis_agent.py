@@ -1200,6 +1200,11 @@ def main():
     # a direct "did it solve" flag on this NX version.
     solve_ok = (num_solved > 0 and num_failed == 0)
     if solve_ok:
+        try:
+            solution.LoadResults()
+            log(lw, "      ✓ Successfully loaded results into NX Post-Processor.")
+        except Exception as e:
+            log(lw, "      Note on automatic result load: %s" % str(e))
         sim_dir = os.path.dirname(sim_path)
         sim_base = os.path.splitext(os.path.basename(sim_path))[0]
         result_candidates = [f for f in os.listdir(sim_dir)
