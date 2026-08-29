@@ -651,7 +651,15 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
         except Exception:
             pass
 
-    log(lw, "      Extracted %d total nodes from FE mesh for Whiffletree constraint mapping." % len(node_data))
+    # Strictly isolate nodes on the back support plane (Z ≈ back_z)
+    min_z_found = min(z for (lbl, x, y, z) in node_data) if node_data else back_z
+    target_back_z = back_z if abs(min_z_found - back_z) <= 10.0 else min_z_found
+    
+    back_nodes = [(lbl, x, y, z) for (lbl, x, y, z) in node_data if abs(z - target_back_z) <= 6.0]
+    if not back_nodes:
+        back_nodes = node_data
+
+    log(lw, "      Found %d nodes on the back support plane (Z ≈ %.1f mm)." % (len(back_nodes), target_back_z))
 
     results = [None] * len(hubs)
     used_labels = set()
@@ -659,29 +667,24 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
     for i, (hx, hy) in enumerate(hubs):
         best = None
         best_d = 999999.0
-        for (label, nx_, ny_, nz_) in node_data:
+        for (label, nx_, ny_, nz_) in back_nodes:
             if label in used_labels:
                 continue
-            # Prioritize nodes near the back surface (Z ≈ back_z)
             d_xy = math.hypot(nx_ - hx, ny_ - hy)
-            d_z = abs(nz_ - back_z)
-            total_d = d_xy + d_z * 2.0
-            if total_d < best_d:
-                best_d = total_d
+            if d_xy < best_d:
+                best_d = d_xy
                 best = (label, nx_, ny_, nz_)
 
         if best is not None:
             results[i] = best
             used_labels.add(best[0])
-            log(lw, "        Hub %2d -> Node %d at (%6.1f, %6.1f, %6.1f) mm  dist=%.2f mm"
+            log(lw, "        Hub %2d -> Node %d at (%6.1f, %6.1f, %6.1f) mm  [dist=%.2f mm from nominal]"
                 % (i + 1, best[0], best[1], best[2], best[3], best_d))
         else:
-            log(lw, "        Hub %2d -> ERROR: No valid support node found on back face." % (i + 1))
+            log(lw, "        Hub %2d -> ERROR: No back-plane node found near (%6.1f, %6.1f) mm." % (i + 1, hx, hy))
 
     hub_node_labels = [r[0] for r in results if r is not None]
-    log(lw, "      Final: %d of %d Whiffletree hub nodes located." % (len(hub_node_labels), len(hubs)))
-    if len(hub_node_labels) < len(hubs):
-        log(lw, "      WARNING: Only %d nodes found for %d hubs." % (len(hub_node_labels), len(hubs)))
+    log(lw, "      Successfully locked %d of %d Whiffletree support nodes on back plane." % (len(hub_node_labels), len(hubs)))
     return hub_node_labels
 
 def main():
