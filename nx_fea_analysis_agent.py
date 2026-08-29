@@ -917,36 +917,27 @@ def main():
     cae_body = max(cae_bodies, key=get_cae_body_face_count)
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
-    # NOTE: "automatic size option bool" = True hands sizing to NX's own
-    # curvature/feature-based auto-mesher and IGNORES mesh_elem_size
-    # entirely. That is the exact scenario documented in
-    # compute_adaptive_mesh_size()'s docstring (623k elements / 1.16M nodes,
-    # slow/stalled meshing on the isogrid pockets, GEOMCHECK + solver
-    # out-of-memory failures). Disable it and apply the computed size.
-    #
     unit_mm_fem = workFemPart.UnitCollection.FindObject("MilliMeter")
     
-    # ── ROBUST COARSED AUTO-MESHING (from recorded NX journal) ──
-    # Uses NX's native automatic mesher with a 3.0 coarsening factor and small feature suppression
-    # This generates ~15k-25k elements in < 3 seconds without getting stuck
+    # ── ROBUST AUTO-MESHING (CTETRA 10 Quadratic Elements) ──
     try:
         mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("automatic element size factor", "3.0", NXOpen.Unit.Null)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("automatic element size factor", "1.2", NXOpen.Unit.Null)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", str(mesh_elem_size), unit_mm_fem)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", "18.0", unit_mm_fem)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature size", "3.0", unit_mm_fem)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature size", "2.5", unit_mm_fem)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature value", "3.0", NXOpen.Unit.Null)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature value", "2.5", NXOpen.Unit.Null)
     except Exception:
         pass
     try:
@@ -966,36 +957,24 @@ def main():
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum growth rate", "2.0", NXOpen.Unit.Null)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum growth rate", "1.5", NXOpen.Unit.Null)
     except Exception:
         pass
 
-    log(lw, "      Applied fast mesher configuration (automatic element size factor = 3.0, small feature = 3.0 mm).")
+    log(lw, "      Applied optimal quadratic element configuration (CTETRA(10), factor=1.2, small feature=2.5mm).")
 
     mesh_builder.SelectionList.Add(cae_body)
 
     mesh_start_time = time.time()
-    log(lw, "      Meshing started - this step tessellates and tet-meshes the full body and can take a while on thin-rib geometry...")
-    try:
-        mesh_builder.CommitMesh()
-    except Exception as e:
-        log(lw, "FATAL ERROR: 3D tetrahedral meshing raised an exception after %.1f min: %s"
-            % ((time.time() - mesh_start_time) / 60.0, str(e)))
-        mesh_builder.Destroy()
-        return
-    mesh_elapsed_min = (time.time() - mesh_start_time) / 60.0
+    log(lw, "      Meshing 3D Tetrahedral body...")
+    mesh_builder.CommitMesh()
+    mesh_elapsed_sec = time.time() - mesh_start_time
     mesh_builder.Destroy()
-    log(lw, "      3D tetrahedral meshing completed successfully in %.1f minutes." % mesh_elapsed_min)
+    log(lw, "      3D tetrahedral meshing completed successfully in %.1f seconds." % mesh_elapsed_sec)
     
     # -------------------------------------------------------------------------
     # STEP 4b: LOCATE WHIFFLETREE SUPPORT NODES IN FEM MESH (collect labels)
     # -------------------------------------------------------------------------
-    # We find nodes now (while we have the meshed FEM part as the work part)
-    # but store only their integer LABELS. FENode objects are owned by the FEM
-    # part and cannot be handed directly to the SIM part's constraint builder —
-    # that raises "Selected objects are not in the same file as the Targetset".
-    # Labels are stable identifiers; we re-resolve them through the SIM's
-    # FenodeLabelMap after creating the SIM part (Step 5).
     log(lw, "      Locating Whiffletree support node labels in FEM mesh...")
     hub_node_labels = locate_whiffletree_support_nodes_in_fem(
         workFemPart, cae_body, uf_session, hubs, back_z, hub_outer_r, lw
@@ -1003,9 +982,6 @@ def main():
 
     if not hub_node_labels:
         log(lw, "FATAL ERROR: No Whiffletree support nodes could be matched!")
-        log(lw, "      This usually means the mesh itself is empty or badly malformed -")
-        log(lw, "      check the messages above for whether meshing actually completed,")
-        log(lw, "      and inspect the FEM part directly in NX before re-running.")
         return
 
     # -------------------------------------------------------------------------
@@ -1038,15 +1014,18 @@ def main():
     sim_simulation = workSimPart.Simulation
     solution = sim_simulation.CreateSolution("NX NASTRAN", "Structural", "SESTATIC 101 - Single Constraint", "Solution 1", CAE.SimSimulation.AxisymAbstractionType.NotSet)
     
-    # Configure output requests
+    # Configure output requests & GEOMCHECK overrides
     try:
         echo_table = None
         output_table = None
+        geom_table = None
         for table in list(workSimPart.ModelingObjectPropertyTables):
-            if "Bulk Data Echo Request1" in table.Name:
+            if "Bulk Data Echo Request" in table.Name:
                 echo_table = table
-            if "Structural Output Requests1" in table.Name:
+            if "Structural Output Requests" in table.Name:
                 output_table = table
+            if "Geometry Check" in table.Name:
+                geom_table = table
         
         if not echo_table:
             idx = len(list(workSimPart.ModelingObjectPropertyTables)) + 1
