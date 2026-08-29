@@ -947,7 +947,7 @@ def main():
     sync_options.SynchronizeSketchCurvesFlag = False
     sync_options.SynchronizeDplaneFlag = False
     
-    fem_options.SetCadData(workPart, "")
+    fem_options.SetCadData(workPart, ideal_path)
     
     bodies_to_use = [NXOpen.Body.Null] * 1
     bodies_to_use[0] = mirror_body
@@ -967,7 +967,7 @@ def main():
     fe_model = workFemPart.FindObject("FEModel")
     mesh_mgr = fe_model.Find("MeshManager")
     mesh_builder = mesh_mgr.CreateMesh3dTetBuilder(CAE.Mesh3d.Null)
-    mesh_builder.ElementType.ElementTypeName = "CTETRA(4)"  # Fast linear elements
+    mesh_builder.ElementType.ElementTypeName = "CTETRA(4)"  # Fast linear 4-node elements
     
     cae_bodies = [b for b in workFemPart.Bodies]
     if not cae_bodies:
@@ -977,18 +977,11 @@ def main():
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
     unit_mm = workFemPart.UnitCollection.FindObject("MilliMeter")
+    mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
     try:
-        mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", str(mesh_elem_size), unit_mm)
     except Exception:
         pass
-        
-    for size_prop_name in ("mesh overall edge size", "overall edge size", "element size", "quad mesh overall edge size"):
-        try:
-            mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(size_prop_name, str(mesh_elem_size), unit_mm)
-            log(lw, "      Applied 3D Tet mesh size = %.1f mm via property '%s'." % (mesh_elem_size, size_prop_name))
-            break
-        except Exception:
-            continue
 
     mesh_builder.SelectionList.Add(cae_body)
     mesh_builder.CommitMesh()
