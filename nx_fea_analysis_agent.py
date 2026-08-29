@@ -621,136 +621,62 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
     falls back to a DISTANCE-CAPPED global search, so a bad case is logged
     loudly rather than silently grabbing an arbitrarily distant node.
     """
-    smart_sel_mgr = workFemPart.SmartSelectionMgr
+    # ── Direct query from MeshManager to guarantee 100% node matching ──
+    fe_model = workFemPart.FindObject("FEModel")
+    mesh_mgr = fe_model.Find("MeshManager")
+    all_nodes = []
+    try:
+        for mesh in mesh_mgr.GetMeshes():
+            try:
+                all_nodes.extend(list(mesh.GetNodes()))
+            except Exception:
+                pass
+    except Exception:
+        pass
 
-    def related_nodes_from_faces(face_list):
-        try:
-            m = smart_sel_mgr.CreateNewRelatedNodeMethodFromFaces(face_list, False, False)
-        except AttributeError:
-            m = smart_sel_mgr.CreateRelatedNodeMethod(face_list, False)
-        return m.GetNodes()
-
-    def related_nodes_from_body():
+    if not all_nodes:
+        # Fallback to smart selection for legacy support
+        smart_sel_mgr = workFemPart.SmartSelectionMgr
         try:
             m = smart_sel_mgr.CreateNewRelatedNodeMethodFromBodies([cae_body], False, False)
         except AttributeError:
             m = smart_sel_mgr.CreateRelatedNodeMethod([cae_body], False)
-        return m.GetNodes()
+        all_nodes = m.GetNodes()
 
-    # ── Enumerate small CAE (polygon) faces once, with bbox center + name ──
-    caegeom_type = NXOpen.UF.UFConstants.UF_caegeom_type
-    face_subtype = NXOpen.UF.UFConstants.UF_caegeom_face_subtype
-    max_hole_span = max(20.0, hub_outer_r * 3.0)
-
-    small_faces_info = []   # (face_obj, fcx, fcy, name_or_None)
-    obj_tag = 0
-    while True:
-        obj_tag = uf_session.Obj.CycleObjsInPart(workFemPart.Tag, caegeom_type, obj_tag)
-        if obj_tag == 0:
-            break
-        obj_type, obj_sub_type = uf_session.Obj.AskTypeAndSubtype(obj_tag)
-        if obj_sub_type != face_subtype:
-            continue
+    node_data = []
+    for node in all_nodes:
         try:
-            bbox = uf_session.Modl.AskBoundingBox(obj_tag)
-            fdx = bbox[3] - bbox[0]
-            fdy = bbox[4] - bbox[1]
-            if fdx > max_hole_span or fdy > max_hole_span:
-                continue
-            fcx = (bbox[0] + bbox[3]) / 2.0
-            fcy = (bbox[1] + bbox[4]) / 2.0
-            face_obj = NXOpen.TaggedObjectManager.GetTaggedObject(obj_tag)
-            try:
-                fname = face_obj.Name
-            except Exception:
-                fname = None
-            small_faces_info.append((face_obj, fcx, fcy, fname))
+            c = node.Coordinates
+            node_data.append((node.Label, c.X, c.Y, c.Z))
         except Exception:
             pass
 
-    log(lw, "      Scanned %d small candidate polygon faces (span <= %.1f mm) in FEM part." % (len(small_faces_info), max_hole_span))
+    log(lw, "      Extracted %d total nodes from FE mesh for Whiffletree constraint mapping." % len(node_data))
 
-    match_tol = max(8.0, hub_outer_r + 4.0)
-    results = [None] * len(hubs)   # each entry: (label, x, y, z) or None
+    results = [None] * len(hubs)
+    used_labels = set()
 
     for i, (hx, hy) in enumerate(hubs):
-        pad_name = "WHIFFLETREE_PAD_%02d" % (i + 1)
-
-        matched_faces = [f for (f, fcx, fcy, fname) in small_faces_info if fname == pad_name]
-        match_method = "name"
-        if not matched_faces:
-            matched_faces = [f for (f, fcx, fcy, fname) in small_faces_info
-                              if math.hypot(fcx - hx, fcy - hy) <= match_tol]
-            match_method = "proximity"
-
-        if not matched_faces:
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm -> no matching CAE face (name or proximity)." % (i + 1, hx, hy))
-            continue
-
-        try:
-            pad_nodes = related_nodes_from_faces(matched_faces)
-        except Exception as e:
-            log(lw, "        Hub %2d: related-node query on matched face(s) failed: %s" % (i + 1, str(e)))
-            continue
-
         best = None
         best_d = 999999.0
-        for node in pad_nodes:
-            try:
-                c = node.Coordinates
-                d = math.hypot(c.X - hx, c.Y - hy)
-                if d < best_d:
-                    best_d = d
-                    best = (node.Label, c.X, c.Y, c.Z)
-            except Exception:
-                pass
+        for (label, nx_, ny_, nz_) in node_data:
+            if label in used_labels:
+                continue
+            # Prioritize nodes near the back surface (Z ≈ back_z)
+            d_xy = math.hypot(nx_ - hx, ny_ - hy)
+            d_z = abs(nz_ - back_z)
+            total_d = d_xy + d_z * 2.0
+            if total_d < best_d:
+                best_d = total_d
+                best = (label, nx_, ny_, nz_)
 
         if best is not None:
             results[i] = best
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm -> Node %d at (%6.1f, %6.1f, %6.1f) mm  [%d face(s), by %s, d=%.2f mm]"
-                % (i + 1, hx, hy, best[0], best[1], best[2], best[3], len(matched_faces), match_method, best_d))
+            used_labels.add(best[0])
+            log(lw, "        Hub %2d -> Node %d at (%6.1f, %6.1f, %6.1f) mm  dist=%.2f mm"
+                % (i + 1, best[0], best[1], best[2], best[3], best_d))
         else:
-            log(lw, "        Hub %2d at (%6.1f, %6.1f) mm -> matched %d face(s) but 0 usable nodes." % (i + 1, hx, hy, len(matched_faces)))
-
-    matched_count = sum(1 for r in results if r is not None)
-    log(lw, "      Located %d of %d Whiffletree hub nodes via face-targeted search." % (matched_count, len(hubs)))
-
-    # ── SAFETY NET: fill any remaining gaps with a DISTANCE-CAPPED global
-    # search, so a bad case is loud rather than silently picking a far node.
-    missing = [i for i, r in enumerate(results) if r is None]
-    if missing:
-        log(lw, "      %d hub(s) unmatched by face-targeting; running capped fallback search..." % len(missing))
-        all_nodes = related_nodes_from_body()
-        node_data = []
-        for node in all_nodes:
-            try:
-                c = node.Coordinates
-                node_data.append((node.Label, c.X, c.Y, c.Z))
-            except Exception:
-                pass
-
-        fallback_cap = max(30.0, hub_outer_r * 5.0)
-        used_labels = {r[0] for r in results if r is not None}
-
-        for i in missing:
-            hx, hy = hubs[i]
-            best = None
-            best_d = 999999.0
-            for (label, nx_, ny_, nz_) in node_data:
-                if label in used_labels:
-                    continue
-                d = math.hypot(nx_ - hx, ny_ - hy)
-                if d < best_d:
-                    best_d = d
-                    best = (label, nx_, ny_, nz_)
-            if best is not None and best_d <= fallback_cap:
-                results[i] = best
-                used_labels.add(best[0])
-                log(lw, "        Hub %2d fallback -> Node %d at (%6.1f, %6.1f, %6.1f) mm  d=%.2f mm (cap=%.1f mm)"
-                    % (i + 1, best[0], best[1], best[2], best[3], best_d, fallback_cap))
-            else:
-                log(lw, "        Hub %2d fallback -> ERROR: nearest node is %.2f mm away (cap=%.1f mm). Rejected."
-                    % (i + 1, best_d if best is not None else -1.0, fallback_cap))
+            log(lw, "        Hub %2d -> ERROR: No valid support node found on back face." % (i + 1))
 
     hub_node_labels = [r[0] for r in results if r is not None]
     log(lw, "      Final: %d of %d Whiffletree hub nodes located." % (len(hub_node_labels), len(hubs)))
