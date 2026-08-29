@@ -2063,6 +2063,7 @@ function generateNXCode(pocketCount, finalMass) {
     '',
     '    # SETUP PARAMETRIC GEOMETRY EXPRESSIONS FOR FEM AGENT',
     '    for exp_name, exp_val in [',
+    '        ("TOTAL_DEPTH", str(TOTAL_DEPTH)),',
     '        ("CELL_SIDE", str(CELL_SIDE)),',
     '        ("SUPPORT_POINTS", "' + (state.supportType === '9point' ? '9' : '18') + '"),',
     '        ("DIAMETER", str(RADIUS * 2.0)),',

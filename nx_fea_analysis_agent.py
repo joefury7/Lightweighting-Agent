@@ -801,16 +801,16 @@ def main():
     if diameter < 100.0:
         diameter = read_expression_value(workPart, "TOTAL_DIAMETER", 0.0)
     
-    central_hole_dia = read_expression_value(workPart, "CENTRAL_HOLE_DIA", 200.0)
-    total_depth = read_expression_value(workPart, "TOTAL_DEPTH", 90.0)
-    pocket_depth = read_expression_value(workPart, "POCKET_DEPTH", 75.0)
-    faceplate = read_expression_value(workPart, "FACESHEET", 15.0)
+    central_hole_dia = read_expression_value(workPart, "CENTRAL_HOLE_DIA", 175.0)
+    total_depth = read_expression_value(workPart, "TOTAL_DEPTH", 73.7)
+    pocket_depth = read_expression_value(workPart, "POCKET_DEPTH", 64.7)
+    faceplate = read_expression_value(workPart, "FACESHEET", 9.0)
     if faceplate <= 0:
-        faceplate = read_expression_value(workPart, "FACEPLATE", 15.0)
-    cell_size = read_expression_value(workPart, "CELL_SIDE", 93.0)
+        faceplate = read_expression_value(workPart, "FACEPLATE", 9.0)
+    cell_size = read_expression_value(workPart, "CELL_SIDE", 60.0)
     if cell_size <= 0:
-        cell_size = read_expression_value(workPart, "CELL_SIZE", 93.0)
-    rib_thick = read_expression_value(workPart, "RIB_THICK", 6.0)
+        cell_size = read_expression_value(workPart, "CELL_SIZE", 60.0)
+    rib_thick = read_expression_value(workPart, "RIB_THICK", 1.5)
     hub_outer_r = read_expression_value(workPart, "HUB_OUTER_R", 6.0)
     hub_inner_r = read_expression_value(workPart, "HUB_INNER_R", 3.0)
     pattern_name = read_expression_string(workPart, "PATTERN", "isogrid")
@@ -830,15 +830,13 @@ def main():
     # Select the main lightweighted CAD body (largest volume body)
     mirror_body = max(bodies, key=get_body_bbox_vol)
     
-    if diameter < 100.0:
-        try:
-            min_x, min_y, min_z, max_x, max_y, max_z = get_body_bounding_box(mirror_body, uf_session)
-            diameter = round(max(max_x - min_x, max_y - min_y), 1)
-        except Exception:
-            diameter = 560.0
-            
     try:
         min_x, min_y, min_z, max_x, max_y, max_z = get_body_bounding_box(mirror_body, uf_session)
+        actual_h = round(abs(max_z - min_z), 1)
+        if actual_h > 20.0:
+            total_depth = actual_h
+        if diameter < 100.0:
+            diameter = round(max(max_x - min_x, max_y - min_y), 1)
         back_z = min_z
     except Exception:
         back_z = -total_depth
