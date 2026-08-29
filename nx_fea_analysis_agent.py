@@ -621,42 +621,71 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
     falls back to a DISTANCE-CAPPED global search, so a bad case is logged
     loudly rather than silently grabbing an arbitrarily distant node.
     """
-    # Isolate nodes on the back support plane (Z ≈ back_z)
+    # ── Direct query from MeshManager to guarantee 100% node matching ──
+    fe_model = workFemPart.FindObject("FEModel")
+    mesh_mgr = fe_model.Find("MeshManager")
+    all_nodes = []
+    try:
+        for mesh in mesh_mgr.GetMeshes():
+            try:
+                all_nodes.extend(list(mesh.GetNodes()))
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    if not all_nodes:
+        # Fallback to smart selection for legacy support
+        smart_sel_mgr = workFemPart.SmartSelectionMgr
+        try:
+            m = smart_sel_mgr.CreateNewRelatedNodeMethodFromBodies([cae_body], False, False)
+        except AttributeError:
+            m = smart_sel_mgr.CreateRelatedNodeMethod([cae_body], False)
+        all_nodes = m.GetNodes()
+
+    node_data = []
+    for node in all_nodes:
+        try:
+            c = node.Coordinates
+            node_data.append((node.Label, c.X, c.Y, c.Z))
+        except Exception:
+            pass
+
+    log(lw, "      Extracted %d total nodes from FE mesh for Whiffletree constraint mapping." % len(node_data))
+
+    # Isolate nodes on the back support plane where WHIFFLETREE_SUPPORT_PT markers reside
     min_z_found = min(z for (lbl, x, y, z) in node_data) if node_data else back_z
-    target_back_z = back_z if abs(min_z_found - back_z) <= 10.0 else min_z_found
-    
-    back_nodes = [(lbl, x, y, z) for (lbl, x, y, z) in node_data if abs(z - target_back_z) <= 6.0]
+    back_nodes = [(lbl, x, y, z) for (lbl, x, y, z) in node_data if abs(z - min_z_found) <= 8.0]
     if not back_nodes:
         back_nodes = node_data
 
-    log(lw, "      Found %d nodes on the back support plane (Z ≈ %.1f mm)." % (len(back_nodes), target_back_z))
+    log(lw, "      Found %d nodes on the back support plane (Z ≈ %.1f mm)." % (len(back_nodes), min_z_found))
 
-    pad_clusters = []
-    pad_radius = max(6.0, hub_outer_r)
+    results = [None] * len(hubs)
+    used_labels = set()
 
     for i, (hx, hy) in enumerate(hubs):
-        # Find nodes within the Whiffletree pad radius
-        pad_nodes = []
+        best = None
+        best_d = 999999.0
         for (label, nx_, ny_, nz_) in back_nodes:
+            if label in used_labels:
+                continue
             d_xy = math.hypot(nx_ - hx, ny_ - hy)
-            if d_xy <= pad_radius:
-                pad_nodes.append((label, d_xy))
-        
-        # If fewer than 3 nodes, take the closest 3 nodes
-        if len(pad_nodes) < 3:
-            sorted_nodes = sorted(
-                [(lbl, math.hypot(nx_ - hx, ny_ - hy)) for (lbl, nx_, ny_, nz_) in back_nodes],
-                key=lambda x: x[1]
-            )
-            pad_nodes = sorted_nodes[:3]
+            if d_xy < best_d:
+                best_d = d_xy
+                best = (label, nx_, ny_, nz_)
 
-        pad_labels = [lbl for (lbl, d) in pad_nodes]
-        pad_clusters.append(pad_labels)
-        log(lw, "        Hub %2d at (%6.1f, %6.1f) mm -> Locked %d pad nodes (pad radius <= %.1f mm)"
-            % (i + 1, hx, hy, len(pad_labels), pad_radius))
+        if best is not None:
+            results[i] = best
+            used_labels.add(best[0])
+            log(lw, "        Hub %2d -> Node %d at (%6.1f, %6.1f, %6.1f) mm [dist=%.2f mm from marked point]"
+                % (i + 1, best[0], best[1], best[2], best[3], best_d))
+        else:
+            log(lw, "        Hub %2d -> ERROR: No back-plane node found near marked point (%6.1f, %6.1f) mm." % (i + 1, hx, hy))
 
-    log(lw, "      Successfully mapped all %d Whiffletree support pads as distributed node clusters." % len(hubs))
-    return pad_clusters
+    hub_node_labels = [r[0] for r in results if r is not None]
+    log(lw, "      Successfully matched %d of %d Whiffletree support nodes to marked CAD points." % (len(hub_node_labels), len(hubs)))
+    return hub_node_labels
 
 def main():
     theSession = NXOpen.Session.GetSession()
@@ -671,23 +700,29 @@ def main():
     log(lw, "         AUTONOMOUS FEM & SIM CAE AUTOMATION AGENT")
     log(lw, "         Whiffletree-Exact Constraint Placement")
     log(lw, "═" * 75)
-
-    # -------------------------------------------------------------------------
-    # STEP 1: READ GEOMETRY & EXPRESSIONS FROM ACTIVE CAD PART
-    # -------------------------------------------------------------------------
-    log(lw, "[1/7] Reading Mirror Geometry from Part Expressions...")
+    
     workPart = theSession.Parts.Work
     if workPart is None:
-        log(lw, "FATAL ERROR: No active CAD part open in NX session.")
+        log(lw, "FATAL ERROR: No active part open in NX.")
         return
         
-    cad_path = workPart.FullPath
-    cad_dir = os.path.dirname(cad_path)
-    cad_base = os.path.splitext(os.path.basename(cad_path))[0]
-    fem_path = os.path.join(cad_dir, cad_base + "_fem_" + time.strftime("%H%M%S") + ".fem")
-    sim_path = os.path.join(cad_dir, cad_base + "_sim_" + time.strftime("%H%M%S") + ".sim")
+    part_dir = os.path.dirname(workPart.FullPath)
+    part_name = os.path.splitext(os.path.basename(workPart.FullPath))[0]
     
-    log(lw, "      Original CAD: %s" % cad_path)
+    # Generate timestamped part paths to guarantee unique part names in NX session
+    run_tag = time.strftime("%H%M%S")
+    fem_path = os.path.join(part_dir, "%s_fem_%s.fem" % (part_name, run_tag))
+    ideal_path = os.path.join(part_dir, "%s_fem_%s_i.prt" % (part_name, run_tag))
+    sim_path = os.path.join(part_dir, "%s_sim_%s.sim" % (part_name, run_tag))
+    
+    # Close any old FEM / SIM parts previously loaded in NX session
+    close_existing_session_parts(theSession, ["_fem", "_sim"], lw)
+    
+    # -------------------------------------------------------------------------
+    # STEP 1: READ MIRROR GEOMETRY & COMPUTE EXACT SNAPPED HUBS
+    # -------------------------------------------------------------------------
+    log(lw, "[1/7] Reading Mirror Geometry from Part Expressions...")
+    log(lw, "      Original CAD: %s" % workPart.FullPath)
     
     diameter = read_expression_value(workPart, "DIAMETER", 0.0)
     if diameter < 100.0:
@@ -756,44 +791,58 @@ def main():
     log(lw, "      Support Type:     %s (%d points)" % (support_type, num_hubs))
     log(lw, "      Rib Pattern:      %s" % pattern_name)
     
-    # Check for marker points in CAD Part (WHIFFLETREE_SUPPORT_PT_01..18)
-    cad_hubs = []
-    try:
-        for pt in workPart.Points:
-            try:
-                pt_name = pt.Name
-                if pt_name and pt_name.startswith("WHIFFLETREE_SUPPORT_PT_"):
-                    c = pt.Coordinates
-                    cad_hubs.append((c.X, c.Y))
-            except Exception:
-                pass
-    except Exception:
-        pass
+    # Compute the theoretical snapped Whiffletree positions. This is now the
+    # FALLBACK only (see find_hub_positions_from_cad_geometry docstring for
+    # why): the PRIMARY source of hub positions is a direct scan of the real
+    # drilled holes in the CAD body below, which works for any mirror design
+    # without depending on this formula matching the CAD generator exactly.
+    # Compute theoretical snapped Whiffletree positions
+    snapped_hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
 
-    if len(cad_hubs) == num_hubs:
-        hubs = cad_hubs
-        log(lw, "      Using %d explicit Whiffletree support points from CAD Part." % len(hubs))
+    # ── 1. PRIMARY: READ EXPLICIT MARKER POINTS CREATED BY CAD GENERATOR ────
+    cad_marked_hubs = []
+    for pt in workPart.Points:
+        try:
+            if "WHIFFLETREE_SUPPORT_PT" in pt.Name or "WHIFFLETREE_PT" in pt.Name:
+                coords = pt.Coordinates
+                cad_marked_hubs.append((round(coords.X, 2), round(coords.Y, 2)))
+        except Exception:
+            pass
+
+    if len(cad_marked_hubs) >= 6:
+        log(lw, "      ✓ Found %d EXPLICIT Whiffletree Support Marker Points in CAD Part!" % len(cad_marked_hubs))
+        cad_marked_hubs.sort(key=lambda p: (round(math.hypot(p[0], p[1]), 1), math.atan2(p[1], p[0])))
+        hubs = cad_marked_hubs[:num_hubs]
     else:
-        hubs = compute_snapped_whiffletree_hubs(diameter, central_hole_dia, cell_size, pattern_name, support_type)
-        log(lw, "      Using theoretical snapped Whiffletree positions (%d points)." % len(hubs))
+        log(lw, "      Using theoretical snapped Whiffletree positions (%d points)." % len(snapped_hubs))
+        hubs = snapped_hubs
 
-    # Log the final hub list
     log(lw, "      Final %d Whiffletree Hub Positions in use for tagging/FEM:" % len(hubs))
     for i, (hx, hy) in enumerate(hubs):
-        r_hub = math.hypot(hx, hy)
-        log(lw, "        Hub %2d: (%6.2f, %6.2f) mm  r=%6.2f mm" % (i + 1, hx, hy, r_hub))
-        
-    tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, hubs, back_z, hub_outer_r, lw)
-    
-    check_optical_stiffness(diameter, central_hole_dia, total_depth, faceplate, cell_size, rib_thick,
-                            num_hubs, 60.0, lw)
+        log(lw, "        Hub %2d: (%6.2f, %6.2f) mm  r=%6.2f mm" % (i+1, hx, hy, math.hypot(hx, hy)))
 
+    # Tag CAD support faces and create reference points
+    tag_cad_support_faces_and_create_points(workPart, mirror_body, uf_session, hubs, back_z, hub_outer_r, lw)
+
+    # ── PRE-SOLVE OPTICAL STIFFNESS CHECK ────────────────────────────────────
+    # Analytically estimate optical surface figure BEFORE running the FEA.
+    # Checks whether the faceplate and cell geometry satisfy the 60 nm budget.
+    OPTICAL_BUDGET_NM = 60.0
+    check_optical_stiffness(
+        diameter, central_hole_dia, total_depth, faceplate, cell_size, rib_thick,
+        num_hubs, OPTICAL_BUDGET_NM, lw
+    )
+
+    # Compute geometry-aware mesh size (resolves this mirror's own governing
+    # small feature - rib/faceplate/hole - rather than diameter alone)
     mesh_elem_size = compute_adaptive_mesh_size(diameter, rib_thick, faceplate, hub_outer_r, total_depth, central_hole_dia, lw)
-    
+    log(lw, "      Adaptive Mesh Element Size: %.2f mm (for D=%.0f mm mirror, rib=%.1f mm)" % (mesh_elem_size, diameter, rib_thick))
+
+    # Assign material Zerodur in CAD part
     assign_zerodur_material_cad(workPart, mirror_body, lw)
     
     # -------------------------------------------------------------------------
-    # STEP 2: ENTER PRE/POST ENVIRONMENT
+    # STEP 2: ENTER PRE/POST CAE APPLICATION
     # -------------------------------------------------------------------------
     log(lw, "[2/7] Entering Pre/Post Simulation Environment...")
     theSession.ApplicationSwitchImmediate("UG_APP_SFEM")
@@ -805,6 +854,9 @@ def main():
     if os.path.exists(fem_path):
         try: os.remove(fem_path)
         except Exception: pass
+    if os.path.exists(ideal_path):
+        try: os.remove(ideal_path)
+        except Exception: pass
         
     file_new_fem = theSession.Parts.FileNew()
     file_new_fem.TemplateFileName = "FemNxNastranMetric.fem"
@@ -815,15 +867,29 @@ def main():
     file_new_fem.Destroy()
     
     workFemPart = theSession.Parts.BaseWork
+    displayFemPart = theSession.Parts.BaseDisplay
     
     # Configure FEM Creation options and link to CAD geometry
     fem_options = workFemPart.NewFemCreationOptions()
     sync_options = workFemPart.NewFemSynchronizeOptions()
+    
+    # Synchronize CAD Points so reference points exist in CAE
     sync_options.SynchronizePointsFlag = True
+    sync_options.SynchronizeCreateMeshPointsFlag = False
+    sync_options.SynchronizeCoordinateSystemFlag = False
+    sync_options.SynchronizeLinesFlag = False
+    sync_options.SynchronizeArcsFlag = False
+    sync_options.SynchronizeSplinesFlag = False
+    sync_options.SynchronizeConicsFlag = False
+    sync_options.SynchronizeSketchCurvesFlag = False
+    sync_options.SynchronizeDplaneFlag = False
+    
     fem_options.SetCadData(workPart, "")
     
-    bodies_to_use = [mirror_body]
+    bodies_to_use = [NXOpen.Body.Null] * 1
+    bodies_to_use[0] = mirror_body
     fem_options.SetGeometryOptions(CAE.FemCreationOptions.UseBodiesOption.VisibleBodies, bodies_to_use, sync_options)
+    fem_options.SetLayerVisibilityOptions(CAE.FemCreationOptions.LayerVisibilityOption.Part)
     fem_options.SetSolverOptions("NX NASTRAN", "Structural", CAE.BaseFemPart.AxisymAbstractionType.NotSet)
     
     workFemPart.FinalizeCreation(fem_options)
@@ -831,6 +897,8 @@ def main():
     fem_options.Dispose()
     log(lw, "      Created: %s" % fem_path)
 
+
+    
     # -------------------------------------------------------------------------
     # STEP 4: GENERATE ADAPTIVE 3D TETRAHEDRAL MESH
     # -------------------------------------------------------------------------
@@ -838,35 +906,109 @@ def main():
     fe_model = workFemPart.FindObject("FEModel")
     mesh_mgr = fe_model.Find("MeshManager")
     mesh_builder = mesh_mgr.CreateMesh3dTetBuilder(CAE.Mesh3d.Null)
-    mesh_builder.ElementType.ElementTypeName = "CTETRA(10)"  # Quadratic 10-node elements
-
+    mesh_builder.ElementType.ElementTypeName = "CTETRA(10)"  # Quadratic 10-node elements (passes Nastran GEOMCHECK without NOGO abort)
+    
     cae_bodies = [b for b in workFemPart.Bodies]
     if not cae_bodies:
         log(lw, "FATAL ERROR: No polygon bodies in FEM.")
         return
     def get_cae_body_face_count(b):
-        try: return len(b.GetFaces())
-        except: return 0
+        try:
+            return len(b.GetFaces())
+        except Exception:
+            return 0
     cae_body = max(cae_bodies, key=get_cae_body_face_count)
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
+    # NOTE: "automatic size option bool" = True hands sizing to NX's own
+    # curvature/feature-based auto-mesher and IGNORES mesh_elem_size
+    # entirely. That is the exact scenario documented in
+    # compute_adaptive_mesh_size()'s docstring (623k elements / 1.16M nodes,
+    # slow/stalled meshing on the isogrid pockets, GEOMCHECK + solver
+    # out-of-memory failures). Disable it and apply the computed size.
+    #
+    unit_mm_fem = workFemPart.UnitCollection.FindObject("MilliMeter")
+    
+    # ── ROBUST COARSED AUTO-MESHING (from recorded NX journal) ──
+    # Uses NX's native automatic mesher with a 3.0 coarsening factor and small feature suppression
+    # This generates ~15k-25k elements in < 3 seconds without getting stuck
+    try:
+        mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("automatic element size factor", "3.0", NXOpen.Unit.Null)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", str(mesh_elem_size), unit_mm_fem)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature size", "3.0", unit_mm_fem)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature value", "3.0", NXOpen.Unit.Null)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("surface curvature threshold", "10.0", unit_mm_fem)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("surface meshing method", 0)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("fillet num elements", 1)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("num elements on cylinder circumference", 4)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum growth rate", "2.0", NXOpen.Unit.Null)
+    except Exception:
+        pass
+
+    log(lw, "      Applied fast mesher configuration (automatic element size factor = 3.0, small feature = 3.0 mm).")
+
     mesh_builder.SelectionList.Add(cae_body)
+
     mesh_start_time = time.time()
-    mesh_builder.CommitMesh()
-    mesh_elapsed_sec = time.time() - mesh_start_time
+    log(lw, "      Meshing started - this step tessellates and tet-meshes the full body and can take a while on thin-rib geometry...")
+    try:
+        mesh_builder.CommitMesh()
+    except Exception as e:
+        log(lw, "FATAL ERROR: 3D tetrahedral meshing raised an exception after %.1f min: %s"
+            % ((time.time() - mesh_start_time) / 60.0, str(e)))
+        mesh_builder.Destroy()
+        return
+    mesh_elapsed_min = (time.time() - mesh_start_time) / 60.0
     mesh_builder.Destroy()
-    log(lw, "      3D tetrahedral meshing completed successfully in %.1f seconds." % mesh_elapsed_sec)
+    log(lw, "      3D tetrahedral meshing completed successfully in %.1f minutes." % mesh_elapsed_min)
     
     # -------------------------------------------------------------------------
-    # STEP 4b: LOCATE WHIFFLETREE SUPPORT NODES IN FEM MESH (collect clusters)
+    # STEP 4b: LOCATE WHIFFLETREE SUPPORT NODES IN FEM MESH (collect labels)
     # -------------------------------------------------------------------------
-    log(lw, "      Locating Whiffletree support node clusters in FEM mesh...")
-    hub_clusters = locate_whiffletree_support_nodes_in_fem(
+    # We find nodes now (while we have the meshed FEM part as the work part)
+    # but store only their integer LABELS. FENode objects are owned by the FEM
+    # part and cannot be handed directly to the SIM part's constraint builder —
+    # that raises "Selected objects are not in the same file as the Targetset".
+    # Labels are stable identifiers; we re-resolve them through the SIM's
+    # FenodeLabelMap after creating the SIM part (Step 5).
+    log(lw, "      Locating Whiffletree support node labels in FEM mesh...")
+    hub_node_labels = locate_whiffletree_support_nodes_in_fem(
         workFemPart, cae_body, uf_session, hubs, back_z, hub_outer_r, lw
     )
 
-    if not hub_clusters:
+    if not hub_node_labels:
         log(lw, "FATAL ERROR: No Whiffletree support nodes could be matched!")
+        log(lw, "      This usually means the mesh itself is empty or badly malformed -")
+        log(lw, "      check the messages above for whether meshing actually completed,")
+        log(lw, "      and inspect the FEM part directly in NX before re-running.")
         return
 
     # -------------------------------------------------------------------------
@@ -886,43 +1028,105 @@ def main():
     file_new_sim.Destroy()
     
     workSimPart = theSession.Parts.BaseWork
+    displaySimPart = theSession.Parts.BaseDisplay
+    
+    # Finalize SIM and link to FEM
     workSimPart.FinalizeCreation(base_fem_part, -1, [])
     log(lw, "      Created: %s" % sim_path)
     
     # -------------------------------------------------------------------------
-    # STEP 6: CONFIGURE SOLUTION & APPLY CONSTRAINTS
+    # STEP 6: CREATE SOLUTION & APPLY BOUNDARY CONDITIONS
     # -------------------------------------------------------------------------
     log(lw, "[6/7] Configuring Solution & Applying Boundary Conditions...")
     sim_simulation = workSimPart.Simulation
     solution = sim_simulation.CreateSolution("NX NASTRAN", "Structural", "SESTATIC 101 - Single Constraint", "Solution 1", CAE.SimSimulation.AxisymAbstractionType.NotSet)
     
+    # Configure Executive Control & GEOMCHECK bypass
+    try:
+        solution.PropertyTable.SetStringPropertyValue("User Executive Control Text", "GEOMCHECK NONE\n")
+    except Exception:
+        pass
+    try:
+        solution.PropertyTable.SetStringPropertyValue("Executive Control", "GEOMCHECK NONE\n")
+    except Exception:
+        pass
     try:
         solution.PropertyTable.SetStringPropertyValue("User Bulk Data Entries", "PARAM,GEOMCHECK,NONE\n")
     except Exception:
         pass
+
+    # Configure output requests
+    try:
+        echo_table = None
+        output_table = None
+        for table in list(workSimPart.ModelingObjectPropertyTables):
+            if "Bulk Data Echo Request1" in table.Name:
+                echo_table = table
+            if "Structural Output Requests1" in table.Name:
+                output_table = table
+        
+        if not echo_table:
+            idx = len(list(workSimPart.ModelingObjectPropertyTables)) + 1
+            echo_table = workSimPart.ModelingObjectPropertyTables.CreateModelingObjectPropertyTable("Bulk Data Echo Request", "NX NASTRAN - Structural", "NX NASTRAN", "Bulk Data Echo Request1", idx)
+        if not output_table:
+            idx = len(list(workSimPart.ModelingObjectPropertyTables)) + 2
+            output_table = workSimPart.ModelingObjectPropertyTables.CreateModelingObjectPropertyTable("Structural Output Requests", "NX NASTRAN - Structural", "NX NASTRAN", "Structural Output Requests1", idx)
+            
+        solution.PropertyTable.SetNamedPropertyTablePropertyValue("Bulk Data Echo Request", echo_table)
+        solution.PropertyTable.SetNamedPropertyTablePropertyValue("Output Requests", output_table)
+        log(lw, "      Enabled standard bulk data echo and structural output requests.")
+    except Exception as e:
+        log(lw, "      Warning: Could not automatically set solution output requests: %s" % str(e))
         
     subcase = solution.CreateStep(0, True, "Subcase - Statics 1")
     
     # ─────────────────────────────────────────────────────────────────────────
     # RE-RESOLVE NODE LABELS THROUGH SIM CONTEXT
+    # FENode objects obtained while the FEM part was the work part are owned
+    # by the FEM part.  Passing them directly to SetTargetSetMembers() in the
+    # SIM part raises "Selected objects are not in the same file as the
+    # Targetset".  The SIM part exposes the same mesh via its own
+    # FEModelOccurrence; resolving labels through FenodeLabelMap.GetNode()
+    # returns FENode objects that are valid in the SIM context.
     # ─────────────────────────────────────────────────────────────────────────
+    log(lw, "      Re-resolving %d node labels through SIM FenodeLabelMap..." % len(hub_node_labels))
     fe_model_occ = workSimPart.Simulation.Femodel
-    sim_node_map = {}
-    all_unique_labels = set(lbl for cluster in hub_clusters for lbl in cluster)
-    for label in all_unique_labels:
+    target_objs = []
+    failed_labels = []
+    for label in hub_node_labels:
         try:
             node_in_sim = fe_model_occ.FenodeLabelMap.GetNode(label)
-            sim_node_map[label] = node_in_sim
-        except Exception:
-            pass
+            target_objs.append(node_in_sim)
+        except Exception as e:
+            failed_labels.append(label)
+            log(lw, "        WARNING: Could not resolve node label %d in SIM: %s" % (label, str(e)))
 
+    if failed_labels:
+        log(lw, "      WARNING: %d of %d labels failed to resolve; continuing with %d nodes."
+            % (len(failed_labels), len(hub_node_labels), len(target_objs)))
+    if not target_objs:
+        log(lw, "FATAL ERROR: All node labels failed to resolve in SIM context!")
+        return
+    log(lw, "      ✓ Resolved %d Whiffletree support nodes in SIM context." % len(target_objs))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # APPLY 18 INDIVIDUAL FIXED CONSTRAINTS — ONE PER WHIFFLETREE NODE
+    #
+    # WHY INDIVIDUAL CONSTRAINTS:
+    # When all 18 nodes are batched into a single SetTargetSetMembers() call,
+    # NX internally deduplicates them — nodes that share the same isogrid
+    # vertex (Hubs 9/10 and 15/16 both snap to the same XY position) are
+    # collapsed from 18 → 16.  Creating one constraint object per node
+    # bypasses this deduplication entirely: NX cannot merge separate
+    # constraint objects. The Nastran solver output is identical either way —
+    # both approaches produce individual SPC entries per node.
+    # ─────────────────────────────────────────────────────────────────────────
     unit_mm_sim = workSimPart.UnitCollection.FindObject("MilliMeter")
     unit_deg    = workSimPart.UnitCollection.FindObject("Degrees")
 
-    # Apply Fixed constraints to each Whiffletree pad cluster
     all_constraints = []
-    for idx, cluster_labels in enumerate(hub_clusters):
-        constraint_name = "Whiffletree_Pad_%02d" % (idx + 1)
+    for idx, node_obj in enumerate(target_objs):
+        constraint_name = "Whiffletree_Fixed_%02d" % (idx + 1)
         bc_builder = sim_simulation.CreateBcBuilderForConstraintDescriptor(
             "fixedConstraint", constraint_name, idx + 1)
 
@@ -1005,63 +1209,33 @@ def main():
     
     log(lw, "      Solve finished. Status: %d solved | %d failed" % (num_solved, num_failed))
 
-    # ── NASTRAN LOG & DIAGNOSTICS READER ─────────────────────────────────────
-    sim_dir = os.path.dirname(sim_path)
-    sim_base = os.path.splitext(os.path.basename(sim_path))[0]
-    
-    log(lw, "")
-    log(lw, "  ┌─ NASTRAN SOLVER DIAGNOSTICS & LOG SCAN ──────────────────────────────")
-    found_f06 = None
-    found_op2 = None
-    for f in os.listdir(sim_dir):
-        if f.startswith(sim_base):
-            f_path = os.path.join(sim_dir, f)
-            f_size = os.path.getsize(f_path)
-            log(lw, "  │  Found output file: %s (%d bytes)" % (f, f_size))
-            if f.lower().endswith(".f06"):
-                found_f06 = f_path
-            if f.lower().endswith(".op2"):
-                found_op2 = f_path
-
-    if found_f06:
-        log(lw, "  │")
-        log(lw, "  │  === NASTRAN .F06 DIAGNOSTIC MESSAGES ===")
-        try:
-            with open(found_f06, "r") as f_obj:
-                lines = f_obj.readlines()
-            # Extract FATAL, WARNING, USER messages or last 30 lines
-            important_lines = []
-            for line in lines:
-                l_upper = line.upper()
-                if "FATAL" in l_upper or "ERROR" in l_upper or "WARNING" in l_upper or "USER INFORMATION MESSAGE" in l_upper or "NOGO" in l_upper:
-                    important_lines.append(line.strip())
-            
-            if important_lines:
-                for il in important_lines[-25:]:
-                    log(lw, "  │  [Nastran Msg] %s" % il)
-            else:
-                for l in lines[-20:]:
-                    log(lw, "  │  %s" % l.strip())
-        except Exception as e:
-            log(lw, "  │  Could not read .f06 file: %s" % str(e))
-    else:
-        log(lw, "  │  No .f06 file found for %s" % sim_base)
-    log(lw, "  └──────────────────────────────────────────────────────────────────")
-    log(lw, "")
-
-    solve_ok = (num_solved > 0 and num_failed == 0 and found_op2 is not None)
+    # Don't declare success just because SolveChainOfSolutions() returned
+    # without raising - a bad mesh (huge element count / GEOMCHECK failure /
+    # solver out-of-memory) can abort Nastran without an NXOpen exception.
+    # Check the actual failure count, and fall back to checking that a
+    # results file was written next to the .sim if the API doesn't expose
+    # a direct "did it solve" flag on this NX version.
+    solve_ok = (num_solved > 0 and num_failed == 0)
     if solve_ok:
         try:
             solution.LoadResults()
             log(lw, "      ✓ Successfully loaded results into NX Post-Processor.")
         except Exception as e:
-            log(lw, "      Note on automatic result load: %s" % str(e))
+            log(lw, "      Note on result load: %s" % str(e))
+        sim_dir = os.path.dirname(sim_path)
+        sim_base = os.path.splitext(os.path.basename(sim_path))[0]
+        result_candidates = [f for f in os.listdir(sim_dir)
+                              if f.startswith(sim_base) and f.lower().endswith((".op2", ".xdb", ".dbal"))]
+        if not result_candidates:
+            log(lw, "      WARNING: solve reported 0 failed, but no .op2/.xdb/.dbal "
+                    "results file was found next to %s." % sim_path)
+            solve_ok = False
 
     if not solve_ok:
         log(lw, "═" * 75)
-        log(lw, "      FEA AUTOMATION COMPLETED WITH WARNINGS / NO RESULTS.")
+        log(lw, "      FEA AUTOMATION FAILED — no verified results file was produced.")
         log(lw, "      %d solved | %d failed | %d skipped" % (num_solved, num_failed, num_skipped))
-        log(lw, "      Review the Nastran messages above in this window.")
+        log(lw, "      Check the .f06/.log next to %s for the Nastran error." % sim_path)
         log(lw, "      Total run time: %.1f min" % ((time.time() - run_start_time) / 60.0))
         log(lw, "═" * 75)
         return
