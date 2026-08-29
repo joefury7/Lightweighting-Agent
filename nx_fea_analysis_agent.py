@@ -1192,33 +1192,63 @@ def main():
     
     log(lw, "      Solve finished. Status: %d solved | %d failed" % (num_solved, num_failed))
 
-    # Don't declare success just because SolveChainOfSolutions() returned
-    # without raising - a bad mesh (huge element count / GEOMCHECK failure /
-    # solver out-of-memory) can abort Nastran without an NXOpen exception.
-    # Check the actual failure count, and fall back to checking that a
-    # results file was written next to the .sim if the API doesn't expose
-    # a direct "did it solve" flag on this NX version.
-    solve_ok = (num_solved > 0 and num_failed == 0)
+    # ── NASTRAN LOG & DIAGNOSTICS READER ─────────────────────────────────────
+    sim_dir = os.path.dirname(sim_path)
+    sim_base = os.path.splitext(os.path.basename(sim_path))[0]
+    
+    log(lw, "")
+    log(lw, "  ┌─ NASTRAN SOLVER DIAGNOSTICS & LOG SCAN ──────────────────────────────")
+    found_f06 = None
+    found_op2 = None
+    for f in os.listdir(sim_dir):
+        if f.startswith(sim_base):
+            f_path = os.path.join(sim_dir, f)
+            f_size = os.path.getsize(f_path)
+            log(lw, "  │  Found output file: %s (%d bytes)" % (f, f_size))
+            if f.lower().endswith(".f06"):
+                found_f06 = f_path
+            if f.lower().endswith(".op2"):
+                found_op2 = f_path
+
+    if found_f06:
+        log(lw, "  │")
+        log(lw, "  │  === NASTRAN .F06 DIAGNOSTIC MESSAGES ===")
+        try:
+            with open(found_f06, "r") as f_obj:
+                lines = f_obj.readlines()
+            # Extract FATAL, WARNING, USER messages or last 30 lines
+            important_lines = []
+            for line in lines:
+                l_upper = line.upper()
+                if "FATAL" in l_upper or "ERROR" in l_upper or "WARNING" in l_upper or "USER INFORMATION MESSAGE" in l_upper or "NOGO" in l_upper:
+                    important_lines.append(line.strip())
+            
+            if important_lines:
+                for il in important_lines[-25:]:
+                    log(lw, "  │  [Nastran Msg] %s" % il)
+            else:
+                for l in lines[-20:]:
+                    log(lw, "  │  %s" % l.strip())
+        except Exception as e:
+            log(lw, "  │  Could not read .f06 file: %s" % str(e))
+    else:
+        log(lw, "  │  No .f06 file found for %s" % sim_base)
+    log(lw, "  └──────────────────────────────────────────────────────────────────")
+    log(lw, "")
+
+    solve_ok = (num_solved > 0 and num_failed == 0 and found_op2 is not None)
     if solve_ok:
         try:
             solution.LoadResults()
             log(lw, "      ✓ Successfully loaded results into NX Post-Processor.")
         except Exception as e:
             log(lw, "      Note on automatic result load: %s" % str(e))
-        sim_dir = os.path.dirname(sim_path)
-        sim_base = os.path.splitext(os.path.basename(sim_path))[0]
-        result_candidates = [f for f in os.listdir(sim_dir)
-                              if f.startswith(sim_base) and f.lower().endswith((".op2", ".xdb", ".dbal"))]
-        if not result_candidates:
-            log(lw, "      WARNING: solve reported 0 failed, but no .op2/.xdb/.dbal "
-                    "results file was found next to %s." % sim_path)
-            solve_ok = False
 
     if not solve_ok:
         log(lw, "═" * 75)
-        log(lw, "      FEA AUTOMATION FAILED — no verified results file was produced.")
+        log(lw, "      FEA AUTOMATION COMPLETED WITH WARNINGS / NO RESULTS.")
         log(lw, "      %d solved | %d failed | %d skipped" % (num_solved, num_failed, num_skipped))
-        log(lw, "      Check the .f06/.log next to %s for the Nastran error." % sim_path)
+        log(lw, "      Review the Nastran messages above in this window.")
         log(lw, "      Total run time: %.1f min" % ((time.time() - run_start_time) / 60.0))
         log(lw, "═" * 75)
         return
