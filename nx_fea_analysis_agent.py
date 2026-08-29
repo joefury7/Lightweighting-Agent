@@ -942,39 +942,6 @@ def main():
     workFemPart = theSession.Parts.BaseWork
     displayFemPart = theSession.Parts.BaseDisplay
     
-    # Initialize polygon resolution.
-    #
-    # "Standard" tessellates the exact CAD BREP into a polygon/facet body at
-    # full fidelity BEFORE any tet mesh sizing applies - this happens during
-    # the "Process Mesh Geometry" phase, which is a DIFFERENT, EARLIER stage
-    # than the tet element sizing/small-feature tuning done later in Step 4.
-    # On a part with 1.5mm ribs repeated across ~100+ isogrid cells, full-
-    # fidelity tessellation of every rib edge at this stage is a strong
-    # candidate for the exact "stuck at 5% on Process Mesh Geometry" symptom
-    # seen twice now, independent of the tet-mesh-stage tuning already added.
-    # Try coarser resolution levels in order; a wrong enum member just
-    # raises AttributeError harmlessly (no partial state applied), unlike
-    # the earlier PropertyTable-key guesses.
-    poly_res_type = CAE.PolygonGeometryManager.PolygonBodyResolutionType
-    poly_res_candidates = ["Draft", "Coarse", "Low"]
-    poly_res_applied = None
-    for cand_name in poly_res_candidates:
-        try:
-            cand_value = getattr(poly_res_type, cand_name)
-            workFemPart.PolygonGeometryMgr.SetPolygonBodyResolutionOnFemBodies(cand_value)
-            poly_res_applied = cand_name
-            break
-        except AttributeError:
-            continue
-    if poly_res_applied:
-        log(lw, "      Polygon body resolution set to '%s' (coarser than Standard) to speed up initial tessellation." % poly_res_applied)
-    else:
-        workFemPart.PolygonGeometryMgr.SetPolygonBodyResolutionOnFemBodies(poly_res_type.Standard)
-        log(lw, "      NOTE: No coarser PolygonBodyResolutionType member found among %s - left at 'Standard'." % poly_res_candidates)
-        log(lw, "            If 'Process Mesh Geometry' stalls again, check Insert > Mesh > 3D Tetrahedral")
-        log(lw, "            manually in NX on this FEM part to see the real enum options available,")
-        log(lw, "            and to confirm whether the stall reproduces outside this script entirely.")
-    
     # Configure FEM Creation options and link to CAD geometry
     fem_options = workFemPart.NewFemCreationOptions()
     sync_options = workFemPart.NewFemSynchronizeOptions()
@@ -1002,6 +969,12 @@ def main():
     sync_options.Dispose()
     fem_options.Dispose()
     log(lw, "      Created: %s" % fem_path)
+
+    # Initialize polygon resolution AFTER FinalizeCreation (when polygon bodies exist)
+    try:
+        workFemPart.PolygonGeometryMgr.SetPolygonBodyResolutionOnFemBodies(CAE.PolygonGeometryManager.PolygonBodyResolutionType.Standard)
+    except Exception:
+        pass
     
     # -------------------------------------------------------------------------
     # STEP 4: GENERATE ADAPTIVE 3D TETRAHEDRAL MESH
