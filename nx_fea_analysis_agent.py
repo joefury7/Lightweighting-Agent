@@ -815,11 +815,15 @@ def main():
     hub_inner_r = read_expression_value(workPart, "HUB_INNER_R", 3.0)
     pattern_name = read_expression_string(workPart, "PATTERN", "isogrid")
     
-    bodies = [b for b in workPart.Bodies]
-    if not bodies:
-        log(lw, "FATAL ERROR: No solid bodies found in part.")
-        return
-    mirror_body = bodies[0]
+    def get_body_bbox_vol(b):
+        try:
+            bx1, by1, bz1, bx2, by2, bz2 = get_body_bounding_box(b, uf_session)
+            return (bx2 - bx1) * (by2 - by1) * (bz2 - bz1)
+        except Exception:
+            return 0.0
+
+    # Select the main lightweighted CAD body (largest volume body)
+    mirror_body = max(bodies, key=get_body_bbox_vol)
     
     if diameter < 100.0:
         try:
@@ -933,8 +937,38 @@ def main():
     workFemPart = theSession.Parts.BaseWork
     displayFemPart = theSession.Parts.BaseDisplay
     
-    # Initialize polygon resolution
-    workFemPart.PolygonGeometryMgr.SetPolygonBodyResolutionOnFemBodies(CAE.PolygonGeometryManager.PolygonBodyResolutionType.Standard)
+    # Initialize polygon resolution.
+    #
+    # "Standard" tessellates the exact CAD BREP into a polygon/facet body at
+    # full fidelity BEFORE any tet mesh sizing applies - this happens during
+    # the "Process Mesh Geometry" phase, which is a DIFFERENT, EARLIER stage
+    # than the tet element sizing/small-feature tuning done later in Step 4.
+    # On a part with 1.5mm ribs repeated across ~100+ isogrid cells, full-
+    # fidelity tessellation of every rib edge at this stage is a strong
+    # candidate for the exact "stuck at 5% on Process Mesh Geometry" symptom
+    # seen twice now, independent of the tet-mesh-stage tuning already added.
+    # Try coarser resolution levels in order; a wrong enum member just
+    # raises AttributeError harmlessly (no partial state applied), unlike
+    # the earlier PropertyTable-key guesses.
+    poly_res_type = CAE.PolygonGeometryManager.PolygonBodyResolutionType
+    poly_res_candidates = ["Draft", "Coarse", "Low"]
+    poly_res_applied = None
+    for cand_name in poly_res_candidates:
+        try:
+            cand_value = getattr(poly_res_type, cand_name)
+            workFemPart.PolygonGeometryMgr.SetPolygonBodyResolutionOnFemBodies(cand_value)
+            poly_res_applied = cand_name
+            break
+        except AttributeError:
+            continue
+    if poly_res_applied:
+        log(lw, "      Polygon body resolution set to '%s' (coarser than Standard) to speed up initial tessellation." % poly_res_applied)
+    else:
+        workFemPart.PolygonGeometryMgr.SetPolygonBodyResolutionOnFemBodies(poly_res_type.Standard)
+        log(lw, "      NOTE: No coarser PolygonBodyResolutionType member found among %s - left at 'Standard'." % poly_res_candidates)
+        log(lw, "            If 'Process Mesh Geometry' stalls again, check Insert > Mesh > 3D Tetrahedral")
+        log(lw, "            manually in NX on this FEM part to see the real enum options available,")
+        log(lw, "            and to confirm whether the stall reproduces outside this script entirely.")
     
     # Configure FEM Creation options and link to CAD geometry
     fem_options = workFemPart.NewFemCreationOptions()
@@ -977,60 +1011,87 @@ def main():
     if not cae_bodies:
         log(lw, "FATAL ERROR: No polygon bodies in FEM.")
         return
-    cae_body = cae_bodies[0]
+    def get_cae_body_face_count(b):
+        try:
+            return len(b.GetFaces())
+        except Exception:
+            return 0
+    cae_body = max(cae_bodies, key=get_cae_body_face_count)
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
-    unit_mm_fem = workFemPart.UnitCollection.FindObject("MilliMeter")
-    
-    # ── EXACT NX 3D TETRAHEDRAL MESHER CONFIGURATION (from recorded journal) ──
+    # NOTE: "automatic size option bool" = True hands sizing to NX's own
+    # curvature/feature-based auto-mesher and IGNORES mesh_elem_size
+    # entirely. That is the exact scenario documented in
+    # compute_adaptive_mesh_size()'s docstring (623k elements / 1.16M nodes,
+    # slow/stalled meshing on the isogrid pockets, GEOMCHECK + solver
+    # out-of-memory failures). Disable it and apply the computed size.
+    #
+    # Confirmed via a recorded NX journal (Insert > Mesh > 3D Tetrahedral):
+    # the tet mesh element size is set under the SAME internal property key
+    # as the 2D mesh builder uses - "quad mesh overall edge size" - via
+    # SetBaseScalarWithDataPropertyValue(key, value_str, unit).
     mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
+    unit_mm_fem = workFemPart.UnitCollection.FindObject("MilliMeter")
     mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
         "quad mesh overall edge size", str(mesh_elem_size), unit_mm_fem)
-    
-    # Prevent over-meshing micro-fillets and rib corners
-    try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature size", str(max(2.0, rib_thick)), unit_mm_fem)
-    except Exception:
-        pass
-    try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("surface curvature threshold", "10.0", unit_mm_fem)
-    except Exception:
-        pass
-    try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature value", "1.5", NXOpen.Unit.Null)
-    except Exception:
-        pass
-    try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum growth rate", "1.5", NXOpen.Unit.Null)
-    except Exception:
-        pass
-    try:
-        mesh_builder.PropertyTable.SetIntegerPropertyValue("surface meshing method", 0)
-    except Exception:
-        pass
-    try:
-        mesh_builder.PropertyTable.SetIntegerPropertyValue("fillet num elements", 1)
-    except Exception:
-        pass
-    try:
-        mesh_builder.PropertyTable.SetIntegerPropertyValue("num elements on cylinder circumference", 4)
-    except Exception:
-        pass
-    try:
-        mesh_builder.PropertyTable.SetIntegerPropertyValue("midnodes", 0)
-    except Exception:
-        pass
+    log(lw, "      Explicit element size %.1f mm applied (automatic sizing disabled)." % mesh_elem_size)
 
-    log(lw, "      Applied optimal element size (%.1f mm) and feature suppression." % mesh_elem_size)
+    # ── PRE-MESH COMPLEXITY WARNING ─────────────────────────────────────────
+    # Per NX's own tet-mesher behavior, a wall/rib thinner than the global
+    # element size is ALWAYS resolved down to its own thickness regardless
+    # of "automatic size option bool" - that's correct/required for a valid
+    # mesh, but it means a very thin rib repeated across many isogrid cells
+    # can genuinely take a long time to tessellate, independent of any bug.
+    # This estimates that up front so a slow run is expected, not a surprise.
+    if rib_thick > 0 and cell_size > 0:
+        aspect_ratio = cell_size / rib_thick
+        approx_cells = (math.pi * (diameter / 2.0) ** 2) / (0.433 * cell_size ** 2)  # equilateral triangle cells
+        if aspect_ratio > 20 or approx_cells > 60:
+            log(lw, "      WARNING: cell_size/rib_thick = %.0f across ~%.0f isogrid cells." % (aspect_ratio, approx_cells))
+            log(lw, "               Thin ribs are resolved to their true thickness regardless of the")
+            log(lw, "               28mm global size - meshing may genuinely take several minutes.")
+            log(lw, "               If this hangs indefinitely rather than just being slow, that points")
+            log(lw, "               to a geometry issue (degenerate/near-zero-thickness face) rather than")
+            log(lw, "               scale, and is worth inspecting directly in NX before re-running.")
+
+    # ── SMALL-FEATURE / GROWTH-RATE TUNING (confirmed real keys) ───────────
+    # These keys are confirmed to exist from a recorded NX journal (they are
+    # NOT another guess like the earlier ElementSize attempt). Left at NX's
+    # leftover dialog defaults (observed as small feature size=0.572mm,
+    # unrelated to this part), the mesher doesn't know THIS mirror's rib is
+    # the feature to treat specially. Tying "small feature size" to the
+    # actual rib_thick, and loosening the growth rate a bit from NX's
+    # default (1.3), lets the mesh transition from the fine rib elements
+    # back up to the 28mm global size in fewer graded layers.
+    # TRADE-OFF: this is a real speed/accuracy choice, not a free win - a
+    # looser growth rate and coarser small-feature percentage mesh faster
+    # but with a more abrupt size transition near the ribs, which is worth
+    # a visual/quality check on the first successful run.
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
+            "small feature size", str(rib_thick), unit_mm_fem)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
+            "small feature percentage", "25", NXOpen.Unit.Null)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
+            "maximum growth rate", "1.5", NXOpen.Unit.Null)
+        log(lw, "      Small-feature size tied to rib thickness (%.1f mm), growth rate loosened to 1.5." % rib_thick)
+    except Exception as e:
+        log(lw, "      NOTE: Could not apply small-feature/growth-rate tuning (%s) - continuing with NX defaults." % str(e))
 
     mesh_builder.SelectionList.Add(cae_body)
 
     mesh_start_time = time.time()
-    log(lw, "      Meshing 3D Tetrahedral body...")
-    mesh_builder.CommitMesh()
-    mesh_elapsed_sec = time.time() - mesh_start_time
+    log(lw, "      Meshing started - this step tessellates and tet-meshes the full body and can take a while on thin-rib geometry...")
+    try:
+        mesh_builder.CommitMesh()
+    except Exception as e:
+        log(lw, "FATAL ERROR: 3D tetrahedral meshing raised an exception after %.1f min: %s"
+            % ((time.time() - mesh_start_time) / 60.0, str(e)))
+        mesh_builder.Destroy()
+        return
+    mesh_elapsed_min = (time.time() - mesh_start_time) / 60.0
     mesh_builder.Destroy()
-    log(lw, "      3D tetrahedral meshing completed successfully in %.1f seconds." % mesh_elapsed_sec)
+    log(lw, "      3D tetrahedral meshing completed successfully in %.1f minutes." % mesh_elapsed_min)
     
     # -------------------------------------------------------------------------
     # STEP 4b: LOCATE WHIFFLETREE SUPPORT NODES IN FEM MESH (collect labels)
