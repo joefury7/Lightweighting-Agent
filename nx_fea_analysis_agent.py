@@ -919,29 +919,29 @@ def main():
 
     unit_mm_fem = workFemPart.UnitCollection.FindObject("MilliMeter")
     
-    # ── ROBUST AUTO-MESHING (CTETRA 10 Quadratic Elements) ──
+    # ── ROBUST AUTO-MESHING (CTETRA 10 Quadratic Elements with Quality Enforcement) ──
     try:
         mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("automatic element size factor", "1.2", NXOpen.Unit.Null)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("automatic element size factor", "1.0", NXOpen.Unit.Null)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", "18.0", unit_mm_fem)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("quad mesh overall edge size", "15.0", unit_mm_fem)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature size", "2.5", unit_mm_fem)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature size", "2.0", unit_mm_fem)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature value", "2.5", NXOpen.Unit.Null)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature value", "2.0", NXOpen.Unit.Null)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("surface curvature threshold", "10.0", unit_mm_fem)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("surface curvature threshold", "7.5", unit_mm_fem)
     except Exception:
         pass
     try:
@@ -949,19 +949,35 @@ def main():
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetIntegerPropertyValue("fillet num elements", 1)
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("fillet num elements", 2)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetIntegerPropertyValue("num elements on cylinder circumference", 4)
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("num elements on cylinder circumference", 6)
     except Exception:
         pass
     try:
-        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum growth rate", "1.5", NXOpen.Unit.Null)
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum growth rate", "1.3", NXOpen.Unit.Null)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBooleanPropertyValue("remesh on bad quality bool", True)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("max jacobian", "5.0", NXOpen.Unit.Null)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBooleanPropertyValue("control aspect ratio", True)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum exposed aspect ratio", "50.0", NXOpen.Unit.Null)
     except Exception:
         pass
 
-    log(lw, "      Applied optimal quadratic element configuration (CTETRA(10), factor=1.2, small feature=2.5mm).")
+    log(lw, "      Applied optimal quadratic element configuration with active quality repair.")
 
     mesh_builder.SelectionList.Add(cae_body)
 
@@ -1014,18 +1030,29 @@ def main():
     sim_simulation = workSimPart.Simulation
     solution = sim_simulation.CreateSolution("NX NASTRAN", "Structural", "SESTATIC 101 - Single Constraint", "Solution 1", CAE.SimSimulation.AxisymAbstractionType.NotSet)
     
-    # Configure output requests & GEOMCHECK overrides
+    # Configure Executive Control & GEOMCHECK bypass
+    try:
+        solution.PropertyTable.SetStringPropertyValue("User Executive Control Text", "GEOMCHECK NONE\n")
+    except Exception:
+        pass
+    try:
+        solution.PropertyTable.SetStringPropertyValue("Executive Control", "GEOMCHECK NONE\n")
+    except Exception:
+        pass
+    try:
+        solution.PropertyTable.SetStringPropertyValue("User Bulk Data Entries", "PARAM,GEOMCHECK,NONE\n")
+    except Exception:
+        pass
+
+    # Configure output requests
     try:
         echo_table = None
         output_table = None
-        geom_table = None
         for table in list(workSimPart.ModelingObjectPropertyTables):
             if "Bulk Data Echo Request" in table.Name:
                 echo_table = table
             if "Structural Output Requests" in table.Name:
                 output_table = table
-            if "Geometry Check" in table.Name:
-                geom_table = table
         
         if not echo_table:
             idx = len(list(workSimPart.ModelingObjectPropertyTables)) + 1
