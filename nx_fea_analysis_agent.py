@@ -881,7 +881,7 @@ def main():
     sync_options.SynchronizeSketchCurvesFlag = False
     sync_options.SynchronizeDplaneFlag = False
     
-    fem_options.SetCadData(workPart, ideal_path)
+    fem_options.SetCadData(workPart, "")
     
     bodies_to_use = [NXOpen.Body.Null] * 1
     bodies_to_use[0] = mirror_body
