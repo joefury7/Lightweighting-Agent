@@ -984,17 +984,29 @@ def main():
         mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
     except Exception:
         pass
+    try:
+        mesh_builder.PropertyTable.SetBooleanPropertyValue("auto mesh size bool", False)
+    except Exception:
+        pass
 
-    for prop_name in ("overall edge size", "mesh overall edge size", "element size", "quad mesh overall edge size"):
+    for prop_name in ("overall edge size", "mesh overall edge size", "element size", "quad mesh overall edge size", "size"):
         try:
             mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(prop_name, str(mesh_elem_size), unit_mm)
-            log(lw, "      Set 3D Tet mesh element size = %.1f mm (%s)" % (mesh_elem_size, prop_name))
+            log(lw, "      Set 3D Tet element size = %.1f mm (%s)" % (mesh_elem_size, prop_name))
             break
         except Exception:
             pass
 
     try:
         mesh_builder.PropertyTable.SetDoublePropertyValue("small feature size", 2.0)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetDoublePropertyValue("surface mesh size factor", 1.0)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetDoublePropertyValue("edge tolerance factor", 0.5)
     except Exception:
         pass
 
