@@ -970,11 +970,7 @@ def main():
     fem_options.Dispose()
     log(lw, "      Created: %s" % fem_path)
 
-    # Initialize polygon resolution AFTER FinalizeCreation (when polygon bodies exist)
-    try:
-        workFemPart.PolygonGeometryMgr.SetPolygonBodyResolutionOnFemBodies(CAE.PolygonGeometryManager.PolygonBodyResolutionType.Standard)
-    except Exception:
-        pass
+
     
     # -------------------------------------------------------------------------
     # STEP 4: GENERATE ADAPTIVE 3D TETRAHEDRAL MESH
