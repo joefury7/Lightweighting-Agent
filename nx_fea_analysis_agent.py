@@ -761,6 +761,7 @@ def locate_whiffletree_support_nodes_in_fem(workFemPart, cae_body, uf_session, h
 def main():
     theSession = NXOpen.Session.GetSession()
     uf_session = UF.UFSession.GetUFSession()
+    run_start_time = time.time()
     
     # Open listing window
     lw = theSession.ListingWindow
@@ -979,11 +980,57 @@ def main():
     cae_body = cae_bodies[0]
     assign_zerodur_material_fem(workFemPart, cae_body, lw)
 
-    mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", True)
+    unit_mm_fem = workFemPart.UnitCollection.FindObject("MilliMeter")
+    
+    # ── EXACT NX 3D TETRAHEDRAL MESHER CONFIGURATION (from recorded journal) ──
+    mesh_builder.PropertyTable.SetBooleanPropertyValue("automatic size option bool", False)
+    mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue(
+        "quad mesh overall edge size", str(mesh_elem_size), unit_mm_fem)
+    
+    # Prevent over-meshing micro-fillets and rib corners
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature size", str(max(2.0, rib_thick)), unit_mm_fem)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("surface curvature threshold", "10.0", unit_mm_fem)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("small feature value", "1.5", NXOpen.Unit.Null)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetBaseScalarWithDataPropertyValue("maximum growth rate", "1.5", NXOpen.Unit.Null)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("surface meshing method", 0)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("fillet num elements", 1)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("num elements on cylinder circumference", 4)
+    except Exception:
+        pass
+    try:
+        mesh_builder.PropertyTable.SetIntegerPropertyValue("midnodes", 0)
+    except Exception:
+        pass
+
+    log(lw, "      Applied optimal element size (%.1f mm) and feature suppression." % mesh_elem_size)
+
     mesh_builder.SelectionList.Add(cae_body)
+
+    mesh_start_time = time.time()
+    log(lw, "      Meshing 3D Tetrahedral body...")
     mesh_builder.CommitMesh()
+    mesh_elapsed_sec = time.time() - mesh_start_time
     mesh_builder.Destroy()
-    log(lw, "      3D tetrahedral meshing completed successfully.")
+    log(lw, "      3D tetrahedral meshing completed successfully in %.1f seconds." % mesh_elapsed_sec)
     
     # -------------------------------------------------------------------------
     # STEP 4b: LOCATE WHIFFLETREE SUPPORT NODES IN FEM MESH (collect labels)
@@ -1001,6 +1048,9 @@ def main():
 
     if not hub_node_labels:
         log(lw, "FATAL ERROR: No Whiffletree support nodes could be matched!")
+        log(lw, "      This usually means the mesh itself is empty or badly malformed -")
+        log(lw, "      check the messages above for whether meshing actually completed,")
+        log(lw, "      and inspect the FEM part directly in NX before re-running.")
         return
 
     # -------------------------------------------------------------------------
@@ -1186,10 +1236,38 @@ def main():
     )
     
     log(lw, "      Solve finished. Status: %d solved | %d failed" % (num_solved, num_failed))
+
+    # Don't declare success just because SolveChainOfSolutions() returned
+    # without raising - a bad mesh (huge element count / GEOMCHECK failure /
+    # solver out-of-memory) can abort Nastran without an NXOpen exception.
+    # Check the actual failure count, and fall back to checking that a
+    # results file was written next to the .sim if the API doesn't expose
+    # a direct "did it solve" flag on this NX version.
+    solve_ok = (num_solved > 0 and num_failed == 0)
+    if solve_ok:
+        sim_dir = os.path.dirname(sim_path)
+        sim_base = os.path.splitext(os.path.basename(sim_path))[0]
+        result_candidates = [f for f in os.listdir(sim_dir)
+                              if f.startswith(sim_base) and f.lower().endswith((".op2", ".xdb", ".dbal"))]
+        if not result_candidates:
+            log(lw, "      WARNING: solve reported 0 failed, but no .op2/.xdb/.dbal "
+                    "results file was found next to %s." % sim_path)
+            solve_ok = False
+
+    if not solve_ok:
+        log(lw, "═" * 75)
+        log(lw, "      FEA AUTOMATION FAILED — no verified results file was produced.")
+        log(lw, "      %d solved | %d failed | %d skipped" % (num_solved, num_failed, num_skipped))
+        log(lw, "      Check the .f06/.log next to %s for the Nastran error." % sim_path)
+        log(lw, "      Total run time: %.1f min" % ((time.time() - run_start_time) / 60.0))
+        log(lw, "═" * 75)
+        return
+
     log(lw, "═" * 75)
     log(lw, "      FEA AUTOMATION COMPLETED SUCCESSFULLY!")
     log(lw, "      Constraints at exactly %d Whiffletree support points" % len(hubs))
-    log(lw, "      Mesh size: %.1f mm (auto for D=%.0f mm)" % (mesh_elem_size, diameter))
+    log(lw, "      Mesh size: %.1f mm (explicit, adaptive)" % mesh_elem_size)
+    log(lw, "      Total run time: %.1f min" % ((time.time() - run_start_time) / 60.0))
     log(lw, "═" * 75)
 
 if __name__ == '__main__':
