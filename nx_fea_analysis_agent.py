@@ -1183,12 +1183,12 @@ def main():
     solutions = [CAE.SimSolution.Null] * 1
     solutions[0] = solution
     
-    log(lw, "      Solving Solution 1 in background...")
+    log(lw, "      Solving Solution 1 (Foreground mode to guarantee result file completion)...")
     num_solved, num_failed, num_skipped = solve_mgr.SolveChainOfSolutions(
         solutions, 
         CAE.SimSolution.SolveOption.Solve, 
         CAE.SimSolution.SetupCheckOption.CompleteCheckAndOutputErrors, 
-        CAE.SimSolution.SolveMode.Background
+        CAE.SimSolution.SolveMode.Foreground
     )
     
     log(lw, "      Solve finished. Status: %d solved | %d failed" % (num_solved, num_failed))
