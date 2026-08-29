@@ -242,14 +242,14 @@ def compute_adaptive_mesh_size(diameter, rib_thick=None, faceplate=None, hub_out
     check. Compare a displacement/stress result at this size against a
     finer run before trusting it for final sign-off.
     """
-    # Calibrated global 3D tetrahedral element size:
-    # 2.5% of diameter, clamped between 10.0mm and 18.0mm (14.0mm for D=560mm mirror).
-    # Produces ~60k linear elements, meshing in 3 seconds and solving in 15 seconds.
-    final_size = max(10.0, min(18.0, diameter * 0.025))
+    # Coarser 28.0mm element size for lightweighted mirrors with >200 pockets.
+    # Prevents surface polygon preprocessor from stalling on thousands of corner facets.
+    # Yields ~15k-25k linear elements, meshing in 2s and solving in 5s.
+    final_size = max(22.0, min(35.0, diameter * 0.05))
     final_size = round(final_size, 1)
 
     if lw is not None:
-        log(lw, "      3D Tetrahedral Mesh Element Size: %.1f mm" % final_size)
+        log(lw, "      Fast 3D Tetrahedral Mesh Element Size: %.1f mm" % final_size)
 
     return final_size
 
