@@ -2321,14 +2321,15 @@ function generateNXCode(pocketCount, finalMass) {
     '    r2 = math.sqrt((r_mid**2 + RADIUS**2) / 2.0)',
     '    for i in range(6):',
     '        a = math.radians(i * 60.0)',
-    '        hubs_list.append((r1 * math.cos(a), r1 * math.sin(a)))',
+    '        hx, hy = r1 * math.cos(a), r1 * math.sin(a)',
+    '        hubs_list.append(snap_to_grid_intersection(hx, hy, "' + state.pattern + '", CELL_SIDE, RADIUS))',
     '    delta_a = math.radians(14.5)',
     '    for i in range(6):',
     '        rocker_axis = math.radians(i * 60.0 + 30.0)',
     '        a1 = rocker_axis - delta_a',
     '        a2 = rocker_axis + delta_a',
-    '        hubs_list.append((r2 * math.cos(a1), r2 * math.sin(a1)))',
-    '        hubs_list.append((r2 * math.cos(a2), r2 * math.sin(a2)))'
+    '        hubs_list.append(snap_to_grid_intersection(r2 * math.cos(a1), r2 * math.sin(a1), "' + state.pattern + '", CELL_SIDE, RADIUS))',
+    '        hubs_list.append(snap_to_grid_intersection(r2 * math.cos(a2), r2 * math.sin(a2), "' + state.pattern + '", CELL_SIDE, RADIUS))'
   ];
 
   pyCode.push(
