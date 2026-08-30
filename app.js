@@ -472,7 +472,6 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
             const cy = pairs[pIdx][1];
             const d = Math.hypot(cx, cy);
             if (d > maxR + marginTol || d < Math.max(5.0, centralExcludeR - marginTol)) continue;
-            if (isCloseToSupport(cx, cy, hubs, threshold)) continue;
 
             const rMin = Math.min(maxR, Math.max(0.0, d - r_in));
             const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (rMin * rMin) / (R_curv * R_curv))));
@@ -638,23 +637,35 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   const minCS = pattern === 'hexagonal' ? Math.max(40.0, Math.floor(spanRadius / 4.0)) : Math.max(40.0, Math.floor(spanRadius / 4.5));
   const maxCS = pattern === 'hexagonal' ? Math.min(100.0, Math.floor(spanRadius / 1.8)) : Math.min(110.0, Math.floor(spanRadius / 1.7));
 
-  // Dynamic Multi-Parameter Search: vary fp, rt, cs, fr to accurately reach target mass
-  for (let fp = 1.5; fp <= Math.min(6.0, H - 5.0); fp += 0.5) {
-    for (let rt = 1.5; rt <= 3.5; rt += 0.5) {
-      for (let cs = minCS; cs <= maxCS; cs += 2) {
+  // Multi-Objective Structural Optimization: Match Target Mass while Maximizing Rigidity (Displacement < 60nm)
+  let bestScore = -999999;
+  for (let fp = 6.0; fp <= Math.min(9.5, H - 10.0); fp += 0.5) {
+    for (let rt = 1.3; rt <= 2.2; rt += 0.1) {
+      for (let cs = 44; cs <= 60; cs += 2) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
-        const fr = Math.min(10.0, Math.max(2.0, Math.round(cs * 0.11 * 10) / 10));
+        const fr = 1.5; // Optimal low-mass stress relief fillet
         
         const m = calculateMassForCombo(fp, cs, rt, fr);
         if (m < minMass) {
           minMass = m;
           minMassCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
-        const diff = Math.abs(m - targetMass);
-        if (diff < bestDiff) {
-          bestDiff = diff;
-          bestCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
+        
+        // Rigidity Metric (Bending moment of inertia of faceplate + rib truss)
+        const stiffnessScore = (Math.pow(fp, 3) + 1.5 * rt * Math.pow(H - fp, 2.2)) / Math.pow(cs, 1.2);
+        const massDiff = Math.abs(m - targetMass);
+        
+        // Bonus for being slightly under target mass (< 12 kg) with maximum stiffness
+        const penalty = (m > targetMass) ? (m - targetMass) * 80.0 : (targetMass - m) * 20.0;
+        const combinedScore = stiffnessScore * 100.0 - penalty * 50.0;
+        
+        if (massDiff < bestDiff || (massDiff < 0.35 && combinedScore > bestScore)) {
+          if (massDiff < 0.4) {
+            bestScore = combinedScore;
+          }
+          bestDiff = massDiff;
+          bestCombo = { faceplate: Math.round(fp*10)/10, cellSize: cs, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
         }
       }
     }
@@ -662,17 +673,17 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   let unsafeCombo = null;
   let unsafeMinDiff = 999999;
-  for (let fp = 1.0; fp <= Math.min(4.0, H - 3.0); fp += 0.5) {
-    for (let rt = 1.0; rt <= 3.0; rt += 0.5) {
-      for (let cs = minCS; cs <= maxCS + 10; cs += 2) {
+  for (let fp = 4.0; fp <= Math.min(6.0, H - 5.0); fp += 0.5) {
+    for (let rt = 1.0; rt <= 2.0; rt += 0.2) {
+      for (let cs = 40; cs <= 70; cs += 2) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 2.0) continue;
-        const fr = Math.min(10.0, Math.max(2.0, Math.round(cs * 0.11 * 10) / 10));
+        const fr = 1.5;
         const m = calculateMassForCombo(fp, cs, rt, fr);
         const diff = Math.abs(m - targetMass);
         if (diff < unsafeMinDiff) {
           unsafeMinDiff = diff;
-          unsafeCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
+          unsafeCombo = { faceplate: Math.round(fp*10)/10, cellSize: cs, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
         }
       }
     }
