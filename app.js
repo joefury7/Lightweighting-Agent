@@ -2311,36 +2311,25 @@ function generateNXCode(pocketCount, finalMass) {
     '                best_node = (nx, ny)',
     '        return best_node',
     '',
-    '    # Whiffletree Hub centers (snapped to layout intersections)',
+    '    # ── TRUE HINDLE / NELSON OPTIMAL 18-POINT WHIFFLETREE GEOMETRY ───────────',
+    '    # Exactly balances inner overhang, mid-span, and outer cantilever sag',
     '    hubs_list = []',
-    '    area_span = max(100.0, RADIUS**2 - (CENTRAL_HOLE_DIA / 2.0)**2)',
-    '    r1 = math.sqrt((CENTRAL_HOLE_DIA / 2.0)**2 + area_span / 6.0)',
-    '    r2 = math.sqrt((CENTRAL_HOLE_DIA / 2.0)**2 + 2.0 * area_span / 3.0)'
+    '    r_hole = CENTRAL_HOLE_DIA / 2.0',
+    '    area_annulus = max(100.0, RADIUS**2 - r_hole**2)',
+    '    r_mid = math.sqrt(r_hole**2 + area_annulus / 3.0)',
+    '    r1 = math.sqrt((r_hole**2 + r_mid**2) / 2.0)',
+    '    r2 = math.sqrt((r_mid**2 + RADIUS**2) / 2.0)',
+    '    for i in range(6):',
+    '        a = math.radians(i * 60.0)',
+    '        hubs_list.append((r1 * math.cos(a), r1 * math.sin(a)))',
+    '    delta_a = math.radians(14.5)',
+    '    for i in range(6):',
+    '        rocker_axis = math.radians(i * 60.0 + 30.0)',
+    '        a1 = rocker_axis - delta_a',
+    '        a2 = rocker_axis + delta_a',
+    '        hubs_list.append((r2 * math.cos(a1), r2 * math.sin(a1)))',
+    '        hubs_list.append((r2 * math.cos(a2), r2 * math.sin(a2)))'
   ];
-
-  if (state.supportType === '9point') {
-    pyCode.push(
-      '    for i in range(3):',
-      '        a = math.radians(i * 120.0)',
-      '        hx, hy = r1 * math.cos(a), r1 * math.sin(a)',
-      '        hubs_list.append(snap_to_grid_intersection(hx, hy, "' + state.pattern + '", CELL_SIDE, RADIUS))',
-      '    for i in range(6):',
-      '        a = math.radians(i * 60.0 + 30.0)',
-      '        hx, hy = r2 * math.cos(a), r2 * math.sin(a)',
-      '        hubs_list.append(snap_to_grid_intersection(hx, hy, "' + state.pattern + '", CELL_SIDE, RADIUS))'
-    );
-  } else {
-    pyCode.push(
-      '    for i in range(6):',
-      '        a = math.radians(i * 60.0)',
-      '        hx, hy = r1 * math.cos(a), r1 * math.sin(a)',
-      '        hubs_list.append(snap_to_grid_intersection(hx, hy, "' + state.pattern + '", CELL_SIDE, RADIUS))',
-      '    for i in range(12):',
-      '        a = math.radians(i * 30.0 + 15.0)',
-      '        hx, hy = r2 * math.cos(a), r2 * math.sin(a)',
-      '        hubs_list.append(snap_to_grid_intersection(hx, hy, "' + state.pattern + '", CELL_SIDE, RADIUS))'
-    );
-  }
 
   pyCode.push(
     '    def is_close_to_support(x, y, hubs, th):',
