@@ -2401,8 +2401,6 @@ function generateNXCode(pocketCount, finalMass) {
       '                margin_tol = CELL_SIDE * 0.6',
       '                if d > max_r + margin_tol or d < max(5.0, CENTRAL_EXCLUDE_R - margin_tol):',
       '                    continue',
-      '                if is_close_to_support(cx, cy, hubs_list, hub_outer_limit):',
-      '                    continue',
       '                curves = build_filleted_triangle(cx, cy, r_in, r_fillet, ori, BACK_Z)',
       '                h_ext  = get_pocket_height(cx, cy)',
       '                hp     = NXOpen.Point3d(cx, cy, BACK_Z)',
