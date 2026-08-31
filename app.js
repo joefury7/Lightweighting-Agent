@@ -2348,7 +2348,7 @@ function generateNXCode(pocketCount, finalMass) {
     '        for d_ang in [-delta_a, delta_a]:',
     '            a = rocker_axis + d_ang',
     '            tx, ty = r2 * math.cos(a), r2 * math.sin(a)',
-    '            available = [n for n in all_grid_nodes if n not in inner_hubs and n not in outer_hubs]',
+    '            available = [n for n in all_grid_nodes if math.hypot(n[0], n[1]) >= r_mid and n not in inner_hubs and n not in outer_hubs]',
     '            if available:',
     '                best_n = min(available, key=lambda n: math.hypot(n[0] - tx, n[1] - ty))',
     '                outer_hubs.append(best_n)',
