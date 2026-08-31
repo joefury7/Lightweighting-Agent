@@ -1115,17 +1115,29 @@ def main():
 
     all_constraints = []
     for idx, node_obj in enumerate(target_objs):
-        constraint_name = "Whiffletree_Fixed_%02d" % (idx + 1)
+        constraint_name = "Whiffletree_Support_%02d" % (idx + 1)
         bc_builder = sim_simulation.CreateBcBuilderForConstraintDescriptor(
             "fixedConstraint", constraint_name, idx + 1)
 
-        # Lock all 6 DOFs
-        bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF1").EditFieldExpression("0", unit_mm_sim, [], False)
-        bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF2").EditFieldExpression("0", unit_mm_sim, [], False)
-        bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF3").EditFieldExpression("0", unit_mm_sim, [], False)
-        bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF4").EditFieldExpression("0", unit_deg, [], False)
-        bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF5").EditFieldExpression("0", unit_deg, [], False)
-        bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF6").EditFieldExpression("0", unit_deg, [], False)
+        # ── TRUE KINEMATIC WHIFFLETREE SUPPORT ───────────────────────────────
+        # All 18 points provide pure axial support (DOF3: UZ = 0).
+        # To prevent rigid-body motion in XY without artificial Poisson over-constraint:
+        #   - Hub 1 (idx 0): fixes UX, UY, UZ (anchors XY origin)
+        #   - Hub 4 (idx 3, 180° opposite): fixes UY, UZ (prevents RZ rotation, allows radial breathing)
+        #   - Hubs 2,3,5..18: fix UZ ONLY (free in UX, UY for zero Poisson clamping stress)
+        # ─────────────────────────────────────────────────────────────────────
+        if idx == 0:
+            # Primary kinematic anchor: fix UX, UY, UZ
+            bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF1").EditFieldExpression("0", unit_mm_sim, [], False)
+            bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF2").EditFieldExpression("0", unit_mm_sim, [], False)
+            bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF3").EditFieldExpression("0", unit_mm_sim, [], False)
+        elif idx == 3:
+            # Secondary kinematic anchor (180° opposite): fix UY, UZ (free UX)
+            bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF2").EditFieldExpression("0", unit_mm_sim, [], False)
+            bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF3").EditFieldExpression("0", unit_mm_sim, [], False)
+        else:
+            # Pure axial Whiffletree support: fix UZ ONLY
+            bc_builder.PropertyTable.GetScalarFieldPropertyValue("DOF3").EditFieldExpression("0", unit_mm_sim, [], False)
 
         set_obj = CAE.SetObject()
         set_obj.Obj = node_obj
@@ -1138,7 +1150,7 @@ def main():
         all_constraints.append(constraint)
         log(lw, "        ✓ Constraint %2d/%-2d created: %s" % (idx + 1, len(target_objs), constraint_name))
 
-    log(lw, "      ✓ Applied %d individual Fixed constraints (one per Whiffletree hub node)." % len(all_constraints))
+    log(lw, "      ✓ Applied 18 Kinematic Whiffletree axial constraints (isostatic XY support, zero Poisson clamping).")
     
     # Create Gravity Load (1g = 9806.65 mm/s² in -Z)
     gravity_builder = sim_simulation.CreateBcBuilderForLoadDescriptor("magnitudeDirectionGravity", "Gravity(1)", 1)
