@@ -1478,7 +1478,7 @@ function drawMirrorCanvas(pocketCount) {
 
   const hubs = getWhiffletreeHubPositions(state.supportType, state.diameter / 2.0);
   const hubOuterR = state.supportType === '9point' ? 8.0 : 6.0;
-  const threshold = hubOuterR + 6.0;
+  const threshold = 6.0;
 
   const centralExcludeR = (state.centralHoleDia / 2.0) + 3.0;
 
