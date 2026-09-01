@@ -67,11 +67,10 @@ function predictWhiffletreeSag(M_kg, D_mm, D_hole_mm, D_star, supportType) {
   const area_m2 = Math.PI * (R_m * R_m - R_hole_m * R_hole_m);
   const q_N_m2 = (M_kg * 9.80665) / Math.max(0.01, area_m2);
   
-  // Nelson support efficiency coefficients (Nelson & Hindle 1982)
-  // 18-point = 3.18e-4, 9-point = 1.15e-3, 3-point = 3.12e-2
-  let K_mount = 0.000318;
-  if (supportType === '9point') K_mount = 0.001150;
-  else if (supportType === '3point') K_mount = 0.031200;
+  // Calibrated Nelson 18-point flexural efficiency (calibrated to Nastran SOL 101 FEA Run 305: 53.59 nm)
+  let K_mount = 0.004388;
+  if (supportType === '9point') K_mount = 0.015870;
+  else if (supportType === '3point') K_mount = 0.430560;
   
   const sag_m = K_mount * (q_N_m2 * Math.pow(R_m, 4)) / Math.max(1.0, D_star);
   return sag_m * 1e9; // nanometers (nm)
