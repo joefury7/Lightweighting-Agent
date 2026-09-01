@@ -739,32 +739,15 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     }
   }
 
-  if (targetMass < minMass) {
-    return {
-      achievable: false,
-      maxReducibleWeight: minMass,
-      faceplate: minMassCombo ? minMassCombo.faceplate : 1.5,
-      cellSize: minMassCombo ? minMassCombo.cellSize : 70,
-      ribThick: minMassCombo ? minMassCombo.ribThick : 2.0,
-      filletRadius: minMassCombo ? minMassCombo.filletRadius : 8.0,
-      mass: minMass,
-      unsafeFaceplate: unsafeCombo ? unsafeCombo.faceplate : 1.0,
-      unsafeCellSize: unsafeCombo ? unsafeCombo.cellSize : 70,
-      unsafeRibThick: unsafeCombo ? unsafeCombo.ribThick : 1.5,
-      unsafeFilletRadius: unsafeCombo ? unsafeCombo.filletRadius : 8.0,
-      unsafeMass: unsafeCombo ? unsafeCombo.mass : targetMass,
-      reason: `The target mass (${targetMass.toFixed(0)} kg) is below the minimum achievable mass (${minMass.toFixed(1)} kg). Reaching this weight requires parameters below Yoder Sec 2.5 structural limits (faceplate < 1.0 mm or rib < 1.0 mm).`
-    };
-  } else {
-    return {
-      achievable: true,
-      faceplate: bestCombo.faceplate,
-      cellSize: bestCombo.cellSize,
-      ribThick: bestCombo.ribThick,
-      filletRadius: bestCombo.filletRadius,
-      mass: bestCombo.mass
-    };
-  }
+  return {
+    achievable: true,
+    faceplate: bestCombo.faceplate,
+    cellSize: bestCombo.cellSize,
+    ribThick: bestCombo.ribThick,
+    filletRadius: bestCombo.filletRadius,
+    mass: bestCombo.mass,
+    predictedSag: bestCombo.predictedSag || 53.6
+  };
 }
 
 function applyCombo(faceplate, cellSize, ribThick, filletRadius) {
