@@ -1858,13 +1858,15 @@ function drawMirrorCanvas(pocketCount) {
 }
 
 function drawTriangle(ctx, x, y, side, ori, filletRadius) {
+  if (side <= 1) return;
   const r = side / Math.sqrt(3.0);
   const pts = [];
   for (let k = 0; k < 3; k++) {
     const a = (ori === 1) ? (Math.PI / 2 + (k * 2 * Math.PI / 3)) : (-Math.PI / 2 + (k * 2 * Math.PI / 3));
     pts.push({ x: x + r * Math.cos(a), y: y + r * Math.sin(a) });
   }
-  const fillet = (filletRadius !== undefined) ? filletRadius : Math.max(2, side * 0.16);
+  const maxF = Math.max(0.5, (side / (2.0 * Math.sqrt(3.0))) * 0.85);
+  const fillet = Math.max(0.2, Math.min(filletRadius !== undefined ? filletRadius : maxF * 0.5, maxF));
   
   ctx.beginPath();
   const midX = (pts[0].x + pts[1].x) / 2;
