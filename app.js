@@ -7,16 +7,16 @@ const state = {
   radiusCurv: 1085,
   depth: 73.7,
   pattern: 'isogrid',
-  cellSize: 91,
-  ribThick: 1.5,
+  cellSize: 55.5,
+  ribThick: 3.0,
   supportType: '18point',
   material: 'zerodur',
   density: 2530,
   targetMass: 12,
-  faceplate: 1.5,
+  faceplate: 1.0,
   conicConstant: -1.22,
   centralHoleDia: 175.0,
-  filletRadius: 10.0
+  filletRadius: 1.5
 };
 
 const PATTERN_CATALOG = {
@@ -1519,7 +1519,7 @@ function drawMirrorCanvas(pocketCount) {
         const cx = i * state.cellSize + xOff;
         const cy = yBase + rowH / 3.0;
         const d1 = Math.hypot(cx, cy);
-        if (d1 + pocketRadius <= maxR + 5 && d1 - pocketRadius >= centralExcludeR - 5) {
+        if (d1 >= centralExcludeR + 5 && d1 <= maxR - 5) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
             drawTriangle(ctx, center + cx * scale, center + cy * scale, pocketSide * scale, 1, state.filletRadius * scale);
           }
@@ -1528,7 +1528,7 @@ function drawMirrorCanvas(pocketCount) {
         const cx2 = i * state.cellSize + state.cellSize * 0.5 + xOff;
         const cy2 = yBase + 2.0 * rowH / 3.0;
         const d2 = Math.hypot(cx2, cy2);
-        if (d2 + pocketRadius <= maxR + 5 && d2 - pocketRadius >= centralExcludeR - 5) {
+        if (d2 >= centralExcludeR + 5 && d2 <= maxR - 5) {
           if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
             drawTriangle(ctx, center + cx2 * scale, center + cy2 * scale, pocketSide * scale, -1, state.filletRadius * scale);
           }
