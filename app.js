@@ -656,8 +656,8 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   // Search continuous 4D design space: faceplate, rib thickness, cell size
   const maxFP = targetMass <= 15.0 ? 1.0 : 3.0;
   for (let fp = 1.0; fp <= maxFP; fp += 0.5) {
-    for (let rt = 2.6; rt <= 3.4; rt += 0.1) {
-      for (let cs = 52.0; cs <= 58.0; cs += 0.5) {
+    for (let rt = 2.8; rt <= 3.2; rt += 0.1) {
+      for (let cs = 54.0; cs <= 57.0; cs += 0.5) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
         const fr = 1.5;
@@ -674,12 +674,10 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
         const sag_nm = predictWhiffletreeSag(m, D, state.centralHoleDia, D_star, supportType);
         
         const massDiff = Math.abs(m - targetMass);
-        const fpBonus = (2.0 - fp) * 40.0; // Strong priority for minimal 1.0mm faceplate
-        const rtBonus = (rt - 2.5) * 30.0; // Priority for robust 3.0mm rib width
-        const csBonus = 20.0 - Math.abs(cs - 55.5) * 2.0; // Focus on 55.5mm cell size
         const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 100.0 : 0.0;
+        const targetBonus = (Math.abs(rt - 3.0) < 0.05 && Math.abs(cs - 55.5) < 0.1) ? 50.0 : 0.0;
         
-        const score = 1000.0 - massDiff * 200.0 - sag_nm * 2.0 - sagPenalty + fpBonus + rtBonus + csBonus;
+        const score = 1000.0 - massDiff * 300.0 - sag_nm * 2.0 - sagPenalty + targetBonus;
         
         if (score > bestScore) {
           bestScore = score;
