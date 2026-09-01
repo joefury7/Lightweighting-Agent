@@ -647,13 +647,6 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     return finalVol * rho;
   }
 
-  let bestCombo = null;
-  let bestDiff = 999999;
-  let minMass = 999999;
-  let minMassCombo = null;
-
-  const rt = state.ribThick;
-
   // ── NASA EQUIVALENT-PLATE COUPLED MULTI-OBJECTIVE OPTIMIZATION SOLVER ────
   const matObj = materialsMap[state.material] || { E: 90.3e9, nu: 0.24 };
   let bestCombo = null;
