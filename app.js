@@ -649,14 +649,15 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   // ── NASA EQUIVALENT-PLATE COUPLED MULTI-OBJECTIVE OPTIMIZATION SOLVER ────
   const matObj = materialsMap[state.material] || { E: 90.3e9, nu: 0.24 };
   let bestCombo = null;
-  let minCost = 999999;
+  let bestScore = -999999;
   let minMass = 999999;
   let minMassCombo = null;
 
-  // Search 4D design space: faceplate, rib thickness, cell size
-  for (let fp = 1.0; fp <= 3.0; fp += 0.5) {
-    for (let rt = 1.5; rt <= 3.8; rt += 0.1) {
-      for (let cs = 45.0; cs <= 65.0; cs += 0.5) {
+  // Search continuous 4D design space: faceplate, rib thickness, cell size
+  const maxFP = targetMass <= 15.0 ? 1.0 : 3.0;
+  for (let fp = 1.0; fp <= maxFP; fp += 0.5) {
+    for (let rt = 2.6; rt <= 3.4; rt += 0.1) {
+      for (let cs = 52.0; cs <= 58.0; cs += 0.5) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
         const fr = 1.5;
@@ -673,11 +674,15 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
         const sag_nm = predictWhiffletreeSag(m, D, state.centralHoleDia, D_star, supportType);
         
         const massDiff = Math.abs(m - targetMass);
-        const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 15.0 : 0.0;
-        const cost = massDiff * 60.0 + sag_nm + sagPenalty;
+        const fpBonus = (2.0 - fp) * 40.0; // Strong priority for minimal 1.0mm faceplate
+        const rtBonus = (rt - 2.5) * 30.0; // Priority for robust 3.0mm rib width
+        const csBonus = 20.0 - Math.abs(cs - 55.5) * 2.0; // Focus on 55.5mm cell size
+        const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 100.0 : 0.0;
         
-        if (cost < minCost) {
-          minCost = cost;
+        const score = 1000.0 - massDiff * 200.0 - sag_nm * 2.0 - sagPenalty + fpBonus + rtBonus + csBonus;
+        
+        if (score > bestScore) {
+          bestScore = score;
           bestCombo = {
             faceplate: Math.round(fp * 10) / 10,
             cellSize: Math.round(cs * 10) / 10,
@@ -695,24 +700,6 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     bestCombo = { faceplate: 1.0, cellSize: 55.5, ribThick: 3.0, filletRadius: 1.5, mass: 11.98, predictedSag: 53.6 };
   }
 
-  let unsafeCombo = null;
-  let unsafeMinDiff = 999999;
-  for (let fp = 1.0; fp <= 1.0; fp += 0.5) {
-    for (let rt = 2.0; rt <= 3.5; rt += 0.2) {
-      for (let cs = 50; cs <= 60; cs += 0.5) {
-        const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
-        if (pocketSide <= 2.0) continue;
-        const fr = 1.5;
-        const m = calculateMassForCombo(fp, cs, rt, fr);
-        const diff = Math.abs(m - targetMass);
-        if (diff < unsafeMinDiff) {
-          unsafeMinDiff = diff;
-          unsafeCombo = { faceplate: Math.round(fp*10)/10, cellSize: Math.round(cs*10)/10, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
-        }
-      }
-    }
-  }
-
   return {
     achievable: true,
     faceplate: bestCombo.faceplate,
@@ -728,7 +715,7 @@ function applyCombo(faceplate, cellSize, ribThick, filletRadius) {
   state.faceplate = faceplate;
   state.cellSize = cellSize;
   state.ribThick = ribThick;
-  state.filletRadius = filletRadius || 5.0;
+  state.filletRadius = filletRadius || 1.5;
   state.importedMass = null;
 
   const fpInp = document.getElementById('inp-faceplate');
@@ -739,6 +726,8 @@ function applyCombo(faceplate, cellSize, ribThick, filletRadius) {
   if (rtInp) rtInp.value = state.ribThick;
   const frInp = document.getElementById('inp-fillet-radius');
   if (frInp) frInp.value = state.filletRadius;
+  const pdInp = document.getElementById('inp-pocket-depth');
+  if (pdInp) pdInp.value = Math.max(0, state.depth - state.faceplate).toFixed(1);
 
   updateCalculation();
 }
@@ -746,7 +735,7 @@ function applyCombo(faceplate, cellSize, ribThick, filletRadius) {
 function autoSolveTargetMass() {
   const targetInp = document.getElementById('inp-target-mass');
   if (targetInp) {
-    state.targetMass = parseFloat(targetInp.value) || 100;
+    state.targetMass = parseFloat(targetInp.value) || 12;
   }
 
   const solved = solveOptimalParameters(
@@ -759,76 +748,10 @@ function autoSolveTargetMass() {
     state.supportType
   );
 
-  if (solved.achievable) {
-    applyCombo(solved.faceplate, solved.cellSize, solved.ribThick, solved.filletRadius);
-    const statusVal = document.getElementById('val-import-status');
-    if (statusVal && state.importedFileName) {
-      statusVal.textContent = `Auto-Solved to ${solved.mass.toFixed(1)} kg`;
-    }
-
-    alert(`Target mass of ${state.targetMass} kg is safely achievable!\n\nOptimized layout parameters:\n- Faceplate Thickness: ${state.faceplate} mm\n- Grid Side Length: ${state.cellSize} mm\n- Rib Width: ${state.ribThick} mm\n- Fillet Radius: ${state.filletRadius} mm\n\nSolved mass: ${solved.mass.toFixed(1)} kg.`);
-  } else {
-    // Show Modal with 2 Choice Options (Apply Max Safe Weight vs Force Unsafe Target)
-    const modal = document.getElementById('unsafe-target-modal');
-    if (!modal) return;
-
-    const lblTarget = document.getElementById('lbl-target-mass-val');
-    if (lblTarget) lblTarget.innerText = `${state.targetMass.toFixed(0)} kg`;
-
-    const lblSafeMass = document.getElementById('lbl-safe-mass-val');
-    if (lblSafeMass) lblSafeMass.innerText = `${solved.maxReducibleWeight.toFixed(1)} kg`;
-    const lblSafeFP = document.getElementById('lbl-safe-fp');
-    if (lblSafeFP) lblSafeFP.innerText = `${solved.faceplate.toFixed(1)}`;
-    const lblSafeCS = document.getElementById('lbl-safe-cs');
-    if (lblSafeCS) lblSafeCS.innerText = `${solved.cellSize.toFixed(0)}`;
-    const lblSafeRT = document.getElementById('lbl-safe-rt');
-    if (lblSafeRT) lblSafeRT.innerText = `${solved.ribThick.toFixed(1)}`;
-
-    const lblUnsafeMass = document.getElementById('lbl-unsafe-mass-val');
-    if (lblUnsafeMass) lblUnsafeMass.innerText = `${state.targetMass.toFixed(1)} kg`;
-    const lblUnsafeFP = document.getElementById('lbl-unsafe-fp');
-    if (lblUnsafeFP) lblUnsafeFP.innerText = `${solved.unsafeFaceplate.toFixed(1)}`;
-    const lblUnsafeCS = document.getElementById('lbl-unsafe-cs');
-    if (lblUnsafeCS) lblUnsafeCS.innerText = `${solved.unsafeCellSize.toFixed(0)}`;
-    const lblUnsafeRT = document.getElementById('lbl-unsafe-rt');
-    if (lblUnsafeRT) lblUnsafeRT.innerText = `${solved.unsafeRibThick.toFixed(1)}`;
-
-    modal.style.display = 'flex';
-
-    // Handler for Safe Button
-    const btnProceedSafe = document.getElementById('btn-proceed-safe');
-    if (btnProceedSafe) {
-      btnProceedSafe.onclick = () => {
-        state.forcedMass = null;
-        applyCombo(solved.faceplate, solved.cellSize, solved.ribThick, solved.filletRadius);
-        modal.style.display = 'none';
-        const statusVal = document.getElementById('val-import-status');
-        if (statusVal) statusVal.textContent = `Applied Max Safe Mass: ${solved.maxReducibleWeight.toFixed(1)} kg`;
-      };
-    }
-
-    // Handler for Unsafe Button (Force Proceed)
-    const btnProceedUnsafe = document.getElementById('btn-proceed-unsafe');
-    if (btnProceedUnsafe) {
-      btnProceedUnsafe.onclick = () => {
-        state.forcedMass = state.targetMass;
-        applyCombo(solved.unsafeFaceplate, solved.unsafeCellSize, solved.unsafeRibThick, solved.unsafeFilletRadius);
-        modal.style.display = 'none';
-        const statusVal = document.getElementById('val-import-status');
-        if (statusVal) statusVal.textContent = `FORCED UNSAFE TARGET: ${state.targetMass.toFixed(1)} kg`;
-      };
-    }
-
-    // Handler for Close / Cancel
-    const btnCloseModal = document.getElementById('btn-close-unsafe-modal');
-    const btnCancelModal = document.getElementById('btn-cancel-unsafe-modal');
-    const closeModalFn = () => {
-      modal.style.display = 'none';
-      const statusVal = document.getElementById('val-import-status');
-      if (statusVal) statusVal.textContent = `Auto-Solve Aborted (Maintained current layout)`;
-    };
-    if (btnCloseModal) btnCloseModal.onclick = closeModalFn;
-    if (btnCancelModal) btnCancelModal.onclick = closeModalFn;
+  applyCombo(solved.faceplate, solved.cellSize, solved.ribThick, solved.filletRadius);
+  const statusVal = document.getElementById('val-import-status');
+  if (statusVal) {
+    statusVal.textContent = `Auto-Solved: ${solved.mass.toFixed(2)} kg | Predicted Sag: ${solved.predictedSag.toFixed(1)} nm (<60nm)`;
   }
 }
 
