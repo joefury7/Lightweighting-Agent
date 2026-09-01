@@ -80,24 +80,6 @@ function predictWhiffletreeSag(M_kg, D_mm, D_hole_mm, D_star, supportType) {
 function initApp() {
   initEventListeners();
   updateCalculation();
-  loadImportedJSONIfExists();
-}
-
-function loadImportedJSONIfExists() {
-  fetch('imported_mirror.json')
-    .then(res => {
-      if (res.ok) return res.json();
-      throw new Error('No saved import file');
-    })
-    .then(data => {
-      const jsonStr = JSON.stringify(data);
-      const textarea = document.getElementById('inp-import-json');
-      if (textarea) textarea.value = jsonStr;
-      importFromJSON(jsonStr);
-    })
-    .catch(err => {
-      // Quiet fail if file not present
-    });
 }
 
 let appInitialized = false;
