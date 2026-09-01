@@ -1454,65 +1454,71 @@ function drawMirrorCanvas(pocketCount) {
   
   ctx.clearRect(0, 0, size, size);
   
-  // Outer Solid Blank Base Disc
   ctx.beginPath();
   ctx.arc(center, center, (state.diameter / 2.0) * scale, 0, Math.PI * 2);
-  ctx.fillStyle = '#141e33';
+  ctx.fillStyle = '#101726';
   ctx.fill();
-  ctx.strokeStyle = '#00f2fe';
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#4facfe';
+  ctx.lineWidth = 3;
   ctx.stroke();
   
-  // Inner Wall Limit Line
   const wallMargin = 5.0;
   const maxR = (state.diameter / 2.0) - wallMargin;
   ctx.beginPath();
   ctx.arc(center, center, maxR * scale, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(138, 153, 173, 0.6)';
+  ctx.strokeStyle = 'rgba(138, 153, 173, 0.4)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
   
   ctx.strokeStyle = '#00f2fe';
-  ctx.lineWidth = 1.5;
-  ctx.fillStyle = 'rgba(0, 242, 254, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.fillStyle = 'rgba(0, 242, 254, 0.05)';
 
   const hubs = getWhiffletreeHubPositions(state.supportType, state.diameter / 2.0);
   const hubOuterR = state.supportType === '9point' ? 8.0 : 6.0;
-  const threshold = 6.0;
+  const threshold = hubOuterR + 6.0;
 
   const centralExcludeR = (state.centralHoleDia / 2.0) + 3.0;
 
   if (state.pattern === 'isogrid') {
     const rowH = state.cellSize * Math.sqrt(3.0) / 2.0;
-    const pocketSide = Math.max(2.0, state.cellSize - state.ribThick * 2.0 / Math.sqrt(3.0));
-    const pocketRadius = pocketSide / Math.sqrt(3.0);
+    const pocketSide = state.cellSize - state.ribThick * 2.0 / Math.sqrt(3.0);
     const nRows = Math.ceil(maxR / rowH) + 1;
     const nCols = Math.ceil(maxR / state.cellSize) + 1;
+    
+    // Circular clip for max-coverage visual: partial cells at edges are trimmed
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center, center, maxR * scale, 0, Math.PI * 2);
+    ctx.arc(center, center, centralExcludeR * scale, 0, Math.PI * 2, true);
+    ctx.clip();
     
     for (let j = -nRows; j <= nRows; j++) {
       const yBase = j * rowH;
       const xOff = (j % 2 !== 0) ? state.cellSize * 0.5 : 0.0;
       for (let i = -nCols; i <= nCols; i++) {
-        // Upward triangle
+        // Upward triangle ΓÇö allow partial cells at boundaries (clip handles trimming)
         const cx = i * state.cellSize + xOff;
         const cy = yBase + rowH / 3.0;
         const d1 = Math.hypot(cx, cy);
-        if (d1 + pocketRadius <= maxR && d1 - pocketRadius >= centralExcludeR) {
+        const halfCell = state.cellSize * 0.7;
+        if (d1 <= maxR + halfCell && d1 >= centralExcludeR - halfCell) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
             drawTriangle(ctx, center + cx * scale, center + cy * scale, pocketSide * scale, 1, state.filletRadius * scale);
           }
         }
-        // Downward triangle
+        // Downward triangle ΓÇö allow partial cells at boundaries
         const cx2 = i * state.cellSize + state.cellSize * 0.5 + xOff;
         const cy2 = yBase + 2.0 * rowH / 3.0;
         const d2 = Math.hypot(cx2, cy2);
-        if (d2 + pocketRadius <= maxR && d2 - pocketRadius >= centralExcludeR) {
+        if (d2 <= maxR + halfCell && d2 >= centralExcludeR - halfCell) {
           if (!isCloseToSupport(cx2, cy2, hubs, threshold)) {
             drawTriangle(ctx, center + cx2 * scale, center + cy2 * scale, pocketSide * scale, -1, state.filletRadius * scale);
           }
         }
       }
     }
+    ctx.restore();
   } else if (state.pattern === 'square') {
     const pocketSide = state.cellSize - state.ribThick;
     const nGrid = Math.floor(maxR / state.cellSize) + 2;
@@ -1755,6 +1761,14 @@ function drawMirrorCanvas(pocketCount) {
     const stepX = W * Math.sqrt(3.0) / 2.0;
     const stepY = W;
     const nCols = Math.floor(maxR / stepX) + 2;
+    const nRows = Math.floor(maxR / stepY) + 2;
+    
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center, center, maxR * scale, 0, Math.PI * 2);
+    ctx.arc(center, center, centralExcludeR * scale, 0, Math.PI * 2, true);
+    ctx.clip();
+
     const halfCell = W * 0.7;
     for (let c = -nCols; c <= nCols; c++) {
       const cx = c * stepX;
@@ -1762,13 +1776,14 @@ function drawMirrorCanvas(pocketCount) {
       for (let r = -nRows; r <= nRows; r++) {
         const cy = r * stepY + yShift;
         const d = Math.hypot(cx, cy);
-        if (d + pocketSide <= maxR + 5 && d - pocketSide >= centralExcludeR - 5) {
+        if (d <= maxR + halfCell && d >= centralExcludeR - halfCell) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) {
             drawHexagon(ctx, center + cx * scale, center + cy * scale, pocketSide * scale, state.filletRadius * scale);
           }
         }
       }
     }
+    ctx.restore();
   }
 
   // Draw Central Support Hole & surrounding solid boss
@@ -1819,15 +1834,13 @@ function drawMirrorCanvas(pocketCount) {
 }
 
 function drawTriangle(ctx, x, y, side, ori, filletRadius) {
-  if (side <= 1) return;
   const r = side / Math.sqrt(3.0);
   const pts = [];
   for (let k = 0; k < 3; k++) {
     const a = (ori === 1) ? (Math.PI / 2 + (k * 2 * Math.PI / 3)) : (-Math.PI / 2 + (k * 2 * Math.PI / 3));
     pts.push({ x: x + r * Math.cos(a), y: y + r * Math.sin(a) });
   }
-  const maxF = Math.max(0.5, (side / (2.0 * Math.sqrt(3.0))) * 0.85);
-  const fillet = Math.max(0.2, Math.min(filletRadius !== undefined ? filletRadius : maxF * 0.5, maxF));
+  const fillet = (filletRadius !== undefined) ? filletRadius : Math.max(2, side * 0.16);
   
   ctx.beginPath();
   const midX = (pts[0].x + pts[1].x) / 2;
