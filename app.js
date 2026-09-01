@@ -637,11 +637,11 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   const minCS = pattern === 'hexagonal' ? Math.max(40.0, Math.floor(spanRadius / 4.0)) : Math.max(40.0, Math.floor(spanRadius / 4.5));
   const maxCS = pattern === 'hexagonal' ? Math.min(100.0, Math.floor(spanRadius / 1.8)) : Math.min(110.0, Math.floor(spanRadius / 1.7));
 
-  // Multi-Objective Structural Optimization: Match Target Mass while Maximizing Rigidity (Displacement < 60nm)
+  // Multi-Objective Optimization: Minimum Faceplate (1.0-2.5 mm) + Increased Rib Width (2.5-3.5 mm)
   let bestScore = -999999;
-  for (let fp = 6.0; fp <= Math.min(9.5, H - 10.0); fp += 0.5) {
-    for (let rt = 1.3; rt <= 2.2; rt += 0.1) {
-      for (let cs = 44; cs <= 60; cs += 2) {
+  for (let fp = 1.0; fp <= 3.5; fp += 0.5) {
+    for (let rt = 2.0; rt <= 4.0; rt += 0.1) {
+      for (let cs = 50.0; cs <= 60.0; cs += 0.5) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
         const fr = 1.5; // Optimal low-mass stress relief fillet
@@ -652,20 +652,22 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
           minMassCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
         
-        // Rigidity Metric (Bending moment of inertia of faceplate + rib truss)
-        const stiffnessScore = (Math.pow(fp, 3) + 1.5 * rt * Math.pow(H - fp, 2.2)) / Math.pow(cs, 1.2);
+        // Rigidity Metric: High Rib Shear Area (rt * H) / Faceplate Mass Penalty
+        // Favors minimum faceplate thickness (fp -> 1.0 mm) and thicker, deeper ribs (rt -> 3.0 mm)
+        const ribShearWeight = rt * Math.pow(H - fp, 2.0);
+        const minFaceplateBonus = (4.0 - fp) * 200.0;
+        const stiffnessScore = ribShearWeight + minFaceplateBonus;
         const massDiff = Math.abs(m - targetMass);
         
-        // Bonus for being slightly under target mass (< 12 kg) with maximum stiffness
-        const penalty = (m > targetMass) ? (m - targetMass) * 80.0 : (targetMass - m) * 20.0;
-        const combinedScore = stiffnessScore * 100.0 - penalty * 50.0;
+        const penalty = (m > targetMass) ? (m - targetMass) * 120.0 : (targetMass - m) * 30.0;
+        const combinedScore = stiffnessScore - penalty * 40.0;
         
         if (massDiff < bestDiff || (massDiff < 0.35 && combinedScore > bestScore)) {
           if (massDiff < 0.4) {
             bestScore = combinedScore;
           }
           bestDiff = massDiff;
-          bestCombo = { faceplate: Math.round(fp*10)/10, cellSize: cs, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
+          bestCombo = { faceplate: Math.round(fp*10)/10, cellSize: Math.round(cs*10)/10, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
         }
       }
     }
@@ -673,9 +675,9 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   let unsafeCombo = null;
   let unsafeMinDiff = 999999;
-  for (let fp = 4.0; fp <= Math.min(6.0, H - 5.0); fp += 0.5) {
-    for (let rt = 1.0; rt <= 2.0; rt += 0.2) {
-      for (let cs = 40; cs <= 70; cs += 2) {
+  for (let fp = 1.0; fp <= 2.0; fp += 0.5) {
+    for (let rt = 1.5; rt <= 3.5; rt += 0.2) {
+      for (let cs = 45; cs <= 65; cs += 1) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 2.0) continue;
         const fr = 1.5;
@@ -683,7 +685,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
         const diff = Math.abs(m - targetMass);
         if (diff < unsafeMinDiff) {
           unsafeMinDiff = diff;
-          unsafeCombo = { faceplate: Math.round(fp*10)/10, cellSize: cs, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
+          unsafeCombo = { faceplate: Math.round(fp*10)/10, cellSize: Math.round(cs*10)/10, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
         }
       }
     }
