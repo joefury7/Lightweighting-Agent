@@ -1468,6 +1468,8 @@ function updateCalculation() {
   generateNXCode(pocketCount, finalMass);
 }
 
+window.state = state;
+
 function drawMirrorCanvas(pocketCount) {
   const canvas = document.getElementById('mirror-canvas');
   if (!canvas) return;
@@ -1478,25 +1480,27 @@ function drawMirrorCanvas(pocketCount) {
   
   ctx.clearRect(0, 0, size, size);
   
+  // Outer Solid Blank Base Disc
   ctx.beginPath();
   ctx.arc(center, center, (state.diameter / 2.0) * scale, 0, Math.PI * 2);
-  ctx.fillStyle = '#101726';
+  ctx.fillStyle = '#141e33';
   ctx.fill();
-  ctx.strokeStyle = '#4facfe';
-  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#00f2fe';
+  ctx.lineWidth = 2.5;
   ctx.stroke();
   
+  // Inner Wall Limit Line
   const wallMargin = 5.0;
   const maxR = (state.diameter / 2.0) - wallMargin;
   ctx.beginPath();
   ctx.arc(center, center, maxR * scale, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(138, 153, 173, 0.4)';
+  ctx.strokeStyle = 'rgba(138, 153, 173, 0.6)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
   
   ctx.strokeStyle = '#00f2fe';
-  ctx.lineWidth = 1;
-  ctx.fillStyle = 'rgba(0, 242, 254, 0.05)';
+  ctx.lineWidth = 1.5;
+  ctx.fillStyle = 'rgba(0, 242, 254, 0.15)';
 
   const hubs = getWhiffletreeHubPositions(state.supportType, state.diameter / 2.0);
   const hubOuterR = state.supportType === '9point' ? 8.0 : 6.0;
