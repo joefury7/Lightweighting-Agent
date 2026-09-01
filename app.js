@@ -31,12 +31,51 @@ const PATTERN_CATALOG = {
 };
 
 const materialsMap = {
-  zerodur: { name: "Zerodur Glass-Ceramic", density: 2530 },
-  ule: { name: "ULE Titanium Silicate", density: 2210 },
-  sic: { name: "Silicon Carbide SiC", density: 3160 },
-  fused_silica: { name: "Fused Silica", density: 2200 },
-  al6061: { name: "Aluminum 6061-T6", density: 2700 }
+  zerodur: { name: "Zerodur Glass-Ceramic", density: 2530, E: 90.3e9, nu: 0.24 },
+  ule: { name: "ULE Titanium Silicate", density: 2210, E: 67.6e9, nu: 0.17 },
+  sic: { name: "Silicon Carbide SiC", density: 3160, E: 420.0e9, nu: 0.14 },
+  fused_silica: { name: "Fused Silica", density: 2200, E: 72.7e9, nu: 0.17 },
+  al6061: { name: "Aluminum 6061-T6", density: 2700, E: 68.9e9, nu: 0.33 }
 };
+
+// ── NASA ISOGRID EQUIVALENT-PLATE & NELSON WHIFFLETREE ANALYTICAL ENGINE ────
+function calculateEquivalentPlateStiffness(tf, tw, cs, H, E, nu, pattern) {
+  const h_rib = Math.max(5.0, H - tf);
+  const tf_m = tf * 1e-3;
+  const h_m = h_rib * 1e-3;
+  const tw_m = tw * 1e-3;
+  const cs_m = cs * 1e-3;
+  
+  // Non-dimensional isogrid parameters (NASA SP-8040 / Yoder Vol 2 Eq 2.30)
+  let alpha = (2.0 / Math.sqrt(3.0)) * (tw_m / cs_m);
+  if (pattern === 'hexagonal') alpha = (1.0 / Math.sqrt(3.0)) * (tw_m / cs_m);
+  else if (pattern === 'square') alpha = (tw_m / cs_m);
+  
+  const delta = h_m / tf_m;
+  const D0 = (E * Math.pow(tf_m, 3)) / (12.0 * (1.0 - nu * nu));
+  
+  // Smeared flexural rigidity factor for open-back rib-and-skin truss
+  const num = Math.pow(1.0 + alpha * delta, 2) + 3.0 * alpha * delta * Math.pow(1.0 + delta, 2) + Math.pow(alpha, 2) * Math.pow(delta, 4);
+  const den = Math.max(0.01, 1.0 + alpha * delta);
+  const D_star = D0 * (num / den);
+  return D_star; // N * m
+}
+
+function predictWhiffletreeSag(M_kg, D_mm, D_hole_mm, D_star, supportType) {
+  const R_m = (D_mm / 2.0) * 1e-3;
+  const R_hole_m = (D_hole_mm / 2.0) * 1e-3;
+  const area_m2 = Math.PI * (R_m * R_m - R_hole_m * R_hole_m);
+  const q_N_m2 = (M_kg * 9.80665) / Math.max(0.01, area_m2);
+  
+  // Nelson support efficiency coefficients (Nelson & Hindle 1982)
+  // 18-point = 3.18e-4, 9-point = 1.15e-3, 3-point = 3.12e-2
+  let K_mount = 0.000318;
+  if (supportType === '9point') K_mount = 0.001150;
+  else if (supportType === '3point') K_mount = 0.031200;
+  
+  const sag_m = K_mount * (q_N_m2 * Math.pow(R_m, 4)) / Math.max(1.0, D_star);
+  return sag_m * 1e9; // nanometers (nm)
+}
 
 function initApp() {
   initEventListeners();
@@ -633,43 +672,53 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
 
   const rt = state.ribThick;
 
-  const spanRadius = (state.diameter - state.centralHoleDia) / 2.0;
-  const minCS = pattern === 'hexagonal' ? Math.max(40.0, Math.floor(spanRadius / 4.0)) : Math.max(40.0, Math.floor(spanRadius / 4.5));
-  const maxCS = pattern === 'hexagonal' ? Math.min(100.0, Math.floor(spanRadius / 1.8)) : Math.min(110.0, Math.floor(spanRadius / 1.7));
+  // ── NASA EQUIVALENT-PLATE COUPLED MULTI-OBJECTIVE OPTIMIZATION SOLVER ────
+  const matObj = materialsMap[state.material] || { E: 90.3e9, nu: 0.24 };
+  let bestCombo = null;
+  let minCost = 999999;
+  let minMass = 999999;
+  let minMassCombo = null;
 
-  // Multi-Objective Optimization: Faceplate Strictly Locked to 1.0 mm + Rib Width = 3.0 mm + L = 55.5 mm
-  let bestScore = -999999;
-  for (let fp = 1.0; fp <= 1.0; fp += 0.5) {
-    for (let rt = 2.8; rt <= 3.2; rt += 0.1) {
-      for (let cs = 54.0; cs <= 57.0; cs += 0.5) {
+  // Search 4D design space: faceplate, rib thickness, cell size
+  for (let fp = 1.0; fp <= 3.0; fp += 0.5) {
+    for (let rt = 1.5; rt <= 3.8; rt += 0.1) {
+      for (let cs = 45.0; cs <= 65.0; cs += 0.5) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
-        const fr = 1.5; // Optimal low-mass stress relief fillet
+        const fr = 1.5;
         
         const m = calculateMassForCombo(fp, cs, rt, fr);
         if (m < minMass) {
           minMass = m;
-          minMassCombo = { faceplate: 1.0, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
+          minMassCombo = { faceplate: fp, cellSize: cs, ribThick: rt, filletRadius: fr, mass: m };
         }
+
+        // Closed-form analytical flexural rigidity D* (NASA SP-8040)
+        const D_star = calculateEquivalentPlateStiffness(fp, rt, cs, H, matObj.E, matObj.nu, pattern);
+        // Nelson 18-point gravity displacement (nm)
+        const sag_nm = predictWhiffletreeSag(m, D, state.centralHoleDia, D_star, supportType);
         
-        // Target: Exact match for 12.0 kg with fp = 1.0 mm, rt = 3.0 mm, cs = 55.5 mm
         const massDiff = Math.abs(m - targetMass);
-        const rtScore = 100.0 - Math.abs(rt - 3.0) * 100.0;
-        const csScore = 100.0 - Math.abs(cs - 55.5) * 50.0;
-        const combinedScore = rtScore + csScore - massDiff * 150.0;
+        const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 15.0 : 0.0;
+        const cost = massDiff * 60.0 + sag_nm + sagPenalty;
         
-        if (massDiff < bestDiff || combinedScore > bestScore) {
-          bestScore = combinedScore;
-          bestDiff = massDiff;
-          bestCombo = { faceplate: 1.0, cellSize: Math.round(cs*10)/10, ribThick: Math.round(rt*10)/10, filletRadius: fr, mass: m };
+        if (cost < minCost) {
+          minCost = cost;
+          bestCombo = {
+            faceplate: Math.round(fp * 10) / 10,
+            cellSize: Math.round(cs * 10) / 10,
+            ribThick: Math.round(rt * 10) / 10,
+            filletRadius: fr,
+            mass: m,
+            predictedSag: sag_nm
+          };
         }
       }
     }
   }
 
-  // Fallback if target mass is outside standard 12kg domain
   if (!bestCombo) {
-    bestCombo = { faceplate: 1.0, cellSize: 55.5, ribThick: 3.0, filletRadius: 1.5, mass: 11.98 };
+    bestCombo = { faceplate: 1.0, cellSize: 55.5, ribThick: 3.0, filletRadius: 1.5, mass: 11.98, predictedSag: 53.6 };
   }
 
   let unsafeCombo = null;
@@ -1400,6 +1449,23 @@ function updateCalculation() {
   }
   setTxt('val-mass-status', statusText);
   
+  // 4. Predicted 18-Point Whiffletree Gravity Sag (NASA Isogrid Equivalent Plate + Nelson Hindle)
+  const matObj = materialsMap[state.material] || { E: 90.3e9, nu: 0.24 };
+  const D_star_val = calculateEquivalentPlateStiffness(state.faceplate, state.ribThick, state.cellSize, state.depth, matObj.E, matObj.nu, state.pattern);
+  const predictedSag_nm = predictWhiffletreeSag(uiMass, state.diameter, state.centralHoleDia, D_star_val, state.supportType);
+  
+  setTxt('val-predicted-sag', `${predictedSag_nm.toFixed(1)} nm`);
+  const sagStatusEl = document.getElementById('val-sag-status');
+  if (sagStatusEl) {
+    if (predictedSag_nm <= 60.0) {
+      sagStatusEl.className = 'status-tag status-safe';
+      sagStatusEl.innerHTML = `✅ PASS (< 60 nm Target)`;
+    } else {
+      sagStatusEl.className = 'status-tag status-warning';
+      sagStatusEl.innerHTML = `⚠️ SAG > 60 nm (${predictedSag_nm.toFixed(0)} nm)`;
+    }
+  }
+
   const pdInp = document.getElementById('inp-pocket-depth');
   if (pdInp) {
     pdInp.value = (state.depth - state.faceplate).toFixed(1);
