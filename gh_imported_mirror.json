@@ -1,0 +1,20 @@
+{
+  "source": "NX Open Mirror Inspection",
+  "filename": "zerodur_560_12kg.prt",
+  "part_name": "zerodur_560_12kg",
+  "diameter": 560.0,
+  "radius_of_curvature": 1085.0,
+  "blank_depth": 73.7,
+  "faceplate_thickness": 1.0,
+  "cell_grid_size": 55.5,
+  "rib_width": 3.0,
+  "fillet_radius": 1.5,
+  "pattern": "isogrid",
+  "support_points": 18,
+  "material": "zerodur",
+  "material_density": 2530,
+  "is_lightweighted": true,
+  "current_mass_kg": 11.98,
+  "conic_constant": -1.22,
+  "central_hole_dia": 175.0
+}
