@@ -154,6 +154,12 @@ function initEventListeners() {
   });
 
   safeAddListener('inp-target-mass', 'input', (e) => {
+    const raw = (e.target.value || '').trim().toUpperCase();
+    if (raw === 'MIN' || raw === 'MINIMUM') {
+      state.targetMass = 'MIN';
+      updateCalculation();
+      return;
+    }
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val > 0) {
       state.targetMass = val;
@@ -277,9 +283,15 @@ async function executeNSGA2Optimization() {
   const dVal = parseFloat(document.getElementById('inp-diameter').value) || state.diameter;
   const dcVal = parseFloat(document.getElementById('inp-central-hole').value) || state.centralHoleDia;
   const hVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
-  const targetMass = parseFloat(document.getElementById('inp-target-mass').value) || state.targetMass;
+  
+  const rawTarget = (document.getElementById('inp-target-mass').value || '').trim().toUpperCase();
+  const isMin = rawTarget === 'MIN' || rawTarget === 'MINIMUM' || state.targetMass === 'MIN';
+  const targetMass = isMin ? 999.0 : (parseFloat(rawTarget) || state.targetMass || 12.0);
 
-  showSolverStatus('🧬 Running 50,000 Candidate NSGA-II Pareto Optimization with Crowding Distance...', true);
+  const statusMsg = isMin
+    ? '🧬 Running 50,000 Candidate NSGA-II to find absolute MINIMUM mass meeting optical limits...'
+    : `🧬 Running 50,000 Candidate NSGA-II Pareto Optimization for Target ≤ ${targetMass} kg...`;
+  showSolverStatus(statusMsg, true);
   try {
     const res = await fetch('http://127.0.0.1:8000/optimize/nsga2', {
       method: 'POST',
@@ -621,8 +633,11 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   const volBlank = Math.PI * (R * R - rInnerHole * rInnerHole) * (H + sag / 2.0);
   const solidMass = volBlank * rho;
   
+  const isMinMode = (targetMass === 'MIN' || String(targetMass).toUpperCase() === 'MIN');
+  const numTargetMass = isMinMode ? null : parseFloat(targetMass);
+
   // Upper limit check: If target mass is too heavy
-  if (targetMass >= solidMass * 0.95) {
+  if (!isMinMode && numTargetMass >= solidMass * 0.95) {
     return {
       achievable: false,
       maxReducibleWeight: solidMass,
@@ -631,7 +646,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       ribThick: state.ribThick,
       filletRadius: 5.0,
       mass: solidMass,
-      reason: `The target mass (${targetMass.toFixed(0)} kg) is too close to or exceeds the solid glass blank weight (${solidMass.toFixed(1)} kg). No lightweighting pockets are required to meet this target.`
+      reason: `The target mass (${numTargetMass.toFixed(0)} kg) is too close to or exceeds the solid glass blank weight (${solidMass.toFixed(1)} kg). No lightweighting pockets are required to meet this target.`
     };
   }
 
@@ -865,22 +880,40 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
         // Nelson 18-point gravity displacement (nm)
         const sag_nm = predictWhiffletreeSag(m, D, state.centralHoleDia, D_star, supportType);
         
-        const massDiff = Math.abs(m - targetMass);
-        const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 50.0 : 0.0;
-        
-        // Multi-objective score balancing target mass and optical stiffness (No hardcoded bias!)
-        const score = 1000.0 - massDiff * 150.0 - sag_nm * 2.0 - sagPenalty;
-        
-        if (score > bestScore) {
-          bestScore = score;
-          bestCombo = {
-            faceplate: Math.round(fp * 10) / 10,
-            cellSize: Math.round(cs * 10) / 10,
-            ribThick: Math.round(rt * 10) / 10,
-            filletRadius: fr,
-            mass: m,
-            predictedSag: sag_nm
-          };
+        let score = -999999;
+        if (isMinMode) {
+          // MIN Mode: Find the absolute minimum weight that keeps RMS sag <= 60 nm
+          const sagViol = Math.max(0.0, sag_nm - 60.0);
+          score = 1000.0 - (m * 60.0) - (sagViol * 500.0) - (sag_nm * 0.5);
+          if (sag_nm <= 60.0 && score > bestScore) {
+            bestScore = score;
+            bestCombo = {
+              faceplate: Math.round(fp * 10) / 10,
+              cellSize: Math.round(cs * 10) / 10,
+              ribThick: Math.round(rt * 10) / 10,
+              filletRadius: fr,
+              mass: m,
+              predictedSag: sag_nm
+            };
+          }
+        } else {
+          const massDiff = Math.abs(m - numTargetMass);
+          const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 50.0 : 0.0;
+          
+          // Multi-objective score balancing target mass and optical stiffness (No hardcoded bias!)
+          score = 1000.0 - massDiff * 150.0 - sag_nm * 2.0 - sagPenalty;
+          
+          if (score > bestScore) {
+            bestScore = score;
+            bestCombo = {
+              faceplate: Math.round(fp * 10) / 10,
+              cellSize: Math.round(cs * 10) / 10,
+              ribThick: Math.round(rt * 10) / 10,
+              filletRadius: fr,
+              mass: m,
+              predictedSag: sag_nm
+            };
+          }
         }
       }
     }
@@ -928,9 +961,9 @@ function applyCombo(faceplate, cellSize, ribThick, filletRadius) {
 
 function autoSolveTargetMass() {
   const targetInp = document.getElementById('inp-target-mass');
-  if (targetInp) {
-    state.targetMass = parseFloat(targetInp.value) || 12;
-  }
+  const rawTarget = targetInp ? (targetInp.value || '').trim().toUpperCase() : '';
+  const isMin = rawTarget === 'MIN' || rawTarget === 'MINIMUM' || state.targetMass === 'MIN';
+  state.targetMass = isMin ? 'MIN' : (parseFloat(targetInp.value) || 12);
 
   const solved = solveOptimalParameters(
     state.diameter,
@@ -945,7 +978,11 @@ function autoSolveTargetMass() {
   applyCombo(solved.faceplate, solved.cellSize, solved.ribThick, solved.filletRadius);
   const statusVal = document.getElementById('val-import-status');
   if (statusVal) {
-    statusVal.textContent = `Auto-Solved: ${solved.mass.toFixed(2)} kg | Predicted Sag: ${solved.predictedSag.toFixed(1)} nm (<60nm)`;
+    if (isMin) {
+      statusVal.textContent = `Auto-Solved (MIN Lightweight): ${solved.mass.toFixed(2)} kg | Predicted Sag: ${solved.predictedSag.toFixed(1)} nm (<60nm)`;
+    } else {
+      statusVal.textContent = `Auto-Solved: ${solved.mass.toFixed(2)} kg | Predicted Sag: ${solved.predictedSag.toFixed(1)} nm (<60nm)`;
+    }
   }
 }
 
@@ -1505,14 +1542,21 @@ function updateCalculation() {
 
   // Dynamic feedback for target mass
   const targetMassEl = document.getElementById('inp-target-mass');
-  const targetMassVal = targetMassEl ? (parseFloat(targetMassEl.value) || 100) : (state.targetMass || 100);
-  const diffVal = displayMass - targetMassVal;
-  let statusText = state.importedMass ? `Imported (${state.importedFileName || 'PRT'}) | Target: ${targetMassVal.toFixed(0)} kg` : `Target: ${targetMassVal.toFixed(0)} kg`;
-  if (Math.abs(diffVal) < 1.0) {
-    statusText += " | Met (Solved)";
+  const rawTarget = targetMassEl ? (targetMassEl.value || '').trim().toUpperCase() : '';
+  const isMinMode = rawTarget === 'MIN' || rawTarget === 'MINIMUM' || state.targetMass === 'MIN';
+  let statusText = "";
+  if (isMinMode) {
+    statusText = `Target: MIN (Optimal Lightweight) | Solved: ${displayMass.toFixed(1)} kg`;
   } else {
-    const sign = diffVal > 0 ? "+" : "";
-    statusText += ` | Diff: ${sign}${diffVal.toFixed(1)} kg (Click Auto-Solve)`;
+    const targetMassVal = targetMassEl ? (parseFloat(targetMassEl.value) || 100) : (state.targetMass || 100);
+    const diffVal = displayMass - targetMassVal;
+    statusText = state.importedMass ? `Imported (${state.importedFileName || 'PRT'}) | Target: ${targetMassVal.toFixed(0)} kg` : `Target: ${targetMassVal.toFixed(0)} kg`;
+    if (Math.abs(diffVal) < 1.0) {
+      statusText += " | Met (Solved)";
+    } else {
+      const sign = diffVal > 0 ? "+" : "";
+      statusText += ` | Diff: ${sign}${diffVal.toFixed(1)} kg (Click Auto-Solve)`;
+    }
   }
   setTxt('val-mass-status', statusText);
   

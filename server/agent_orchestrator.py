@@ -96,11 +96,15 @@ class OptoMechanicalAgent:
         d_match    = re.search(r'(\d{3,4})\s*mm', text, re.IGNORECASE)
         mass_match = re.search(r'(\d+(?:\.\d+)?)\s*kg', text, re.IGNORECASE)
         sag_match  = re.search(r'(\d+(?:\.\d+)?)\s*nm', text, re.IGNORECASE)
+        is_min     = bool(re.search(r'\b(min|minimum|least|lightest)\b', text, re.IGNORECASE))
+
+        target_mass = 999.0 if is_min else (float(mass_match.group(1)) if mass_match else 12.0)
 
         return {
             "D_mm":        float(d_match.group(1))    if d_match    else 560.0,
-            "max_mass_kg": float(mass_match.group(1)) if mass_match else 12.0,
+            "max_mass_kg": target_mass,
             "max_sag_nm":  float(sag_match.group(1))  if sag_match  else 60.0,
+            "is_min":      is_min
         }
 
     # ── Main Agentic Workflow ────────────────────────────────────────────────
