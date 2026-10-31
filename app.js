@@ -308,8 +308,8 @@ async function executeNSGA2Optimization() {
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const best = await res.json();
 
-    // Apply solved parameters to UI
-    applyCombo(best.tf_mm, best.L_mm, best.tw_mm, best.rf_mm);
+    // Apply solved parameters to UI (including evolved depth H_mm)
+    applyCombo(best.tf_mm, best.L_mm, best.tw_mm, best.rf_mm, best.H_mm);
 
     const mass = best.predicted_mass_kg !== undefined ? best.predicted_mass_kg : (best.mass_kg !== undefined ? best.mass_kg : 11.9);
     const sag = best.predicted_rms_sag_nm !== undefined ? best.predicted_rms_sag_nm : (best.rms_sag_nm !== undefined ? best.rms_sag_nm : 58.0);
@@ -938,11 +938,16 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   };
 }
 
-function applyCombo(faceplate, cellSize, ribThick, filletRadius) {
+function applyCombo(faceplate, cellSize, ribThick, filletRadius, depth) {
   state.faceplate = faceplate;
   state.cellSize = cellSize;
   state.ribThick = ribThick;
   state.filletRadius = filletRadius || 1.5;
+  if (depth !== undefined && depth !== null && !isNaN(depth) && depth > 5.0) {
+    state.depth = depth;
+    const depthInp = document.getElementById('inp-depth');
+    if (depthInp) depthInp.value = state.depth;
+  }
   state.importedMass = null;
 
   const fpInp = document.getElementById('inp-faceplate');
@@ -3108,7 +3113,7 @@ class GeminiAgentEngine {
           const sag = bd.predicted_rms_sag_nm !== undefined ? bd.predicted_rms_sag_nm : (bd.rms_sag_nm !== undefined ? bd.rms_sag_nm : 54.0);
           const quilt = bd.predicted_quilting_nm !== undefined ? bd.predicted_quilting_nm : (bd.quilting_nm !== undefined ? bd.quilting_nm : 10.0);
           
-          applyCombo(bd.tf_mm, bd.L_mm, bd.tw_mm, bd.rf_mm);
+          applyCombo(bd.tf_mm, bd.L_mm, bd.tw_mm, bd.rf_mm, bd.H_mm);
           this.logAction(`Applied Optimal Geometry to CAD: tf=${bd.tf_mm} mm, tw=${bd.tw_mm} mm, L=${bd.L_mm} mm, rf=${bd.rf_mm} mm`);
           this.logResult(`Verified Metrics: Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm`);
         }
