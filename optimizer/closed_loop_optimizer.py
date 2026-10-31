@@ -118,7 +118,7 @@ class ClosedLoopOptimizer:
         with open(self.buffer_file, "w") as f:
             json.dump(self.retraining_buffer, f, indent=2)
 
-    def optimize_nsga2(self, D_mm=560.0, Dc_mm=120.0, max_mass_kg=12.0, max_sag_nm=60.0,
+    def optimize_nsga2(self, D_mm=560.0, Dc_mm=120.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0,
                        pop_size=200, generations=40, eta_c=15.0, eta_m=20.0):
         """
         True NSGA-II Multi-Objective Genetic Algorithm with ML Surrogate fitness evaluations.
@@ -126,11 +126,16 @@ class ClosedLoopOptimizer:
         Constraints: mass <= max_mass_kg, rms_sag <= max_sag_nm, quilting <= 30.0 nm, tf >= 0.8 mm, tw >= 1.5 mm.
         """
         t0 = time.time()
-        print(f"\n[Pillar 3 NSGA-II] Initializing Multi-Objective GA (Pop={pop_size}, Gen={generations}) for D={D_mm}mm...")
+        print(f"\n[Pillar 3 NSGA-II] Initializing Multi-Objective GA (Pop={pop_size}, Gen={generations}) for D={D_mm}mm, Dc={Dc_mm}mm, H={H_mm}mm...")
 
         # Gene bounds: [H, tf, tw, L, rf]
-        bounds_lower = np.array([55.0, 0.8, 1.5, 25.0, 1.0])
-        bounds_upper = np.array([95.0, 3.5, 5.0, 80.0, 5.0])
+        # When H_mm is specified (e.g. 73.7mm from UI blank geometry), fix H so pocket geometry is optimized for the actual blank depth
+        if H_mm is not None and H_mm > 5.0:
+            bounds_lower = np.array([H_mm, 0.8, 1.5, 25.0, 1.0])
+            bounds_upper = np.array([H_mm, 3.5, 5.0, 80.0, 5.0])
+        else:
+            bounds_lower = np.array([55.0, 0.8, 1.5, 25.0, 1.0])
+            bounds_upper = np.array([95.0, 3.5, 5.0, 80.0, 5.0])
 
         # Initial Population
         population = np.random.uniform(bounds_lower, bounds_upper, (pop_size, len(bounds_lower)))
@@ -297,7 +302,10 @@ class ClosedLoopOptimizer:
         tw_vals = np.random.uniform(1.5, 4.5, num_candidates)
         L_vals = np.random.uniform(25.0, 75.0, num_candidates)
         rf_vals = np.random.uniform(1.0, 5.0, num_candidates)
-        H_vals = np.random.uniform(55.0, 95.0, num_candidates)
+        if H_mm is not None and H_mm > 5.0:
+            H_vals = np.full(num_candidates, H_mm)
+        else:
+            H_vals = np.random.uniform(55.0, 95.0, num_candidates)
 
         D_arr = np.full(num_candidates, D_mm)
         Dc_arr = np.full(num_candidates, Dc_mm)

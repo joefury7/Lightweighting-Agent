@@ -132,7 +132,7 @@ def run_nsga2_optimization(req: OptimizeRequest):
     """
     try:
         best_design = optimizer.optimize_nsga2(
-            req.D_mm, req.Dc_mm, req.max_mass_kg, req.max_sag_nm
+            req.D_mm, req.Dc_mm, req.H_mm, req.max_mass_kg, req.max_sag_nm
         )
         return best_design
     except Exception as e:

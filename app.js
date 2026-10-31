@@ -326,7 +326,7 @@ async function executeNSGA2Optimization() {
     if (quiltEl) quiltEl.innerText = `${quilt.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(freq)} Hz`;
 
-    showSolverStatus(`🧬 NSGA-II Optimal Pareto Solution: Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm (tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
+    showSolverStatus(`🧬 NSGA-II Optimal Pareto Solution: Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
   } catch (err) {
     showSolverStatus('NSGA-II Error: ' + err.message + '. Running fallback local solver.', false);
     autoSolveTargetMass();
