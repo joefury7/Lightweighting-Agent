@@ -18,14 +18,14 @@ def main():
     D = 560.0        # Clear Aperture Diameter (mm)
     Dc = 175.0      # Center Bore Hole (mm)
     H = 73.7        # Overall Axial Height (mm)
-    tf = 0.82      # Faceplate Thickness (mm)
-    tw = 1.67      # Rib Wall Thickness (mm)
-    L = 40.91        # Isogrid Cell Inscribed Pitch (mm)
-    rf = 4.09      # Fillet Radius (mm)
+    tf = 1.13      # Faceplate Thickness (mm)
+    tw = 3.38      # Rib Wall Thickness (mm)
+    L = 62.14        # Isogrid Cell Inscribed Pitch (mm)
+    rf = 3.31      # Fillet Radius (mm)
     
-    hubs = [(102.275, 35.4291), (20.455, 106.2873), (-102.275, 35.4291), (-102.275, -35.4291), (-20.455, -106.2873), (102.275, -35.4291), (204.55, 70.8582), (163.64, 141.7164), (40.91, 212.5746), (-40.91, 212.5746), (-163.64, 141.7164), (-204.55, 70.8582), (-204.55, -70.8582), (-163.64, -141.7164), (-40.91, -212.5746), (40.91, -212.5746), (163.64, -141.7164), (204.55, -70.8582)]  # 18 Snapped Whiffletree Hub Coordinates
+    hubs = [(93.21, 53.8148), (0.0, 107.6296), (-93.21, 53.8148), (-93.21, -53.8148), (0.0, -107.6296), (93.21, -53.8148), (217.49, 53.8148), (155.35, 161.4445), (62.14, 215.2593), (-62.14, 215.2593), (-155.35, 161.4445), (-217.49, 53.8148), (-217.49, -53.8148), (-155.35, -161.4445), (-62.14, -215.2593), (62.14, -215.2593), (155.35, -161.4445), (217.49, -53.8148)]  # 18 Snapped Whiffletree Hub Coordinates
     
-    prt_path = r"C:\\Users\\JOEL\\OneDrive\\Desktop\\Lightweighting Agent\\primary_mirror_560mm.prt"
+    prt_path = r"C:\\Users\\JOEL\\OneDrive\\Desktop\\Lightweighting Agent\\test_nx_mirror.prt"
     
     # 1. Create or open display part
     try:

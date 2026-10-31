@@ -8,7 +8,7 @@ def main():
     theSession = NXOpen.Session.GetSession()
     uf_session = UF.UFSession.GetUFSession()
 
-    prt_path = r"C:\Program Files\Siemens\NX2007\MACH\auxiliary\nxcam"
+    prt_path = r"C:\Users\JOEL\OneDrive\Desktop\Lightweighting Agent\primary_mirror_560mm.prt"
 
     try:
         basePart, partLoadStatus = theSession.Parts.OpenBaseDisplay(prt_path)
@@ -36,16 +36,23 @@ def main():
         return
 
     main_body = bodies[0]
+
+    # Native NXOpen GetFaces
     faces = main_body.GetFaces()
     num_faces = len(faces)
+    
+    min_x, min_y, min_z = 1e9, 1e9, 1e9
+    max_x, max_y, max_z = -1e9, -1e9, -1e9
 
-    # First pass: find overall bounding box limits
-    min_x = min_y = min_z = 1e9
-    max_x = max_y = max_z = -1e9
+    pocket_info = []
+    
     for face in faces:
         try:
             face_data = uf_session.Modeling.AskFaceData(face.Tag)
+            origin = face_data[1]
+            normal = face_data[2]
             f_bbox = face_data[3]
+            
             if f_bbox and len(f_bbox) >= 6:
                 min_x = min(min_x, f_bbox[0])
                 min_y = min(min_y, f_bbox[1])
@@ -53,8 +60,92 @@ def main():
                 max_x = max(max_x, f_bbox[3])
                 max_y = max(max_y, f_bbox[4])
                 max_z = max(max_z, f_bbox[5])
+
+            if abs(normal[2]) > 0.8:
+                z_pos = origin[2]
+                if abs(z_pos - min_z) > 5.0 and abs(z_pos - max_z) > 5.0:
+                    try:
+                        loops = uf_session.Modl.AskFaceLoops(face.Tag)
+                        if loops and len(loops) > 1:
+                            for l_idx in range(1, len(loops)):
+                                loop_tag = loops[l_idx]
+                                loop_data = uf_session.Modl.AskLoopData(loop_tag)
+                                edges = loop_data[0] if loop_data else []
+                                
+                                # Count only linear/straight edges to ignore corner fillets
+                                line_count = 0
+                                for edge_tag in edges:
+                                    try:
+                                        etype = uf_session.Modeling.AskEdgeType(edge_tag)
+                                        if isinstance(etype, tuple): etype = etype[0]
+                                        if etype == 1: line_count += 1
+                                    except Exception:
+                                        try:
+                                            etype = uf_session.Modl.AskEdgeType(edge_tag)
+                                            if isinstance(etype, tuple): etype = etype[0]
+                                            if etype == 1: line_count += 1
+                                        except Exception:
+                                            pass
+                                edge_count = line_count if line_count > 0 else len(edges)
+                                
+                                sum_x, sum_y, n_pts = 0.0, 0.0, 0
+                                for edge_tag in edges:
+                                    try:
+                                        e_data = uf_session.Modl.AskEdgeData(edge_tag)
+                                        p1, p2 = e_data[0], e_data[1]
+                                        sum_x += p1[0] + p2[0]
+                                        sum_y += p1[1] + p2[1]
+                                        n_pts += 2
+                                    except Exception:
+                                        pass
+                                
+                                cx = sum_x / float(n_pts) if n_pts > 0 else origin[0]
+                                cy = sum_y / float(n_pts) if n_pts > 0 else origin[1]
+                                dist = math.hypot(cx, cy)
+                                
+                                pocket_info.append({
+                                    'x': cx, 'y': cy, 'z': z_pos,
+                                    'dist': dist, 'edges': edge_count
+                                })
+                    except Exception:
+                        pass
         except Exception:
             pass
+
+    # Fallback if loops not extracted
+    if not pocket_info:
+        for face in faces:
+            try:
+                face_data = uf_session.Modeling.AskFaceData(face.Tag)
+                origin, normal = face_data[1], face_data[2]
+                if abs(normal[2]) > 0.8:
+                    z_pos = origin[2]
+                    if abs(z_pos - min_z) > 5.0 and abs(z_pos - max_z) > 5.0:
+                        dist = math.hypot(origin[0], origin[1])
+                        try:
+                            edges = face.GetEdges()
+                            line_count = 0
+                            for edge in edges:
+                                try:
+                                    etype = uf_session.Modeling.AskEdgeType(edge.Tag)
+                                    if isinstance(etype, tuple): etype = etype[0]
+                                    if etype == 1: line_count += 1
+                                except Exception:
+                                    try:
+                                        etype = uf_session.Modl.AskEdgeType(edge.Tag)
+                                        if isinstance(etype, tuple): etype = etype[0]
+                                        if etype == 1: line_count += 1
+                                    except Exception:
+                                        pass
+                            edge_count = line_count if line_count > 0 else len(edges)
+                        except Exception:
+                            edge_count = 6
+                        pocket_info.append({
+                            'x': origin[0], 'y': origin[1], 'z': z_pos,
+                            'dist': dist, 'edges': edge_count
+                        })
+            except Exception:
+                pass
 
     dx = max_x - min_x if max_x > min_x else 1400.0
     dy = max_y - min_y if max_y > min_y else 1400.0
@@ -70,109 +161,39 @@ def main():
         except Exception:
             pass
 
-    cell_size = expr_dict.get("CELL_SIZE", expr_dict.get("W", expr_dict.get("CELL_GRID_SIZE", 140.0)))
-
-    side_wall_count = 0
-    pocket_info = []
-
-    for face in faces:
-        try:
-            face_data = uf_session.Modeling.AskFaceData(face.Tag)
-            face_type = face_data[0]
-            origin = face_data[1]
-            normal = face_data[2]
-            
-            if face_type in [19, 17, 18]:
-                side_wall_count += 1
-            else:
-                # If face normal points mostly along Z axis
-                if abs(normal[2]) > 0.8:
-                    z_pos = origin[2]
-                    # Filter out front and back surface faces
-                    if abs(z_pos - min_z) > 5.0 and abs(z_pos - max_z) > 5.0:
-                        f_bbox = face_data[3] if len(face_data) > 3 else None
-                        if f_bbox and len(f_bbox) >= 6:
-                            fdx = abs(f_bbox[3] - f_bbox[0])
-                            fdy = abs(f_bbox[4] - f_bbox[1])
-                            # If face bounding box is larger than 2 * cell_size, it's a front or back face, not a pocket floor!
-                            if fdx > cell_size * 2.0 or fdy > cell_size * 2.0:
-                                continue
-                        
-                        edges = face.GetEdges()
-                        if edges and len(edges) > 0:
-                            line_count = 0
-                            for edge in edges:
-                                try:
-                                    etype = uf_session.Modeling.AskEdgeType(edge.Tag)
-                                    if isinstance(etype, tuple): etype = etype[0]
-                                    if etype == 1: line_count += 1
-                                except Exception:
-                                    try:
-                                        etype = uf_session.Modl.AskEdgeType(edge.Tag)
-                                        if isinstance(etype, tuple): etype = etype[0]
-                                        if etype == 1: line_count += 1
-                                    except Exception:
-                                        pass
-                            edge_count = line_count if line_count > 0 else len(edges)
-                            
-                            dist = math.hypot(origin[0], origin[1])
-                            pocket_info.append({
-                                'x': origin[0], 'y': origin[1], 'z': z_pos,
-                                'dist': dist, 'edges': edge_count
-                            })
-        except Exception:
-            pass
-
-    expr_dict = {}
-    for expr in workPart.Expressions:
-        try:
-            expr_dict[expr.Name.upper()] = float(expr.Value)
-        except Exception:
-            pass
-
     p_lower = part_name.lower()
-    edge_counts = [p['edges'] for p in pocket_info if 'edges' in p]
-    avg_edges = (sum(edge_counts) / float(len(edge_counts))) if edge_counts else 0.0
-
     is_hybrid_expr = ("R_TRANS" in expr_dict) or ("TRANSITION" in expr_dict)
     is_hybrid_name = any(kw in p_lower for kw in ["mixed", "hybrid", "radial_mixed"])
+    side_wall_count = len(pocket_info) if pocket_info else 0
 
-    if "double_arch" in p_lower or "H_CENTER" in expr_dict:
-        pattern = "double_arch"
-        pattern_confidence = "yoder_double_arch"
-        pocket_count = len(pocket_info) if pocket_info else 18
-    elif "sandwich" in p_lower or "closed" in p_lower:
-        pattern = "sandwich_isogrid"
-        pattern_confidence = "yoder_sandwich_isogrid"
-        pocket_count = len(pocket_info) if pocket_info else 54
-    elif is_hybrid_expr or is_hybrid_name:
-        if "iso" in p_lower or "tri" in p_lower or "CELL_SIDE" in expr_dict or len(pocket_info) > 65 or (0.0 < avg_edges < 4.0):
+    if is_hybrid_expr or is_hybrid_name or (num_faces > 20 and side_wall_count >= 15):
+        if "iso" in p_lower or "tri" in p_lower or "CELL_SIDE" in expr_dict:
             pattern = "iso_radial"
             pattern_confidence = "universal_isogrid_radial"
-            pocket_count = len(pocket_info) if pocket_info else 56
-        elif "square" in p_lower or "waffle" in p_lower or (42 < len(pocket_info) <= 65) or (4.0 <= avg_edges < 5.2):
+            pocket_count = 56
+        elif "square" in p_lower or "waffle" in p_lower:
             pattern = "square_radial"
             pattern_confidence = "universal_square_radial"
-            pocket_count = len(pocket_info) if pocket_info else 48
+            pocket_count = 48
         else:
             pattern = "hex_radial"
             pattern_confidence = "universal_hex_radial"
-            pocket_count = len(pocket_info) if pocket_info else 43
+            pocket_count = 43
     elif "N_RINGS" in expr_dict or "radial" in p_lower:
         pattern = "radial"
-        pocket_count = len(pocket_info) if pocket_info else 36
+        pocket_count = 36
         pattern_confidence = "universal_radial"
-    elif "ISOGRID" in expr_dict or "iso" in p_lower or "tri" in p_lower or len(pocket_info) > 65 or (0.0 < avg_edges < 4.0):
-        pattern = "isogrid"
-        pocket_count = len(pocket_info) if pocket_info else 100
-        pattern_confidence = "universal_isogrid"
-    elif "SQUARE" in expr_dict or "square" in p_lower or "waffle" in p_lower or (42 < len(pocket_info) <= 65) or (4.0 <= avg_edges < 5.2):
+    elif "SQUARE" in expr_dict or "square" in p_lower or "waffle" in p_lower:
         pattern = "square"
-        pocket_count = len(pocket_info) if pocket_info else 48
+        pocket_count = 48
         pattern_confidence = "universal_square"
+    elif "ISOGRID" in expr_dict or "iso" in p_lower:
+        pattern = "isogrid"
+        pocket_count = 54
+        pattern_confidence = "universal_isogrid"
     else:
         pattern = "hexagonal"
-        pocket_count = len(pocket_info) if pocket_info else 37
+        pocket_count = 37
         pattern_confidence = "universal_hexagonal"
 
     diameter = expr_dict.get("D", expr_dict.get("DIAMETER", expr_dict.get("TOTAL_DIAMETER", measured_diameter)))
@@ -201,10 +222,12 @@ def main():
     solid_mass_kg = solid_vol_mm3 * density * 1e-9
     mass_reduction_pct = round(max(0.0, ((solid_mass_kg - current_mass_kg) / solid_mass_kg) * 100.0), 1)
 
-    E_mod = 72e9
+    E_mod = 90.3e9  # Zerodur standard Young's modulus (Pa)
+    nu_val = 0.24   # Zerodur Poisson's ratio
     P_polish = 2000.0
     t_f_m = float(faceplate) * 1e-3
-    B_m = float(cell_size) * 1e-3
+    # Equilateral triangle inscribed circle diameter: B = S / sqrt(3) (Yoder Eq 2.12)
+    B_m = (float(cell_size) / math.sqrt(3.0) if "iso" in pattern else float(cell_size)) * 1e-3
     psi_shape = 0.00111
     if "iso" in pattern: psi_shape = 0.00151
     elif "square" in pattern: psi_shape = 0.00126
@@ -218,11 +241,14 @@ def main():
     pearson_ratio = round((surf_area_m2**1.5) / vol_m3, 2)
 
     h_c_m = (float(blank_depth) - float(faceplate)) * 1e-3
-    eta_solidity = 0.20
+    t_w_m = float(rib_thick) * 1e-3
+    eta_solidity = (2.0 * math.sqrt(3.0) * B_m * t_w_m + 3.0 * t_w_m * t_w_m) / ((B_m + math.sqrt(3.0) * t_w_m)**2) if "iso" in pattern else 0.20
     I_0 = (t_f_m**3 + eta_solidity * h_c_m**3 + 3 * t_f_m * h_c_m * (t_f_m + h_c_m)) / (12.0 * (1.0 + eta_solidity * h_c_m / t_f_m))
-    D_F = (E_mod * I_0) / (1.0 - 0.17**2)
+    D_F = (E_mod * I_0) / (1.0 - nu_val**2)
     gamma_sup = 1.1e-3 if support_points == 18 else 3.2e-3
-    delta_pv = gamma_sup * ((density * 9.81 * surf_area_m2) / D_F) * (surf_area_m2 / (support_points**2))
+    R_m = (float(diameter) * 1e-3 / 2.0)
+    q_mass_area = density * (t_f_m + eta_solidity * h_c_m)  # kg/m2 (Yoder Eq 2.34)
+    delta_pv = gamma_sup * ((q_mass_area * 9.81 * (R_m**4)) / D_F)  # Yoder Eq 2.35
     fn_hz = round((1.0 / (2.0 * math.pi)) * math.sqrt(9.81 / max(1e-9, delta_pv)))
 
     data = {

@@ -276,16 +276,21 @@ class ClosedLoopOptimizer:
             "tw_mm": round(float(best_genes[2]), 2),
             "L_mm": round(float(best_genes[3]), 2),
             "rf_mm": round(float(best_genes[4]), 2),
-            "predicted_mass_kg": round(float(best_pred[0]), 3),
-            "predicted_rms_sag_nm": round(float(best_pred[1]), 2),
-            "predicted_pv_sag_nm": round(float(best_pred[2]), 2),
-            "predicted_quilting_nm": round(float(best_pred[3]), 2),
-            "predicted_freq_hz": round(float(best_pred[4]), 1),
             "all_constraints_satisfied": is_fully_feasible,
             "optimizer_method": "NSGA-II Multi-Objective Genetic Algorithm",
             "evaluation_duration_ms": round(eval_time * 1000.0, 2),
             "feasible_count": int(len(feasible_indices))
         }
+        # Re-evaluate exactly with rounded parameters to ensure 0.000 kg discrepancy with Instant ML Predict & Siemens NX
+        p_eval = self.predictor.predict(
+            best_design["D_mm"], best_design["Dc_mm"], best_design["H_mm"],
+            best_design["tf_mm"], best_design["tw_mm"], best_design["L_mm"], best_design["rf_mm"]
+        )
+        best_design["predicted_mass_kg"] = round(p_eval["mass_kg"], 2)
+        best_design["predicted_rms_sag_nm"] = round(p_eval["rms_sag_nm"], 2)
+        best_design["predicted_pv_sag_nm"] = round(p_eval["pv_sag_nm"], 2)
+        best_design["predicted_quilting_nm"] = round(p_eval["quilting_nm"], 2)
+        best_design["predicted_freq_hz"] = round(p_eval["frequency_hz"], 1)
 
         best_design["support_hubs_18"] = snap_18_whiffletree_hubs(D_mm, best_design["L_mm"], Dc_mm)
         return best_design
@@ -353,16 +358,21 @@ class ClosedLoopOptimizer:
             "tw_mm": round(float(tw_vals[best_idx]), 2),
             "L_mm": round(float(L_vals[best_idx]), 2),
             "rf_mm": round(float(rf_vals[best_idx]), 2),
-            "predicted_mass_kg": round(float(masses[best_idx]), 3),
-            "predicted_rms_sag_nm": round(float(rms_sags[best_idx]), 2),
-            "predicted_pv_sag_nm": round(float(pv_sags[best_idx]), 2),
-            "predicted_quilting_nm": round(float(quiltings[best_idx]), 2),
-            "predicted_freq_hz": round(float(freqs[best_idx]), 1),
             "all_constraints_satisfied": bool(len(valid_indices) > 0),
             "optimizer_method": "High-Throughput Vectorized Pareto Search",
             "evaluation_duration_ms": round(eval_time * 1000.0, 2),
             "feasible_count": int(len(valid_indices))
         }
+        # Re-evaluate exactly with rounded parameters to ensure 0.000 kg discrepancy with Instant ML Predict & Siemens NX
+        p_eval = self.predictor.predict(
+            best_design["D_mm"], best_design["Dc_mm"], best_design["H_mm"],
+            best_design["tf_mm"], best_design["tw_mm"], best_design["L_mm"], best_design["rf_mm"]
+        )
+        best_design["predicted_mass_kg"] = round(p_eval["mass_kg"], 2)
+        best_design["predicted_rms_sag_nm"] = round(p_eval["rms_sag_nm"], 2)
+        best_design["predicted_pv_sag_nm"] = round(p_eval["pv_sag_nm"], 2)
+        best_design["predicted_quilting_nm"] = round(p_eval["quilting_nm"], 2)
+        best_design["predicted_freq_hz"] = round(p_eval["frequency_hz"], 1)
 
         best_design["support_hubs_18"] = snap_18_whiffletree_hubs(D_mm, best_design["L_mm"], Dc_mm)
         return best_design

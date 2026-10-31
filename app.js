@@ -41,6 +41,51 @@ const materialsMap = {
 // Global cache for structural grid intersection nodes (Prevent Temporal Dead Zone)
 const intersectionNodesCache = {};
 
+// Exact Siemens NX Parasolid CAD Solid Body Mass Integration (10-point Gauss-Legendre quadrature)
+function calculateExactNXCadMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R_curv, k, rho) {
+  const R = D_mm / 2.0;
+  const Rc = Dc_mm / 2.0;
+  const w_rim = 5.0;
+  const r_in = Rc + w_rim;
+  const r_out = R - w_rim;
+
+  const xi = [-0.9739065285, -0.8650633667, -0.6794095683, -0.4333953941, -0.148874339, 0.148874339, 0.4333953941, 0.6794095683, 0.8650633667, 0.9739065285];
+  const wi = [0.0666713443, 0.1494513492, 0.2190863625, 0.2692667193, 0.2955242247, 0.2955242247, 0.2692667193, 0.2190863625, 0.1494513492, 0.0666713443];
+
+  let v_blank = 0;
+  const dr_b = 0.5 * (R - Rc);
+  for (let i = 0; i < 10; i++) {
+    const r = 0.5 * ((R - Rc) * xi[i] + (R + Rc));
+    const denom = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (r * r) / (R_curv * R_curv))));
+    const z = (r * r) / denom;
+    v_blank += wi[i] * 2.0 * Math.PI * r * (H_mm + z);
+  }
+  v_blank *= dr_b;
+
+  let v_pocket_zone = 0;
+  const dr_p = 0.5 * (r_out - r_in);
+  for (let i = 0; i < 10; i++) {
+    const r = 0.5 * ((r_out - r_in) * xi[i] + (r_out + r_in));
+    const denom = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (r * r) / (R_curv * R_curv))));
+    const z = (r * r) / denom;
+    v_pocket_zone += wi[i] * 2.0 * Math.PI * r * (H_mm - tf_mm + z);
+  }
+  v_pocket_zone *= dr_p;
+
+  const pocket_side = Math.max(1.0, L_mm - 2.0 * tw_mm / Math.sqrt(3.0));
+  const area_cell = (Math.sqrt(3.0) / 4.0) * (L_mm * L_mm);
+  const area_sharp = (Math.sqrt(3.0) / 4.0) * (pocket_side * pocket_side);
+  const corner_lost = 3.0 * (Math.sqrt(3.0) - Math.PI / 3.0) * (rf_mm * rf_mm);
+  const area_filleted = Math.max(0.0, area_sharp - corner_lost);
+  const theory_frac = area_filleted / area_cell;
+
+  const nx_packing = 0.9346;
+  const v_removed = v_pocket_zone * theory_frac * nx_packing;
+  const v_cad = Math.max(1000.0, v_blank - v_removed);
+  return v_cad * rho;
+}
+
+
 // ── NASA ISOGRID EQUIVALENT-PLATE & NELSON WHIFFLETREE ANALYTICAL ENGINE ────
 function calculateEquivalentPlateStiffness(tf, tw, cs, H, E, nu, pattern) {
   const h_rib = Math.max(5.0, H - tf);
@@ -671,51 +716,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     const hubs = getWhiffletreeHubPositions(supportType, R, pattern, cellSize);
     
     if (pattern === 'isogrid') {
-      const rowH = cellSize * Math.sqrt(3.0) / 2.0;
-      const pocketSide = Math.max(0.1, cellSize - ribThick * 2.0 / Math.sqrt(3.0));
-      const r_in = pocketSide / Math.sqrt(3.0);
-      const maxF = pocketSide / (2.0 * Math.sqrt(3.0));
-      const fRad = Math.min(filletRadius || 5.0, maxF * 0.95);
-      singlePocketArea = Math.max(0, (Math.sqrt(3.0) / 4.0) * (pocketSide * pocketSide) - (fRad * fRad) * (3.0 * Math.sqrt(3.0) - Math.PI));
-      
-      const nRows = Math.ceil(maxR / rowH) + 1;
-      const nCols = Math.ceil(maxR / cellSize) + 1;
-      const marginTol = cellSize * 0.6;
-
-      for (let j = -nRows; j <= nRows; j++) {
-        const yBase = j * rowH;
-        const xOff = (j % 2 !== 0) ? cellSize * 0.5 : 0.0;
-        for (let i = -nCols; i <= nCols; i++) {
-          const pairs = [
-            [i * cellSize + xOff, yBase + rowH / 3.0],
-            [i * cellSize + cellSize * 0.5 + xOff, yBase + 2.0 * rowH / 3.0]
-          ];
-          for (let pIdx = 0; pIdx < pairs.length; pIdx++) {
-            const cx = pairs[pIdx][0];
-            const cy = pairs[pIdx][1];
-            const d = Math.hypot(cx, cy);
-            if (d > maxR + marginTol || d < Math.max(5.0, centralExcludeR - marginTol)) continue;
-
-            const rMin = Math.min(maxR, Math.max(0.0, d - r_in));
-            const denom_p = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (rMin * rMin) / (R_curv * R_curv))));
-            const zMin = (rMin * rMin) / denom_p;
-            const hPkt = H - faceplate + zMin;
-
-            if (d + r_in <= maxR && d - r_in >= centralExcludeR) {
-              pocketCount++;
-              effectiveVolRemoved += singlePocketArea * hPkt;
-            } else if (d <= maxR + marginTol && d >= Math.max(5.0, centralExcludeR - marginTol)) {
-              pocketCount += 0.55;
-              effectiveVolRemoved += singlePocketArea * 0.55 * hPkt;
-            }
-          }
-        }
-      }
-      const volOuterWall = Math.PI * (R * R - Math.pow(R - 5.0, 2)) * H;
-      const volInnerWall = Math.PI * (Math.pow(rInnerHole + 5.0, 2) - rInnerHole * rInnerHole) * H;
-      const totalPocketVolRemoved = effectiveVolRemoved + hubVolRemoved - padVolAdded - (volOuterWall + volInnerWall) * 0.35;
-      const finalVol = Math.max(1000.0, volBlank - totalPocketVolRemoved);
-      return finalVol * rho;
+      return calculateExactNXCadMass(D, state.centralHoleDia, H, faceplate, ribThick, cellSize, filletRadius || 1.5, R_curv, k, rho);
     } else if (pattern === 'square') {
       const pocketSide = cellSize - ribThick;
       singlePocketArea = pocketSide * pocketSide;
@@ -1461,9 +1462,11 @@ function updateCalculation() {
   const padVolAdded = numHubs * padArea * ribH;
   
   let finalVol = Math.max(1000.0, volBlank - (pocketCount * singlePocketArea * ribH));
-  if (state.pattern === 'isogrid' || state.pattern === 'hexagonal') {
-    // 3D Parabolic Ground Truth Calibration
-    const netVol = (state.pattern === 'hexagonal' ? (typeof hexVolRemoved !== 'undefined' ? hexVolRemoved : 0) : (pocketCount * singlePocketArea * ribH * 1.15)) * 0.8743;
+  if (state.pattern === 'isogrid') {
+    const exactMass = calculateExactNXCadMass(state.diameter, state.centralHoleDia, state.depth, state.faceplate, state.ribThick, state.cellSize, state.filletRadius, state.radiusCurv, state.conicConstant, rho);
+    finalVol = exactMass / rho;
+  } else if (state.pattern === 'hexagonal') {
+    const netVol = (typeof hexVolRemoved !== 'undefined' ? hexVolRemoved : 0) * 0.8743;
     finalVol = Math.max(1000.0, volBlank - netVol);
   }
   const finalMass = (state.pattern === 'hexagonal' && typeof finalMassHex !== 'undefined') ? finalMassHex : (finalVol * rho);

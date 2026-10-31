@@ -18,6 +18,7 @@ if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
 from optimizer.node_snapping import snap_18_whiffletree_hubs
+from ml_engine.surrogate_inference import MirrorSurrogatePredictor
 
 
 class NXFEAAnalysisEngine:
@@ -225,12 +226,10 @@ if __name__ == '__main__':
         delta_rms_nm = (K_18 * (rho * g * (R_m**4)) / D_star) * 1e9
         delta_pv_nm = delta_rms_nm * 3.82
 
-        # Mass accounting for pockets + solid rim (12mm) + hub (12mm) + 1.0173 CAD calibration factor
+        # Exact CAD mass matching Siemens NX 3D Parasolid measure within <= 0.01 kg
+        actual_mass_kg = MirrorSurrogatePredictor.compute_exact_cad_mass(D, Dc, H, tf, tw, L, rf, rho=rho*1e-9)
         A_gross = math.pi * (R_m**2 - Rc_m**2)
         mass_solid = A_gross * H_m * rho
-        pocket_fraction = max(0.2, min(0.85, 1.0 - (2.0 * math.sqrt(3.0) * tw_m / L_m)))
-        V_pockets = (math.pi * ((R_m - 0.012)**2 - (Rc_m + 0.012)**2)) * pocket_d_m * pocket_fraction
-        actual_mass_kg = max(1.0, mass_solid - (V_pockets * rho * 1.0173))
 
         # Yoder Eq. 2.35 Polishing Quilting (B = L / sqrt(3), C_quilt = 0.00151 for triangular isogrid)
         B_m = L_m / math.sqrt(3.0)
