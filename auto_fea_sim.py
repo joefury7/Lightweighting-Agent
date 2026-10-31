@@ -33,11 +33,15 @@ def run_headless_fea(prt_path):
         }
 
     run_journal_exe = find_nx_run_journal()
-    agent_script_path = os.path.join(os.path.dirname(__file__), "..", "nx_fea_analysis_agent.py")
-    if not os.path.exists(agent_script_path):
-        agent_script_path = r"C:\Users\joelb\Desktop\Lightweighting agent\nx_fea_analysis_agent.py"
+    cur_dir = os.path.dirname(os.path.abspath(__file__))
+    candidates = [
+        os.path.join(cur_dir, "nx_fea_analysis_agent.py"),
+        os.path.join(cur_dir, "nx_bridge", "nx_fea_analysis_agent.py"),
+        os.path.join(cur_dir, "..", "nx_fea_analysis_agent.py"),
+    ]
+    agent_script_path = next((p for p in candidates if os.path.exists(p)), None)
 
-    if not os.path.exists(agent_script_path):
+    if not agent_script_path:
         return {
             "status": "error",
             "error": "nx_fea_analysis_agent.py script not found."
@@ -50,12 +54,15 @@ def run_headless_fea(prt_path):
         output = proc.stdout + "\n" + proc.stderr
 
         # Extract Von Mises stress and displacement metrics from log output
-        stress_match = re.search(r"MAX VON MISES STRESS:\s*([\d\.]+)\s*MPa", output, re.IGNORECASE)
-        disp_match = re.search(r"MAX DISPLACEMENT:\s*([\d\.]+)\s*(?:mm|um)", output, re.IGNORECASE)
-        status_match = re.search(r"SOL 101 PASSED|ANALYSIS COMPLETE", output, re.IGNORECASE)
+        stress_match = re.search(r"(?:MAX VON MISES STRESS|VON MISES|MAX STRESS)[:\s=]+([\d\.]+)\s*(?:MPa)?", output, re.IGNORECASE)
+        disp_match = re.search(r"(?:MAX DISPLACEMENT|DISPLACEMENT)[:\s=]+([\d\.]+)\s*(?:mm|um|µm)?", output, re.IGNORECASE)
+        status_match = re.search(r"FEA AUTOMATION COMPLETED SUCCESSFULLY|SOL 101 PASSED|ANALYSIS COMPLETE", output, re.IGNORECASE)
 
         stress_mpa = float(stress_match.group(1)) if stress_match else 3.42
         disp_um = float(disp_match.group(1)) if disp_match else 0.85
+
+        # Zerodur glass-ceramic design tensile allowable (~45.0 MPa, not structural steel 235 MPa)
+        zerodur_allowable_mpa = 45.0
 
         result = {
             "status": "success",
@@ -65,14 +72,14 @@ def run_headless_fea(prt_path):
             "nastran_status": "SOL 101 PASSED" if status_match else "SOL 101 COMPLETED",
             "support_points": 18,
             "gravity_load": "1g (9.81 m/s^2)",
-            "safety_factor": round(235.0 / max(0.1, stress_mpa), 1),
+            "safety_factor": round(zerodur_allowable_mpa / max(0.1, stress_mpa), 1),
             "raw_output_snippet": output[:1000]
         }
 
         # Save JSON output
         out_json_path = os.path.join(os.path.dirname(__file__), "fea_results.json")
         with open(out_json_path, "w", encoding="utf-8") as f:
-            json.dumps(result, f, indent=2)
+            json.dump(result, f, indent=2)
 
         return result
 

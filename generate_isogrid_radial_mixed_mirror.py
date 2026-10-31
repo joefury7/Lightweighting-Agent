@@ -195,27 +195,36 @@ def main():
             # Upward triangle
             cx = i * CELL_SIDE + x_shift
             cy = y_base + row_h / 3.0
-            if math.hypot(cx, cy) + pocket_radius <= (TRANSITION_RADIUS - RIB_THICK / 2.0):
+            d_center = math.hypot(cx, cy)
+            if d_center + pocket_radius <= (TRANSITION_RADIUS - RIB_THICK / 2.0):
+                # Calculate adaptive depth to prevent breaching curved optical face
+                r_min = max(0.0, d_center - pocket_radius)
+                z_front = BLANK_DEPTH + (r_min * r_min) / (2.0 * RADIUS_CURV) - sag_edge
+                local_depth = max(5.0, round(z_front - FACEPLATE_THICK, 2))
                 verts = tri_verts(cx, cy, pocket_side, 1, BACK_Z)
                 lines = []
                 for k in range(3):
                     p1 = NXOpen.Point3d(verts[k][0], verts[k][1], BACK_Z)
                     p2 = NXOpen.Point3d(verts[(k+1)%3][0], verts[(k+1)%3][1], BACK_Z)
                     lines.append(workPart.Curves.CreateLine(p1, p2))
-                if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, POCKET_DEPTH, bool_sub):
+                if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, local_depth, bool_sub):
                     iso_pocket_count += 1
             
             # Downward triangle
             cx2 = cx + CELL_SIDE * 0.5
             cy2 = y_base + 2.0 * row_h / 3.0
-            if math.hypot(cx2, cy2) + pocket_radius <= (TRANSITION_RADIUS - RIB_THICK / 2.0):
+            d_center2 = math.hypot(cx2, cy2)
+            if d_center2 + pocket_radius <= (TRANSITION_RADIUS - RIB_THICK / 2.0):
+                r_min2 = max(0.0, d_center2 - pocket_radius)
+                z_front2 = BLANK_DEPTH + (r_min2 * r_min2) / (2.0 * RADIUS_CURV) - sag_edge
+                local_depth2 = max(5.0, round(z_front2 - FACEPLATE_THICK, 2))
                 verts2 = tri_verts(cx2, cy2, pocket_side, -1, BACK_Z)
                 lines2 = []
                 for k in range(3):
                     p1 = NXOpen.Point3d(verts2[k][0], verts2[k][1], BACK_Z)
                     p2 = NXOpen.Point3d(verts2[(k+1)%3][0], verts2[(k+1)%3][1], BACK_Z)
                     lines2.append(workPart.Curves.CreateLine(p1, p2))
-                if extrude_subtract_pocket(workPart, lines2, blank_body, z_direction, POCKET_DEPTH, bool_sub):
+                if extrude_subtract_pocket(workPart, lines2, blank_body, z_direction, local_depth2, bool_sub):
                     iso_pocket_count += 1
 
     lw.WriteLine(f"   -> Subtracted {iso_pocket_count} inner isogrid triangular pockets.")
@@ -274,7 +283,9 @@ def main():
                 NXOpen.Point3d(r_out * math.cos(a1), r_out * math.sin(a1), BACK_Z)
             ))
             
-            if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, POCKET_DEPTH, bool_sub):
+            z_front_rad = BLANK_DEPTH + (r_in * r_in) / (2.0 * RADIUS_CURV) - sag_edge
+            local_depth_rad = max(5.0, round(z_front_rad - FACEPLATE_THICK, 2))
+            if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, local_depth_rad, bool_sub):
                 radial_pocket_count += 1
 
     lw.WriteLine(f"   -> Subtracted {radial_pocket_count} outer radial sector pockets.")

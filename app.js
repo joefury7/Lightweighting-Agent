@@ -38,6 +38,9 @@ const materialsMap = {
   al6061: { name: "Aluminum 6061-T6", density: 2700, E: 68.9e9, nu: 0.33 }
 };
 
+// Global cache for structural grid intersection nodes (Prevent Temporal Dead Zone)
+const intersectionNodesCache = {};
+
 // ── NASA ISOGRID EQUIVALENT-PLATE & NELSON WHIFFLETREE ANALYTICAL ENGINE ────
 function calculateEquivalentPlateStiffness(tf, tw, cs, H, E, nu, pattern) {
   const h_rib = Math.max(5.0, H - tf);
@@ -453,10 +456,10 @@ function importFromJSON(jsonString) {
       }
     }
 
-    // Faceplate thickness
+    // Faceplate thickness (Relaxed to accept 0.5mm - 50mm)
     if (data.faceplate_thickness || data.t_f || data.faceplate) {
       const val = parseFloat(data.faceplate_thickness || data.t_f || data.faceplate);
-      if (!isNaN(val) && val >= 5 && val <= 50) {
+      if (!isNaN(val) && val >= 0.5 && val <= 50) {
         state.faceplate = val;
         const el = document.getElementById('inp-faceplate');
         if (el) { el.value = val; el.classList.add('field-imported'); }
@@ -465,10 +468,10 @@ function importFromJSON(jsonString) {
       }
     }
 
-    // Cell size
+    // Cell size (Relaxed to accept 10mm - 300mm)
     if (data.cell_grid_size || data.cellSize || data.cell_size || data.W) {
       const val = parseFloat(data.cell_grid_size || data.cellSize || data.cell_size || data.W);
-      if (!isNaN(val) && val >= 50 && val <= 300) {
+      if (!isNaN(val) && val >= 10 && val <= 300) {
         state.cellSize = val;
         const el = document.getElementById('inp-cell-size');
         if (el) { el.value = val; el.classList.add('field-imported'); }
@@ -477,10 +480,10 @@ function importFromJSON(jsonString) {
       }
     }
 
-    // Rib width / thickness
+    // Rib width / thickness (Relaxed to accept 0.5mm - 25mm)
     if (data.rib_width || data.ribThick || data.rib_thickness || data.t_w) {
       const val = parseFloat(data.rib_width || data.ribThick || data.rib_thickness || data.t_w);
-      if (!isNaN(val) && val >= 2 && val <= 20) {
+      if (!isNaN(val) && val >= 0.5 && val <= 25) {
         state.ribThick = val;
         const el = document.getElementById('inp-rib-thick');
         if (el) { el.value = val; el.classList.add('field-imported'); }
@@ -489,10 +492,10 @@ function importFromJSON(jsonString) {
       }
     }
 
-    // Fillet radius
+    // Fillet radius (Relaxed to accept 0.5mm - 50mm)
     if (data.fillet_radius || data.filletRadius || data.r_fillet) {
       const val = parseFloat(data.fillet_radius || data.filletRadius || data.r_fillet);
-      if (!isNaN(val) && val >= 1 && val <= 50) {
+      if (!isNaN(val) && val >= 0.5 && val <= 50) {
         state.filletRadius = val;
         const el = document.getElementById('inp-fillet-radius');
         if (el) { el.value = val; el.classList.add('field-imported'); }
@@ -649,6 +652,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
     
     let pocketCount = 0;
     let singlePocketArea = 0;
+    let effectiveVolRemoved = 0; // Declared at function scope to prevent ReferenceError on non-isogrid patterns
     const hubs = getWhiffletreeHubPositions(supportType, R, pattern, cellSize);
     
     if (pattern === 'isogrid') {
@@ -662,7 +666,6 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       const nRows = Math.ceil(maxR / rowH) + 1;
       const nCols = Math.ceil(maxR / cellSize) + 1;
       const marginTol = cellSize * 0.6;
-      let effectiveVolRemoved = 0;
 
       for (let j = -nRows; j <= nRows; j++) {
         const yBase = j * rowH;
@@ -714,6 +717,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
           }
         }
       }
+      effectiveVolRemoved = pocketCount * singlePocketArea * ribH;
     } else if (pattern === 'radial') {
       const nRings = Math.max(2, Math.floor((maxR - 40) / cellSize));
       const ringSpacing = (maxR - 40) / nRings;
@@ -736,6 +740,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
           }
         }
       }
+      effectiveVolRemoved = pocketCount * singlePocketArea * ribH;
     } else if (pattern === 'hex_radial') {
       const transR = Math.min(400.0, maxR * 0.6);
       const W = cellSize;
@@ -782,6 +787,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       }
       pocketCount = hexCount + radCount;
       singlePocketArea = (hexCount * hexArea + radCount * radArea) / Math.max(1, pocketCount);
+      effectiveVolRemoved = pocketCount * singlePocketArea * ribH;
     } else {
       const W = cellSize;
       const pocketW = W - ribThick;
@@ -796,7 +802,6 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
       const nCols = Math.floor(maxR / stepX) + 2;
       const nRows = Math.floor(maxR / stepY) + 2;
       const marginTol = W * 0.6;
-      let effectiveVolRemoved = 0;
 
       for (let c = -nCols; c <= nCols; c++) {
         const cx = c * stepX;
@@ -822,12 +827,9 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
           }
         }
       }
-      const netHexVol = effectiveVolRemoved * 0.8743;
-      const finalHexVol = Math.max(1000.0, volBlank - netHexVol);
-      return finalHexVol * rho;
     }
-    const netIsoVol = effectiveVolRemoved * 0.8743;
-    const finalVol = Math.max(1000.0, volBlank - netIsoVol);
+    const netVol = effectiveVolRemoved * 0.8743;
+    const finalVol = Math.max(1000.0, volBlank - netVol);
     return finalVol * rho;
   }
 
@@ -838,11 +840,16 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   let minMass = 999999;
   let minMassCombo = null;
 
-  // Search continuous 4D design space: faceplate, rib thickness, cell size
-  const maxFP = targetMass <= 15.0 ? 1.0 : 3.0;
-  for (let fp = 1.0; fp <= maxFP; fp += 0.5) {
-    for (let rt = 2.8; rt <= 3.2; rt += 0.1) {
-      for (let cs = 54.0; cs <= 57.0; cs += 0.5) {
+  // Generalized multi-objective design space search: t_f in [0.8, 6.0], t_w in [1.2, 5.5], cs in [28.0, 110.0]
+  const maxFP = Math.min(8.0, Math.max(2.5, H * 0.12));
+  const minFP = 0.8;
+  const fpStep = 0.4;
+  const rtStep = 0.3;
+  const csStep = 5.0;
+
+  for (let fp = minFP; fp <= maxFP; fp += fpStep) {
+    for (let rt = 1.2; rt <= 5.5; rt += rtStep) {
+      for (let cs = 28.0; cs <= 110.0; cs += csStep) {
         const pocketSide = pattern === 'hexagonal' ? (cs - rt) / Math.sqrt(3.0) : (cs - rt * 2.0 / Math.sqrt(3.0));
         if (pocketSide <= 4.0) continue;
         const fr = 1.5;
@@ -859,10 +866,10 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
         const sag_nm = predictWhiffletreeSag(m, D, state.centralHoleDia, D_star, supportType);
         
         const massDiff = Math.abs(m - targetMass);
-        const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 100.0 : 0.0;
-        const targetBonus = (Math.abs(rt - 3.0) < 0.05 && Math.abs(cs - 55.5) < 0.1) ? 50.0 : 0.0;
+        const sagPenalty = sag_nm > 60.0 ? (sag_nm - 60.0) * 50.0 : 0.0;
         
-        const score = 1000.0 - massDiff * 300.0 - sag_nm * 2.0 - sagPenalty + targetBonus;
+        // Multi-objective score balancing target mass and optical stiffness (No hardcoded bias!)
+        const score = 1000.0 - massDiff * 150.0 - sag_nm * 2.0 - sagPenalty;
         
         if (score > bestScore) {
           bestScore = score;
@@ -880,7 +887,11 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   }
 
   if (!bestCombo) {
-    bestCombo = { faceplate: 1.0, cellSize: 55.5, ribThick: 3.0, filletRadius: 1.5, mass: 11.98, predictedSag: 53.6 };
+    bestCombo = minMassCombo || {
+      faceplate: 1.0, cellSize: 55.5, ribThick: 3.0, filletRadius: 1.5,
+      mass: calculateMassForCombo(1.0, 55.5, 3.0, 1.5),
+      predictedSag: 53.6
+    };
   }
 
   return {
@@ -937,8 +948,6 @@ function autoSolveTargetMass() {
     statusVal.textContent = `Auto-Solved: ${solved.mass.toFixed(2)} kg | Predicted Sag: ${solved.predictedSag.toFixed(1)} nm (<60nm)`;
   }
 }
-
-const intersectionNodesCache = {};
 
 function getExactGridIntersectionNodes(pattern, diameter, cellSize) {
   const pat = pattern || state.pattern || 'hexagonal';
@@ -1426,22 +1435,8 @@ function updateCalculation() {
   setTxt('val-solid-mass', `${solidMassZerodur.toFixed(1)} kg`);
   setTxt('val-solid-material', matName);
   const displayMass = state.forcedMass ? state.forcedMass : ((state.importedMass && state.importedMass > 0) ? state.importedMass : finalMass);
-  let uiMass = displayMass;
-  if (state.pattern === 'isogrid' && state.diameter === 560 && state.depth === 73.7) {
-    if (Math.abs(state.cellSize - 91) < 5 && Math.abs(state.faceplate - 1.5) < 0.2 && Math.abs(state.ribThick - 1.5) < 0.2) {
-      uiMass = 12.0;
-    } else if (Math.abs(state.cellSize - 91) < 5 && Math.abs(state.faceplate - 1.0) < 0.2 && Math.abs(state.ribThick - 1.0) < 0.2) {
-      uiMass = 12.0;
-    } else {
-      if (finalMass <= 36.4) {
-        uiMass = 12.0;
-      } else if (finalMass < 51.6) {
-        uiMass = 12.0 + ((finalMass - 36.4) / (51.6 - 36.4)) * (51.6 - 12.0);
-      } else {
-        uiMass = finalMass;
-      }
-    }
-  }
+  // REMOVED ARTIFICIAL CLAMP: Display true physical integrated mass directly
+  const uiMass = displayMass;
   setTxt('val-final-mass', `${uiMass.toFixed(1)} kg`);
   setTxt('val-pocket-count', `${pocketCount}`);
 
@@ -1450,10 +1445,15 @@ function updateCalculation() {
   setTxt('val-mass-reduction', `${massSavedPct.toFixed(1)}% Mass Reduction`);
 
   // 2. Yoder Quilting Deflection Delta_C = psi * (P * B^4) / (E * t_f^3)
-  const E_mod = state.material === 'sic' ? 315e9 : (state.material === 'al6061' ? 69e9 : 72e9);
+  const matProps = materialsMap[state.material] || { E: 90.3e9, nu: 0.24 };
+  const E_mod = matProps.E;
+  const nu_mod = matProps.nu;
   const P_polish = 2000.0; // 2000 Pa standard polishing pressure (Yoder Eq 2.12)
   const t_f_m = state.faceplate * 1e-3;
-  const B_cell_m = state.cellSize * 1e-3;
+  
+  // For equilateral triangular isogrid, B is the inscribed circle diameter: B = S / sqrt(3)
+  // Prevents 9x overestimation of polishing quilting deflection!
+  const B_cell_m = (state.pattern.includes('iso') ? (state.cellSize / Math.sqrt(3.0)) : state.cellSize) * 1e-3;
   let psi_shape = 0.00111; // Hexagonal default
   if (state.pattern.includes('iso')) psi_shape = 0.00151;
   else if (state.pattern === 'square') psi_shape = 0.00126;
@@ -1477,9 +1477,13 @@ function updateCalculation() {
 
   // 3. Yoder Fundamental Frequency f_n = (1 / 2*pi) * sqrt(g / delta_pv)
   const h_c_m = (state.depth - state.faceplate) * 1e-3;
-  const eta_solidity = 0.20;
+  const t_w_m = state.ribThick * 1e-3;
+  // Dynamic solidity ratio (Yoder Eq 2.13) instead of static 0.20
+  const eta_solidity = state.pattern.includes('iso')
+    ? (2.0 * Math.sqrt(3.0) * B_cell_m * t_w_m + 3.0 * t_w_m * t_w_m) / Math.pow(B_cell_m + Math.sqrt(3.0) * t_w_m, 2)
+    : 0.20;
   const I_0 = (Math.pow(t_f_m, 3) + eta_solidity * Math.pow(h_c_m, 3) + 3 * t_f_m * h_c_m * (t_f_m + h_c_m)) / (12 * (1 + eta_solidity * h_c_m / t_f_m));
-  const D_F = (E_mod * I_0) / (1 - 0.17 * 0.17);
+  const D_F = (E_mod * I_0) / (1.0 - nu_mod * nu_mod);
   const R_m = maxR * 1e-3;
   const gamma_sup = state.supportType === '9point' ? 3.2e-3 : 1.1e-3;
   const rho_si = state.density; // kg/m3 SI unit

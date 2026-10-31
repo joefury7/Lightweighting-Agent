@@ -185,6 +185,7 @@ def main():
     p_lower = part_name.lower()
     is_hybrid_expr = ("R_TRANS" in expr_dict) or ("TRANSITION" in expr_dict)
     is_hybrid_name = any(kw in p_lower for kw in ["mixed", "hybrid", "radial_mixed"])
+    side_wall_count = len(pocket_info) if pocket_info else 0
 
     if is_hybrid_expr or is_hybrid_name or (num_faces > 20 and side_wall_count >= 15):
         if "iso" in p_lower or "tri" in p_lower or "CELL_SIDE" in expr_dict:
@@ -242,10 +243,12 @@ def main():
     solid_mass_kg = solid_vol_mm3 * density * 1e-9
     mass_reduction_pct = round(max(0.0, ((solid_mass_kg - current_mass_kg) / solid_mass_kg) * 100.0), 1)
 
-    E_mod = 72e9
+    E_mod = 90.3e9  # Zerodur standard Young's modulus (Pa)
+    nu_val = 0.24   # Zerodur Poisson's ratio
     P_polish = 2000.0
     t_f_m = float(faceplate) * 1e-3
-    B_m = float(cell_size) * 1e-3
+    # Equilateral triangle inscribed circle diameter: B = S / sqrt(3) (Yoder Eq 2.12)
+    B_m = (float(cell_size) / math.sqrt(3.0) if "iso" in pattern else float(cell_size)) * 1e-3
     psi_shape = 0.00111
     if "iso" in pattern: psi_shape = 0.00151
     elif "square" in pattern: psi_shape = 0.00126
@@ -259,11 +262,14 @@ def main():
     pearson_ratio = round((surf_area_m2**1.5) / vol_m3, 2)
 
     h_c_m = (float(blank_depth) - float(faceplate)) * 1e-3
-    eta_solidity = 0.20
+    t_w_m = float(rib_thick) * 1e-3
+    eta_solidity = (2.0 * math.sqrt(3.0) * B_m * t_w_m + 3.0 * t_w_m * t_w_m) / ((B_m + math.sqrt(3.0) * t_w_m)**2) if "iso" in pattern else 0.20
     I_0 = (t_f_m**3 + eta_solidity * h_c_m**3 + 3 * t_f_m * h_c_m * (t_f_m + h_c_m)) / (12.0 * (1.0 + eta_solidity * h_c_m / t_f_m))
-    D_F = (E_mod * I_0) / (1.0 - 0.17**2)
+    D_F = (E_mod * I_0) / (1.0 - nu_val**2)
     gamma_sup = 1.1e-3 if support_points == 18 else 3.2e-3
-    delta_pv = gamma_sup * ((density * 9.81 * surf_area_m2) / D_F) * (surf_area_m2 / (support_points**2))
+    R_m = (float(diameter) * 1e-3 / 2.0)
+    q_mass_area = density * (t_f_m + eta_solidity * h_c_m)  # kg/m2 (Yoder Eq 2.34)
+    delta_pv = gamma_sup * ((q_mass_area * 9.81 * (R_m**4)) / D_F)  # Yoder Eq 2.35
     fn_hz = round((1.0 / (2.0 * math.pi)) * math.sqrt(9.81 / max(1e-9, delta_pv)))
 
     data = {{

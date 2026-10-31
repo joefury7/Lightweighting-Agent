@@ -190,6 +190,10 @@ def main():
             
             # Keep hex pockets strictly inside TRANSITION_RADIUS
             if cell_dist + pocket_side <= (TRANSITION_RADIUS - RIB_THICK / 2.0):
+                # Calculate adaptive safe depth to prevent breaching front optical face
+                r_min = max(0.0, cell_dist - pocket_side)
+                z_front = BLANK_DEPTH + (r_min * r_min) / (2.0 * RADIUS_CURV) - sag_edge
+                local_depth = max(5.0, round(z_front - FACEPLATE_THICK, 2))
                 lines = []
                 for k in range(6):
                     a1 = math.radians(60.0 * k)
@@ -198,7 +202,7 @@ def main():
                     p2 = NXOpen.Point3d(cx + pocket_side * math.cos(a2), cy + pocket_side * math.sin(a2), BACK_Z)
                     lines.append(workPart.Curves.CreateLine(p1, p2))
                 
-                if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, POCKET_DEPTH, bool_sub):
+                if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, local_depth, bool_sub):
                     hex_pocket_count += 1
 
     lw.WriteLine(f"   -> Subtracted {hex_pocket_count} inner hexagonal pockets.")
@@ -257,7 +261,9 @@ def main():
                 NXOpen.Point3d(r_out * math.cos(a1), r_out * math.sin(a1), BACK_Z)
             ))
             
-            if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, POCKET_DEPTH, bool_sub):
+            z_front_rad = BLANK_DEPTH + (r_in * r_in) / (2.0 * RADIUS_CURV) - sag_edge
+            local_depth_rad = max(5.0, round(z_front_rad - FACEPLATE_THICK, 2))
+            if extrude_subtract_pocket(workPart, lines, blank_body, z_direction, local_depth_rad, bool_sub):
                 radial_pocket_count += 1
 
     lw.WriteLine(f"   -> Subtracted {radial_pocket_count} outer radial sector pockets.")

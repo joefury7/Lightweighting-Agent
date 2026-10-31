@@ -40,6 +40,8 @@ def main():
     num_faces = len(faces)
 
     # First pass: find overall bounding box limits
+    min_x = min_y = min_z = 1e9
+    max_x = max_y = max_z = -1e9
     for face in faces:
         try:
             face_data = uf_session.Modeling.AskFaceData(face.Tag)

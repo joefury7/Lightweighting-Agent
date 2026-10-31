@@ -1,0 +1,20 @@
+{
+  "Mount_Architecture": "Nelson-Hindle 18-Point Kinematic Whiffletree",
+  "Primary_Mirror_Diameter_mm": 560.0,
+  "Support_Pads_Count": 18,
+  "Radial_Rings": {
+    "Inner_Ring_6_Pads": {
+      "Radius_mm": 105.7,
+      "Angular_Spacing_Deg": 60.0
+    },
+    "Outer_Ring_12_Pads": {
+      "Radius_mm": 251.5,
+      "Angular_Spacing_Deg": 30.0
+    }
+  },
+  "Node_Snapping_Rule": "3-Rib Star Intersection Vertices",
+  "Flexure_Blades_Material": "Invar 36 (CTE = 1.2 ppm/K)",
+  "Pad_Diameter_mm": 20.0,
+  "Pad_Fillet_Radius_mm": 2.0,
+  "Target_Reaction_Force_Per_Pad_N": 6.54
+}

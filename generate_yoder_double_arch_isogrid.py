@@ -196,15 +196,21 @@ def main():
     # ----------------------------------------------------------------------------
     # STEP 2: REVOLVE 3D SOLID GLASS BLANK (YODER FIG 2.54 CONTOUR)
     # ----------------------------------------------------------------------------
-    log(lw, "[Step 2/5] Revolving Solid Mirror Blank (D = 1400 mm, H = 90 mm)...")
-    line1 = workPart.Curves.CreateLine(NXOpen.Point3d(RADIUS, 0.0, SAG), NXOpen.Point3d(RADIUS, 0.0, BACK_Z))
-    line2 = workPart.Curves.CreateLine(NXOpen.Point3d(RADIUS, 0.0, BACK_Z), NXOpen.Point3d(0.0, 0.0, BACK_Z))
-    line3 = workPart.Curves.CreateLine(NXOpen.Point3d(0.0, 0.0, BACK_Z), NXOpen.Point3d(0.0, 0.0, 0.0))
+    log(lw, "[Step 2/5] Revolving Solid Mirror Blank with Yoder Double-Arch Contoured Back...")
+    r_sup = 0.707 * RADIUS
+    back_z_support = BACK_Z
+    back_z_center = BACK_Z + 0.35 * abs(BACK_Z)
+    back_z_rim = BACK_Z + 0.40 * abs(BACK_Z)
+
+    line1 = workPart.Curves.CreateLine(NXOpen.Point3d(RADIUS, 0.0, SAG), NXOpen.Point3d(RADIUS, 0.0, back_z_rim))
+    line_arch_outer = workPart.Curves.CreateLine(NXOpen.Point3d(RADIUS, 0.0, back_z_rim), NXOpen.Point3d(r_sup, 0.0, back_z_support))
+    line_arch_inner = workPart.Curves.CreateLine(NXOpen.Point3d(r_sup, 0.0, back_z_support), NXOpen.Point3d(0.0, 0.0, back_z_center))
+    line3 = workPart.Curves.CreateLine(NXOpen.Point3d(0.0, 0.0, back_z_center), NXOpen.Point3d(0.0, 0.0, 0.0))
 
     z_direction = create_z_direction(workPart, line3)
     sec_blank = workPart.Sections.CreateSection(0.0095, 0.01, 0.5)
     sec_blank.SetAllowedEntityTypes(NXOpen.Section.AllowTypes.OnlyCurves)
-    dumb_rule = workPart.ScRuleFactory.CreateRuleCurveDumb([spline_curve, line1, line2, line3])
+    dumb_rule = workPart.ScRuleFactory.CreateRuleCurveDumb([spline_curve, line1, line_arch_outer, line_arch_inner, line3])
     sec_blank.AddToSection([dumb_rule], spline_curve, NXOpen.NXObject.Null, NXOpen.NXObject.Null, NXOpen.Point3d(RADIUS / 2.0, 0.0, 0.0), NXOpen.Section.Mode.Create, False)
 
     revolve_builder = workPart.Features.CreateRevolveBuilder(NXOpen.Features.Revolve.Null)

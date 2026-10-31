@@ -219,10 +219,12 @@ def inspect_mirror_part():
     mass_reduction_pct = round(max(0.0, ((solid_mass_kg - current_mass_kg) / solid_mass_kg) * 100.0), 1)
 
     # Polishing Quilting Deflection Equation: delta_c = psi * (P * B^4) / (E * t_f^3)
-    E_mod = 72e9 # Pa (Glass-Ceramic / Fused Silica)
+    E_mod = 90.3e9 # Pa (Zerodur Glass-Ceramic standard)
+    nu_val = 0.24  # Zerodur Poisson's ratio
     P_polish = 2000.0 # Pa standard polishing pressure
     t_f_m = faceplate * 1e-3
-    B_m = cell_size * 1e-3
+    # Equilateral triangle inscribed circle diameter: B = S / sqrt(3) (Yoder Eq 2.12)
+    B_m = (cell_size / math.sqrt(3.0) if "iso" in pattern else cell_size) * 1e-3
     
     psi_shape = 0.00111
     if "iso" in pattern: psi_shape = 0.00151
@@ -239,11 +241,14 @@ def inspect_mirror_part():
 
     # Fundamental Frequency f_n
     h_c_m = (blank_depth - faceplate) * 1e-3
-    eta_solidity = 0.20
+    t_w_m = rib_thick * 1e-3
+    eta_solidity = (2.0 * math.sqrt(3.0) * B_m * t_w_m + 3.0 * t_w_m * t_w_m) / ((B_m + math.sqrt(3.0) * t_w_m)**2) if "iso" in pattern else 0.20
     I_0 = (t_f_m**3 + eta_solidity * h_c_m**3 + 3 * t_f_m * h_c_m * (t_f_m + h_c_m)) / (12.0 * (1.0 + eta_solidity * h_c_m / t_f_m))
-    D_F = (E_mod * I_0) / (1.0 - 0.17**2)
+    D_F = (E_mod * I_0) / (1.0 - nu_val**2)
     gamma_sup = 1.1e-3 if support_points == 18 else 3.2e-3
-    delta_pv = gamma_sup * ((density * 9.81 * surf_area_m2) / D_F) * (surf_area_m2 / (support_points**2))
+    R_m = (diameter * 1e-3 / 2.0)
+    q_mass_area = density * (t_f_m + eta_solidity * h_c_m)  # kg/m2 (Yoder Eq 2.34)
+    delta_pv = gamma_sup * ((q_mass_area * 9.81 * (R_m**4)) / D_F)  # Yoder Eq 2.35
     fn_hz = round((1.0 / (2.0 * math.pi)) * math.sqrt(9.81 / max(1e-9, delta_pv)))
 
     data = {

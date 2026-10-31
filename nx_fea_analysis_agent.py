@@ -247,10 +247,16 @@ def compute_adaptive_mesh_size(diameter, rib_thick=None, faceplate=None, hub_out
     check. Compare a displacement/stress result at this size against a
     finer run before trusting it for final sign-off.
     """
-    # Coarser 28.0mm element size for lightweighted mirrors with >200 pockets.
-    # Prevents surface polygon preprocessor from stalling on thousands of corner facets.
-    # Yields ~15k-25k linear elements, meshing in 2s and solving in 5s.
-    final_size = max(22.0, min(35.0, diameter * 0.05))
+    # Adaptive feature-based element sizing:
+    # Resolves thin ribs and faceplates with at least 1.5 - 2 quadratic tetrahedral elements across thickness
+    thinnest_feature = 3.0
+    if rib_thick and rib_thick > 0.5:
+        thinnest_feature = min(thinnest_feature, rib_thick)
+    if faceplate and faceplate > 0.5:
+        thinnest_feature = min(thinnest_feature, faceplate)
+
+    feature_target = max(2.5, min(8.0, thinnest_feature * 2.0))
+    final_size = max(feature_target, min(12.0, diameter * 0.02))
     final_size = round(final_size, 1)
 
     if lw is not None:

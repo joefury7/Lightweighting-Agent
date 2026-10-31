@@ -1,0 +1,11 @@
+Spacecraft_Mission,Primary_Agency,Aperture_Diameter_mm,Substrate_Material,Pocket_Pattern,Solid_Blank_Mass_kg,Lightweight_Mass_kg,Mass_Reduction_Pct,Areal_Mass_Density_kg_m2,Kinematic_Support_Points,Optical_SFE_nm_RMS,Primary_Reference_Citation,DOI_or_DocID
+JWST PMSA Segment,NASA / ESA,1520,Beryllium (O-30-H),Triangular Isogrid,250.0,20.1,92.0,28.2,18-Point Whiffletree + Hexapod,20.4,NASA/TM-2015-218730,NASA-20150019479
+Hubble Space Telescope (HST),NASA / ESA,2400,Corning ULE 7971,Hexagonal Eggcrate Core,3800.0,828.0,78.2,183.0,3-Point Kinematic Mount,12.5,Perkin-Elmer Corp Spec / NASA SP-404,NASA-SP-404
+Spitzer Space Telescope (SIRT),NASA / JPL,850,Beryllium (I-70-H),Triangular Isogrid,68.0,14.2,79.1,25.0,3-Point Bipod Flexures,45.0,SPIE Vol. 5172 (2003),10.1117/12.505085
+Kepler Space Telescope,NASA / Ball,1400,Corning ULE 7972,Hexagonal Core (Abrasive Waterjet),520.0,72.0,86.2,46.8,3-Point Kinematic Hexapod,18.0,NASA Kepler Project Report,NASA-Kepler-Doc-2009
+Herschel Space Observatory,ESA,3500,Boostec Sintered SiC,12-Segment Brazed Isogrid,3900.0,315.0,91.9,32.7,9-Point Iso-Static Bipods,1500.0,ESA / Boostec Tech Report,ESA-SCI-2009
+SOFIA Airborne Observatory,NASA / DLR,2700,SCHOTT Zerodur,Open-Back Hexagonal Honeycomb,4200.0,880.0,79.0,153.7,18-Point Whiffletree Support,160.0,DLR / NASA TM-2007,NASA-TM-2007-214457
+Kihm et al. Benchmark (2013),KRISS / KAIST,560,SCHOTT Zerodur,Triangular Isogrid,44.5,10.3,76.9,41.8,18-Point Hindle Whiffletree,12.2,Optics Express 21(17) pp. 19914-19924,10.1364/OE.21.019914
+Park et al. Benchmark (2016),SPIE Optical Eng,600,Boostec SiC,Hexagonal Honeycomb,55.2,11.8,78.6,41.7,3-Point Bipod Mounts,15.0,Optical Engineering 55(1) 015102,10.1117/1.OE.55.1.015102
+Chen et al. Benchmark (2018),Applied Optics,400,Reaction-Bonded SiC,Topology-Optimized Arch Ribs,21.5,4.8,77.7,38.2,3-Point Tangential Flexures,14.8,Applied Optics 57(12) pp. 3120-3129,10.1364/AO.57.003120
+Qu et al. Benchmark (2020),Structural Optimization,650,Corning ULE 7972,Multi-Scale Auxetic Re-entrant,78.0,15.6,80.0,47.0,6-Point Kinematic Mount,16.5,Structural & Multidisciplinary Opt. 61,10.1007/s00158-019-02450-4

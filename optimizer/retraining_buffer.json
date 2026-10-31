@@ -1371,5 +1371,207 @@
     "residual_error_nm": 6.01,
     "error_pct": 9.91,
     "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-10-31 21:20:05",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 119.84,
+      "H_mm": 84.57,
+      "tf_mm": 0.91,
+      "tw_mm": 2.02,
+      "L_mm": 41.62,
+      "rf_mm": 1.93,
+      "predicted_mass_kg": 12.409,
+      "predicted_rms_sag_nm": 38.86,
+      "predicted_pv_sag_nm": 147.03,
+      "predicted_quilting_nm": 11.69,
+      "predicted_freq_hz": 405.2,
+      "all_constraints_satisfied": true,
+      "optimizer_method": "High-Throughput Vectorized Pareto Search",
+      "evaluation_duration_ms": 665.15,
+      "feasible_count": 9740,
+      "support_hubs_18": [
+        [
+          104.05,
+          36.044
+        ],
+        [
+          20.81,
+          108.1319
+        ],
+        [
+          -104.05,
+          36.044
+        ],
+        [
+          -104.05,
+          -36.044
+        ],
+        [
+          -20.81,
+          -108.1319
+        ],
+        [
+          104.05,
+          -36.044
+        ],
+        [
+          208.1,
+          72.088
+        ],
+        [
+          166.48,
+          144.1759
+        ],
+        [
+          41.62,
+          216.2639
+        ],
+        [
+          -41.62,
+          216.2639
+        ],
+        [
+          -166.48,
+          144.1759
+        ],
+        [
+          -208.1,
+          72.088
+        ],
+        [
+          -208.1,
+          -72.088
+        ],
+        [
+          -166.48,
+          -144.1759
+        ],
+        [
+          -41.62,
+          -216.2639
+        ],
+        [
+          41.62,
+          -216.2639
+        ],
+        [
+          166.48,
+          -144.1759
+        ],
+        [
+          208.1,
+          -72.088
+        ]
+      ]
+    },
+    "ml_pred_sag_nm": 38.86,
+    "fea_actual_sag_nm": 42.47,
+    "fea_actual_mass_kg": 12.779,
+    "residual_error_nm": 3.61,
+    "error_pct": 8.5,
+    "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-10-31 21:29:31",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 119.84,
+      "H_mm": 89.71,
+      "tf_mm": 1.1,
+      "tw_mm": 2.35,
+      "L_mm": 50.78,
+      "rf_mm": 2.26,
+      "predicted_mass_kg": 13.032,
+      "predicted_rms_sag_nm": 32.45,
+      "predicted_pv_sag_nm": 123.76,
+      "predicted_quilting_nm": 14.78,
+      "predicted_freq_hz": 431.7,
+      "all_constraints_satisfied": true,
+      "optimizer_method": "High-Throughput Vectorized Pareto Search",
+      "evaluation_duration_ms": 100.37,
+      "feasible_count": 9487,
+      "support_hubs_18": [
+        [
+          76.17,
+          43.9768
+        ],
+        [
+          0.0,
+          87.9535
+        ],
+        [
+          -76.17,
+          43.9768
+        ],
+        [
+          -76.17,
+          -43.9768
+        ],
+        [
+          0.0,
+          -87.9535
+        ],
+        [
+          76.17,
+          -43.9768
+        ],
+        [
+          228.51,
+          43.9768
+        ],
+        [
+          152.34,
+          175.9071
+        ],
+        [
+          76.17,
+          219.8839
+        ],
+        [
+          -76.17,
+          219.8839
+        ],
+        [
+          -152.34,
+          175.9071
+        ],
+        [
+          -228.51,
+          43.9768
+        ],
+        [
+          -228.51,
+          -43.9768
+        ],
+        [
+          -152.34,
+          -175.9071
+        ],
+        [
+          -76.17,
+          -219.8839
+        ],
+        [
+          76.17,
+          -219.8839
+        ],
+        [
+          152.34,
+          -175.9071
+        ],
+        [
+          228.51,
+          -43.9768
+        ]
+      ]
+    },
+    "ml_pred_sag_nm": 32.45,
+    "fea_actual_sag_nm": 37.49,
+    "fea_actual_mass_kg": 13.243,
+    "residual_error_nm": 5.04,
+    "error_pct": 13.44,
+    "needs_retrain": true
   }
 ]

@@ -1,0 +1,18 @@
+Temperature_Kelvin,Temperature_Celsius,Zerodur_Class0_CTE_ppb_K,Corning_ULE_CTE_ppb_K,Boostec_SiC_CTE_ppb_K,Youngs_Modulus_GPa,Poisson_Ratio,Thermal_Conductivity_W_mK,Specific_Heat_J_kgK,Testing_Method_and_Standard
+20,-253.15,-38.2,12.0,120.0,91.8,0.240,0.22,48.0,NIST Cryogenic Dilatometry (ASTM E228)
+50,-223.15,-52.1,8.5,350.0,91.5,0.241,0.45,142.0,NIST Cryogenic Dilatometry (ASTM E228)
+75,-198.15,-61.0,-2.1,680.0,91.2,0.241,0.68,260.0,NIST Cryogenic Dilatometry (ASTM E228)
+100,-173.15,-58.4,-14.8,1100.0,91.0,0.242,0.85,380.0,NIST Cryogenic Dilatometry (ASTM E228)
+125,-148.15,-45.2,-22.0,1520.0,90.8,0.242,0.98,490.0,NIST Cryogenic Dilatometry (ASTM E228)
+150,-123.15,-28.0,-24.1,1900.0,90.6,0.242,1.10,580.0,NIST Cryogenic Dilatometry (ASTM E228)
+175,-98.15,-12.3,-19.5,2210.0,90.5,0.243,1.20,655.0,NIST Cryogenic Dilatometry (ASTM E228)
+200,-73.15,-1.2,-10.2,2480.0,90.4,0.243,1.28,715.0,NIST Cryogenic Dilatometry (ASTM E228)
+225,-48.15,4.8,1.5,2700.0,90.4,0.243,1.34,760.0,NIST Cryogenic Dilatometry (ASTM E228)
+250,-23.15,7.2,14.8,2900.0,90.3,0.243,1.39,795.0,NIST Cryogenic Dilatometry (ASTM E228)
+273,0.0,7.0,26.4,3050.0,90.3,0.243,1.43,820.0,NIST / SCHOTT Dilatometry Standard
+293,20.0,0.0,30.0,3150.0,90.3,0.243,1.46,840.0,SCHOTT Reference Temp (20°C Baseline)
+300,26.85,-2.1,31.2,3200.0,90.3,0.243,1.47,848.0,SCHOTT Fizeau Interferometry
+325,51.85,-6.5,33.0,3350.0,90.2,0.243,1.50,870.0,SCHOTT Fizeau Interferometry
+350,76.85,-7.8,32.5,3500.0,90.1,0.244,1.53,892.0,SCHOTT Fizeau Interferometry
+375,101.85,-6.1,30.1,3640.0,90.0,0.244,1.55,910.0,NIST High-Temp Dilatometry (ASTM E228)
+400,126.85,-1.5,25.8,3780.0,89.9,0.244,1.57,925.0,NIST High-Temp Dilatometry (ASTM E228)
