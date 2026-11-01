@@ -160,7 +160,7 @@ class ClosedLoopOptimizer:
             structural_penalty = (c_sag * 0.5) + (c_quilt * 2.0) + (c_tf * 50.0) + (c_tw * 50.0)
 
             is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
-            target_kg = float(max_mass_kg) if not is_min_mode else 12.0
+            target_kg = float(max_mass_kg) if not is_min_mode else None
 
             if not is_min_mode:
                 # Force Target Weight Mode: minimize absolute deviation |mass - target_kg|
@@ -169,11 +169,10 @@ class ClosedLoopOptimizer:
                 obj1 = mass_diff * 20.0 + structural_penalty
                 obj2 = sag + structural_penalty
             else:
-                # Minimum Weight (MIN) Mode: minimize mass directly
-                c_mass = np.maximum(0.0, mass - target_kg) if target_kg < 900.0 else 0.0
-                total_penalty = structural_penalty + (c_mass * 10.0)
-                obj1 = mass + total_penalty
-                obj2 = sag + total_penalty
+                # Minimum Weight (MIN) Mode: minimize mass directly without artificial ceiling
+                total_penalty = structural_penalty
+                obj1 = mass + structural_penalty
+                obj2 = sag + structural_penalty
 
             objs = np.column_stack([obj1, obj2])
             return objs, preds, total_penalty
@@ -254,7 +253,7 @@ class ClosedLoopOptimizer:
         final_objs, final_preds, final_penalties = evaluate_pop(population)
 
         is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
-        target_kg = float(max_mass_kg) if not is_min_mode else 12.0
+        target_kg = float(max_mass_kg) if not is_min_mode else None
 
         # Filter strictly feasible in final population (meeting optical and manufacturing limits)
         feasible_mask = (
@@ -263,8 +262,6 @@ class ClosedLoopOptimizer:
             (population[:, 1] >= 0.8) &
             (population[:, 2] >= 1.5)
         )
-        if is_min_mode and target_kg < 900.0:
-            feasible_mask &= (final_preds[:, 0] <= target_kg)
 
         feasible_indices = np.where(feasible_mask)[0]
 
@@ -277,10 +274,12 @@ class ClosedLoopOptimizer:
                 best_idx = feasible_indices[np.argmin(scores)]
                 is_fully_feasible = bool(m_diffs[np.argmin(scores)] <= 0.2)
             else:
-                # Minimum Weight (MIN) Mode: find absolute lightest feasible design
-                norm_m = (final_preds[feasible_indices, 0] - final_preds[feasible_indices, 0].min()) / (np.ptp(final_preds[feasible_indices, 0]) + 1e-6)
-                norm_s = (final_preds[feasible_indices, 1] - final_preds[feasible_indices, 1].min()) / (np.ptp(final_preds[feasible_indices, 1]) + 1e-6)
-                best_idx = feasible_indices[np.argmin(0.7 * norm_m + 0.3 * norm_s)]
+                # Minimum Weight (MIN) Mode: find absolute lightest feasible design with sag tiebreaker
+                valid_masses = final_preds[feasible_indices, 0]
+                valid_sags = final_preds[feasible_indices, 1]
+                norm_m = (valid_masses - valid_masses.min()) / (np.ptp(valid_masses) + 1e-6)
+                norm_s = (valid_sags - valid_sags.min()) / (np.ptp(valid_sags) + 1e-6)
+                best_idx = feasible_indices[np.argmin(0.85 * norm_m + 0.15 * norm_s)]
                 is_fully_feasible = True
         else:
             if not is_min_mode:
@@ -354,7 +353,7 @@ class ClosedLoopOptimizer:
         freqs = preds[:, 4]
 
         is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
-        target_kg = float(max_mass_kg) if not is_min_mode else 12.0
+        target_kg = float(max_mass_kg) if not is_min_mode else None
 
         valid_mask = (
             (rms_sags <= max_sag_nm) &
@@ -362,8 +361,6 @@ class ClosedLoopOptimizer:
             (tf_vals >= 0.8) &
             (tw_vals >= 1.5)
         )
-        if is_min_mode and target_kg < 900.0:
-            valid_mask &= (masses <= target_kg)
 
         valid_indices = np.where(valid_mask)[0]
         print(f"[Pillar 3] Evaluated {num_candidates:,} designs in {eval_time*1000:.2f} ms ({len(valid_indices)} feasible designs found)")
@@ -379,14 +376,14 @@ class ClosedLoopOptimizer:
             scores = (m_diffs / 0.05)**2 + 0.5 * (s_vals / max_sag_nm)
             best_idx = valid_indices[np.argmin(scores)]
         else:
-            # Minimum Weight (MIN) Mode: prioritize lowest mass
+            # Minimum Weight (MIN) Mode: prioritize lowest mass with sag tiebreaker
             valid_masses = masses[valid_indices]
             valid_sags = rms_sags[valid_indices]
             ptp_mass = float(np.ptp(valid_masses)) + 1e-6
             ptp_sag = float(np.ptp(valid_sags)) + 1e-6
             norm_mass = (valid_masses - valid_masses.min()) / ptp_mass
             norm_sag = (valid_sags - valid_sags.min()) / ptp_sag
-            scores = 0.7 * norm_mass + 0.3 * norm_sag
+            scores = 0.85 * norm_mass + 0.15 * norm_sag
             best_idx = valid_indices[np.argmin(scores)]
 
         best_design = {
@@ -437,6 +434,12 @@ class ClosedLoopOptimizer:
         self.retraining_buffer.append(entry)
         self._save_buffer()
         print(f"[Active Learning] Residual logged: Error = {pct_error:.2f}% (Threshold: 5.0%). Buffer size: {len(self.retraining_buffer)}")
+        # Online Active Learning: retrain residual compensator immediately
+        try:
+            if hasattr(self.predictor, "active_learner"):
+                self.predictor.active_learner.train_from_buffer()
+        except Exception as e:
+            print(f"[Active Learning] Online update warning: {e}")
         return entry
 
 

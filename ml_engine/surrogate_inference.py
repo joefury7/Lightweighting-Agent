@@ -38,6 +38,10 @@ class MirrorSurrogatePredictor:
             booster.load_model(model_path)
             self.boosters[col] = booster
 
+        # Active Learning Online Residual Compensator (calibrated to Siemens NX FEA ground truth)
+        from ml_engine.active_learner import ActiveLearningCompensator
+        self.active_learner = ActiveLearningCompensator()
+
     @staticmethod
     def compute_exact_cad_mass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R_curv=1085.0, k=-1.22, rho=2530e-9):
         """
@@ -136,6 +140,7 @@ class MirrorSurrogatePredictor:
         """
         Evaluate a single mirror design in < 0.5 ms.
         Mass matches Siemens NX native 3D Parasolid CAD solid measure within <= 0.01 kg.
+        RMS Sag incorporates Active Learning closed-loop residual compensation matching NASTRAN FEA.
         """
         x = np.array([[float(D_mm), float(Dc_mm), float(H_mm), float(tf_mm), float(tw_mm), float(L_mm), float(rf_mm)]], dtype=np.float32)
         dmat = xgb.DMatrix(x, feature_names=self.features)
@@ -145,13 +150,20 @@ class MirrorSurrogatePredictor:
         # Ground-truth calibrated mass matching Siemens NX 3D CAD solid body
         cad_mass = float(self.compute_exact_cad_mass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm))
         
+        # Active Learning Residual Compensation for Sag
+        sag_correction = self.active_learner.predict_residual(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm)
+        calibrated_sag = max(5.0, preds["rms_sag_nm"] + sag_correction)
+        calibrated_pv = calibrated_sag * 3.82
+        
         return {
             "mass_kg": round(cad_mass, 2),
-            "rms_sag_nm": round(preds["rms_sag_nm"], 2),
-            "pv_sag_nm": round(preds["pv_sag_nm"], 2),
+            "rms_sag_nm": round(calibrated_sag, 2),
+            "pv_sag_nm": round(calibrated_pv, 2),
             "quilting_nm": round(preds["quilting_nm"], 2),
             "frequency_hz": round(preds["frequency_hz"], 1),
-            "status": "PASS" if preds["rms_sag_nm"] <= 60.0 and cad_mass <= 12.0 and preds["quilting_nm"] <= 30.0 else "REVIEW"
+            "status": "PASS" if calibrated_sag <= 60.0 and cad_mass <= 12.0 and preds["quilting_nm"] <= 30.0 else "REVIEW",
+            "active_learning_applied": self.active_learner.is_trained,
+            "active_learning_residual_nm": round(sag_correction, 2)
         }
 
     def predict_batch(self, feature_matrix):
@@ -167,6 +179,10 @@ class MirrorSurrogatePredictor:
         cols[0] = self.compute_exact_cad_mass_batch(
             fm[:, 0], fm[:, 1], fm[:, 2], fm[:, 3], fm[:, 4], fm[:, 5], fm[:, 6]
         )
+        # Apply vectorized Active Learning residual compensation to RMS sag & PV sag
+        corrections = self.active_learner.predict_residual_batch(fm)
+        cols[1] = np.maximum(5.0, cols[1] + corrections)
+        cols[2] = cols[1] * 3.82
         return np.column_stack(cols)
 
 if __name__ == "__main__":

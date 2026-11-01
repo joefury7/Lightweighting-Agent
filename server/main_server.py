@@ -141,6 +141,26 @@ def run_nsga2_optimization(req: OptimizeRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/active_learning/status")
+def get_active_learning_status():
+    """Returns status of the active learning residual compensator."""
+    try:
+        return predictor.active_learner.get_status()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/active_learning/retrain")
+def trigger_active_learning_retrain():
+    """Triggers online retraining of the active learning compensator using all buffer entries."""
+    try:
+        success = predictor.active_learner.train_from_buffer()
+        return {
+            "success": success,
+            "status": predictor.active_learner.get_status()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.post("/agent/chat")
 def agent_chat_endpoint(req: ChatRequest):
     """

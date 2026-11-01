@@ -15,6 +15,6 @@
     "quilting_nm",
     "frequency_hz"
   ],
-  "trained_timestamp": "2026-09-26 21:27:13",
+  "trained_timestamp": "2026-11-01 12:07:47",
   "model_format": "xgboost_native_json"
 }
