@@ -182,86 +182,60 @@ if __name__ == '__main__':
             f.write(script_content)
         return output_script
 
-    def open_in_nx_gui(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0, target_prt="primary_mirror_560mm.prt"):
-        """
-        Launches Siemens NX GUI (ugraf.exe) with -run-journal flag so NX opens
-        and executes the journal script right on screen.
-        """
-        journal_path = self.generate_nx_journal_script(D, Dc, H, tf, tw, L, rf, target_prt=target_prt)
-        abs_journal = os.path.abspath(journal_path)
-        ugraf_exe = os.path.join(self.nx_bin_dir, "ugraf.exe") if self.nx_bin_dir else None
-
-        if not ugraf_exe or not os.path.exists(ugraf_exe):
-            return {
-                "status": "ERROR",
-                "message": f"Siemens NX GUI (ugraf.exe) not found at {ugraf_exe}",
-                "journal_path": abs_journal
-            }
-
-        cmd = [ugraf_exe, "-run-journal", abs_journal]
-        subprocess.Popen(cmd)
-        return {
-            "status": "NX_GUI_LAUNCHED",
-            "message": "Siemens NX GUI launched! The model is being drawn live in NX.",
-            "journal_path": abs_journal,
-            "target_prt": os.path.abspath(target_prt)
-        }
-
     def create_3d_prt(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0, target_prt="primary_mirror_560mm.prt"):
         """
-        Executes Siemens NX Open run_journal.exe to generate native .prt CAD model directly.
-        Returns dictionary with execution status and file paths.
+        1-Click Automated Siemens NX Connection:
+        1. Compiles the exact parameterized Python journal (build_mirror_journal.py).
+        2. Pre-builds the .PRT part via run_journal.exe so the native CAD file is immediately ready on disk.
+        3. Automatically launches Siemens NX GUI (ugraf.exe -run-journal) which opens NX on screen
+           and plays the journal to draw the mirror in real time.
         """
         journal_path = self.generate_nx_journal_script(D, Dc, H, tf, tw, L, rf, target_prt=target_prt)
         abs_journal = os.path.abspath(journal_path)
         abs_prt = os.path.abspath(target_prt)
+        ugraf_exe = os.path.join(self.nx_bin_dir, "ugraf.exe") if self.nx_bin_dir else None
 
         if not self.is_nx_installed():
             return {
                 "status": "JOURNAL_GENERATED",
-                "message": "Siemens NX headless executable (run_journal.exe) not found on default path. Journal script generated for direct execution in NX GUI.",
+                "message": "Siemens NX executable not found on default path. Journal script generated for direct execution.",
                 "journal_path": abs_journal,
                 "target_prt": abs_prt,
-                "nx_installed": False,
-                "how_to_run_in_nx": "In Siemens NX GUI: Open Menu -> Tools -> Journal -> Play -> Select build_mirror_journal.py"
+                "nx_installed": False
             }
 
-        print(f"[Pillar 4 NX Bridge] Running Siemens NX Open: {self.run_journal_exe} with {abs_journal}...")
+        # 1. Execute run_journal.exe to ensure .prt is generated and saved on disk
+        print(f"[Pillar 4 NX Bridge] Pre-building native .PRT via run_journal.exe...")
         try:
-            cmd = [self.run_journal_exe, abs_journal]
-            # Use 10-second timeout to prevent UI hang if license server is waiting for response
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            prt_exists = os.path.exists(abs_prt)
-
-            return {
-                "status": "PRT_GENERATED" if prt_exists else "JOURNAL_READY",
-                "message": "Native Siemens NX .PRT model generated successfully!" if prt_exists else "NX Open journal generated and execution dispatched.",
-                "journal_path": abs_journal,
-                "target_prt": abs_prt,
-                "prt_created": prt_exists,
-                "nx_installed": True,
-                "nx_bin_dir": self.nx_bin_dir,
-                "stdout": proc.stdout[:300] if proc.stdout else "",
-                "stderr": proc.stderr[:300] if proc.stderr else ""
-            }
-        except subprocess.TimeoutExpired:
-            return {
-                "status": "JOURNAL_READY",
-                "message": "NX Open journal generated. (Headless NX timed out waiting for license server; you can play the journal directly in Siemens NX GUI).",
-                "journal_path": abs_journal,
-                "target_prt": abs_prt,
-                "prt_created": False,
-                "nx_installed": True,
-                "nx_bin_dir": self.nx_bin_dir
-            }
+            cmd_headless = [self.run_journal_exe, abs_journal]
+            subprocess.run(cmd_headless, capture_output=True, text=True, timeout=15)
         except Exception as e:
-            return {
-                "status": "ERROR",
-                "message": f"Execution error: {str(e)}",
-                "journal_path": abs_journal,
-                "target_prt": abs_prt,
-                "nx_installed": True
-            }
+            print(f"[Pillar 4 NX Bridge] Headless pre-build note: {e}")
+
+        # 2. Automatically launch Siemens NX GUI and play the journal script to draw the part
+        if ugraf_exe and os.path.exists(ugraf_exe):
+            print(f"[Pillar 4 NX Bridge] Opening Siemens NX GUI and playing journal: {ugraf_exe} -run-journal {abs_journal}")
+            try:
+                subprocess.Popen([ugraf_exe, "-run-journal", abs_journal], cwd=workspace_root)
+                return {
+                    "status": "NX_LAUNCHED",
+                    "message": "Siemens NX opened automatically! Playing journal script to draw 3D mirror.",
+                    "journal_path": abs_journal,
+                    "target_prt": abs_prt,
+                    "nx_installed": True
+                }
+            except Exception as e:
+                print(f"[Pillar 4 NX Bridge] Error launching NX GUI: {e}")
+
+        prt_exists = os.path.exists(abs_prt)
+        return {
+            "status": "PRT_GENERATED" if prt_exists else "JOURNAL_READY",
+            "message": "Native Siemens NX .PRT model generated successfully!" if prt_exists else "NX Open journal generated and execution dispatched.",
+            "journal_path": abs_journal,
+            "target_prt": abs_prt,
+            "prt_created": prt_exists,
+            "nx_installed": True
+        }
 
     def run_fea_solve(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0):
         """

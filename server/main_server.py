@@ -180,20 +180,6 @@ def agent_chat_endpoint(req: ChatRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.post("/cad/launch_nx_gui")
-def launch_in_nx_gui(design: MirrorDesignInput):
-    """
-    Executes Siemens NX GUI (ugraf.exe -run-journal) to draw the part live on screen.
-    """
-    try:
-        gui_result = fea_engine.open_in_nx_gui(
-            design.D_mm, design.Dc_mm, design.H_mm,
-            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm
-        )
-        return gui_result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 @app.post("/cad/create_prt")
 def create_nx_prt_file(design: MirrorDesignInput):
     """

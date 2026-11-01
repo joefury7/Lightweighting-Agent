@@ -15,7 +15,7 @@ def main():
     
     # Mirror Design Specifications
     D = 560.0        # Clear Aperture Diameter (mm)
-    Dc = 120.0      # Center Bore Hole (mm)
+    Dc = 175.0      # Center Bore Hole (mm)
     H = 73.7        # Overall Axial Height (mm)
     tf = 1.0      # Faceplate Thickness (mm)
     tw = 3.0      # Rib Wall Thickness (mm)
