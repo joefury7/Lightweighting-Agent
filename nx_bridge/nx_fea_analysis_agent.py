@@ -225,17 +225,33 @@ if __name__ == '__main__':
             print(f"[Pillar 4 NX Bridge] Opening Siemens NX CAM with CAD model: {ugraf_exe} {nxcam_args}")
             launched = False
 
-            # Strategy 1: Windows Shell COM (delegates launch to desktop Explorer in user's interactive session)
+            # Strategy 1: Windows Interactive Task Scheduler (Bypasses service/background desktop isolation, guarantees window on WinSta0\default)
             try:
-                import win32com.client
-                shell_app = win32com.client.Dispatch("Shell.Application")
-                shell_app.ShellExecute(ugraf_exe, nxcam_args, work_dir, "open", 1)
-                launched = True
-                print("[Pillar 4 NX Bridge] NX CAM dispatched via Shell.Application COM successfully.")
-            except Exception as e_com:
-                print(f"[Pillar 4 NX Bridge] Shell.Application COM note: {e_com}")
+                ps_cmd = f'''
+                $action = New-ScheduledTaskAction -Execute "{ugraf_exe}" -Argument '-nxcam -retrieve:"{abs_prt}"' -WorkingDirectory "{work_dir}"
+                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+                Register-ScheduledTask -TaskName "Launch_NX_CAM" -Action $action -Settings $settings -Force | Out-Null
+                Start-ScheduledTask -TaskName "Launch_NX_CAM"
+                '''
+                res = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", ps_cmd], capture_output=True, text=True, timeout=12)
+                if res.returncode == 0:
+                    launched = True
+                    print("[Pillar 4 NX Bridge] NX CAM launched successfully via Interactive Task Scheduler onto desktop.")
+            except Exception as e_task:
+                print(f"[Pillar 4 NX Bridge] Task Scheduler error: {e_task}")
 
-            # Strategy 2: Win32 ShellExecuteW API
+            # Strategy 2: Windows Shell COM (delegates launch to desktop Explorer in user's interactive session)
+            if not launched:
+                try:
+                    import win32com.client
+                    shell_app = win32com.client.Dispatch("Shell.Application")
+                    shell_app.ShellExecute(ugraf_exe, nxcam_args, work_dir, "open", 1)
+                    launched = True
+                    print("[Pillar 4 NX Bridge] NX CAM dispatched via Shell.Application COM successfully.")
+                except Exception as e_com:
+                    print(f"[Pillar 4 NX Bridge] Shell.Application COM note: {e_com}")
+
+            # Strategy 3: Win32 ShellExecuteW API
             if not launched:
                 try:
                     import ctypes
@@ -246,7 +262,7 @@ if __name__ == '__main__':
                 except Exception as e_sh:
                     print(f"[Pillar 4 NX Bridge] ShellExecuteW error: {e_sh}")
 
-            # Strategy 3: Detached Subprocess Popen
+            # Strategy 4: Detached Subprocess Popen
             if not launched:
                 try:
                     creation_flags = 0
