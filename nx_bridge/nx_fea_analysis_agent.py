@@ -166,6 +166,15 @@ def main():
 
     theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Milled {{pockets_created}} isogrid pocket cavities.")
 
+    # 4b. Assign Zerodur Material and Parasolid Density (2.53e-6 kg/mm3)
+    try:
+        theUf = NXOpen.UF.UFSession.GetUFSession()
+        theUf.Modeling.SetDefaultDensity(2530.0, theUf.Modl.DensityUnits.KILOGRAMS_METERS)
+        theUf.Modeling.SetBodyDensity(blankBody.Tag, theUf.Modl.DensityUnits.KILOGRAMS_METERS, 2530.0)
+        theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Assigned Zerodur body density: 2530.0 kg/m3 (2.53e-6 kg/mm3)")
+    except Exception as e_mat:
+        theSession.LogFile.WriteLine(f"[NX Open Note] Material density note: {{e_mat}}")
+
     # 5. Save Native NX Part
     try:
         workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)

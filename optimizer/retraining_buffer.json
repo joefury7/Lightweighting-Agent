@@ -1573,5 +1573,24 @@
     "residual_error_nm": 5.04,
     "error_pct": 13.44,
     "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-01 21:11:51",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 175.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.01,
+      "tw_mm": 4.77,
+      "L_mm": 58.51,
+      "rf_mm": 1.0,
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 38.34,
+    "fea_actual_sag_nm": 38.55,
+    "fea_actual_mass_kg": 14.997,
+    "residual_error_nm": 0.21,
+    "error_pct": 0.54,
+    "needs_retrain": false
   }
 ]
