@@ -175,10 +175,10 @@ function setOptimizationMode(mode) {
       hintEl.innerText = 'Forces geometry to lightweight to your custom target weight within ±0.01 kg.';
     }
     if (optBtn) {
-      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 Optimize to Target Weight';
+      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 Run 50k NSGA-II (Target Weight)';
     }
     if (optBtnTop) {
-      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 AI Optimize';
+      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 50k NSGA-II';
     }
   } else {
     if (btnMin) {
@@ -205,10 +205,10 @@ function setOptimizationMode(mode) {
       hintEl.innerText = 'Finds the absolute lightest feasible mirror meeting optical & quilting limits.';
     }
     if (optBtn) {
-      optBtn.innerHTML = '<i class="fa-solid fa-feather"></i> ⚡ Optimize for Minimum Weight (MIN)';
+      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 Run 50k NSGA-II (MIN Weight)';
     }
     if (optBtnTop) {
-      optBtnTop.innerHTML = '<i class="fa-solid fa-feather"></i> ⚡ Min Weight';
+      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 50k NSGA-II (MIN)';
     }
   }
 }
