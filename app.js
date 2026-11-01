@@ -343,6 +343,8 @@ function initEventListeners() {
   safeAddListener('btn-fea-top', 'click', executeNastranFEASolve);
   safeAddListener('btn-create-prt', 'click', executeCreateNXPart);
   safeAddListener('btn-create-prt-top', 'click', executeCreateNXPart);
+  safeAddListener('btn-launch-gui', 'click', executeLaunchNXGui);
+  safeAddListener('btn-launch-gui-top', 'click', executeLaunchNXGui);
 }
 
 function showSolverStatus(message, isSuccess = true) {
@@ -523,11 +525,43 @@ async function executeCreateNXPart() {
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    showSolverStatus(`🚀 Siemens NX 3D CAD Part Created Successfully: ${data.prt_path} (Status: ${data.status})`, true);
+    showSolverStatus(`🚀 Siemens NX 3D CAD Part Created Successfully: ${data.target_prt || data.prt_path} (Status: ${data.status})`, true);
   } catch (err) {
     showSolverStatus('CAD Execution Error: ' + err.message + '. You can also copy the generated NX Python Journal script below and run it directly inside Siemens NX GUI.', false);
   }
 }  // ← END executeCreateNXPart
+
+async function executeLaunchNXGui() {
+  const dVal = parseFloat(document.getElementById('inp-diameter').value) || state.diameter;
+  const dcVal = parseFloat(document.getElementById('inp-central-hole').value) || state.centralHoleDia;
+  const hVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
+  const tfVal = parseFloat(document.getElementById('inp-faceplate').value) || state.faceplate;
+  const twVal = parseFloat(document.getElementById('inp-rib-thick').value) || state.ribThick;
+  const lVal = parseFloat(document.getElementById('inp-cell-size').value) || state.cellSize;
+  const rfVal = parseFloat(document.getElementById('inp-fillet-radius').value) || state.filletRadius;
+
+  showSolverStatus('🖥️ Launching Siemens NX GUI (ugraf.exe) and drawing mirror live on screen...', true);
+  try {
+    const res = await fetch('http://127.0.0.1:8000/cad/launch_nx_gui', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        D_mm: dVal,
+        Dc_mm: dcVal,
+        H_mm: hVal,
+        tf_mm: tfVal,
+        tw_mm: twVal,
+        L_mm: lVal,
+        rf_mm: rfVal
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    showSolverStatus(`🖥️ ${data.message || 'Siemens NX GUI launched successfully! Drawing part live.'}`, true);
+  } catch (err) {
+    showSolverStatus('NX Launch Error: ' + err.message + '. Ensure Siemens NX is installed.', false);
+  }
+}  // ← END executeLaunchNXGui
 
 function handleImportClick() {
   const textarea = document.getElementById('inp-import-json');

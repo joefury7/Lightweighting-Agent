@@ -76,14 +76,13 @@ class NXFEAAnalysisEngine:
 import NXOpen
 import NXOpen.UF
 import NXOpen.Features
+import NXOpen.GeometricUtilities
 import math
 import os
 
 def main():
     theSession = NXOpen.Session.GetSession()
     theUFSession = NXOpen.UF.UFSession.GetUFSession()
-    
-    workPart = theSession.Parts.Work
     
     # Mirror Design Specifications
     D = {D}        # Clear Aperture Diameter (mm)
@@ -100,11 +99,12 @@ def main():
     
     # 1. Create or open display part
     try:
-        newPart = theSession.Parts.NewDisplay(prt_path, NXOpen.Part.Units.Millimeters)
+        if os.path.exists(prt_path):
+            os.remove(prt_path)
     except Exception:
-        newPart = theSession.Parts.Work
-    
-    workPart = theSession.Parts.Work
+        pass
+        
+    workPart = theSession.Parts.NewDisplay(prt_path, NXOpen.Part.Units.Millimeters)
     theSession.LogFile.WriteLine(f"[NX Open] Generating 3D Mirror CAD: D={{D}}mm, H={{H}}mm, tf={{tf}}mm, tw={{tw}}mm, L={{L}}mm...")
     
     # 2. Cylindrical Solid Blank Feature
@@ -115,24 +115,62 @@ def main():
     cylinderBuilder.Direction = NXOpen.Vector3d(0.0, 0.0, 1.0)
     cylinderFeature = cylinderBuilder.Commit()
     cylinderBuilder.Destroy()
+    blankBody = cylinderFeature.GetBodies()[0]
     
     # 3. Center Hole Bore (Subtracted)
     if Dc > 0.0:
         boreBuilder = workPart.Features.CreateCylinderBuilder(NXOpen.Features.Feature.Null)
         boreBuilder.Diameter.RightHandSide = str(Dc)
-        boreBuilder.Height.RightHandSide = str(H + 10.0)
-        boreBuilder.Origin = NXOpen.Point3d(0.0, 0.0, -5.0)
+        boreBuilder.Height.RightHandSide = str(H + 20.0)
+        boreBuilder.Origin = NXOpen.Point3d(0.0, 0.0, -10.0)
         boreBuilder.Direction = NXOpen.Vector3d(0.0, 0.0, 1.0)
-        boreBuilder.BooleanOption.Type = NXOpen.GeometricUtilities.BooleanType.Subtract
-        boreBuilder.BooleanOption.SetTargetBodies([cylinderFeature.GetBodies()[0]])
+        boreBuilder.BooleanOption.Type = NXOpen.GeometricUtilities.BooleanOperation.BooleanType.Subtract
+        boreBuilder.BooleanOption.SetTargetBodies([blankBody])
         boreFeature = boreBuilder.Commit()
         boreBuilder.Destroy()
 
-    # 4. Save Native NX Part
+    # 4. Mill Isogrid Pocket Cavities over Pocket Zone
+    R = D / 2.0
+    Rc = Dc / 2.0
+    pocket_depth = H - tf
+    w_rim = 5.0
+    r_in = Rc + w_rim
+    r_out = R - w_rim
+
+    dx = L
+    dy = L * math.sqrt(3.0) / 2.0
+    nx = int(math.ceil(D / dx)) + 1
+    ny = int(math.ceil(D / dy)) + 1
+    pocket_dia = max(10.0, L - 2.0 * tw / math.sqrt(3.0))
+
+    pockets_created = 0
+    for j in range(-ny, ny + 1):
+        py = j * dy
+        x_off = (dx / 2.0) if (j % 2 != 0) else 0.0
+        for i in range(-nx, nx + 1):
+            px = i * dx + x_off
+            dist = math.hypot(px, py)
+            if (r_in + pocket_dia/2.0) <= dist <= (r_out - pocket_dia/2.0):
+                near_hub = any(math.hypot(px - hx, py - hy) < 14.0 for hx, hy in hubs)
+                if not near_hub:
+                    pBuilder = workPart.Features.CreateCylinderBuilder(NXOpen.Features.Feature.Null)
+                    pBuilder.Diameter.RightHandSide = str(round(pocket_dia, 2))
+                    pBuilder.Height.RightHandSide = str(round(pocket_depth + 5.0, 2))
+                    pBuilder.Origin = NXOpen.Point3d(px, py, tf)
+                    pBuilder.Direction = NXOpen.Vector3d(0.0, 0.0, 1.0)
+                    pBuilder.BooleanOption.Type = NXOpen.GeometricUtilities.BooleanOperation.BooleanType.Subtract
+                    pBuilder.BooleanOption.SetTargetBodies([blankBody])
+                    pFeat = pBuilder.Commit()
+                    pBuilder.Destroy()
+                    pockets_created += 1
+
+    theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Milled {{pockets_created}} isogrid pocket cavities.")
+
+    # 5. Save Native NX Part
     try:
         workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)
         theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Saved native CAD model to: {{prt_path}}")
-        print(f"[NX Open SUCCESS] Model generated: {{prt_path}}")
+        print(f"[NX Open SUCCESS] Model generated with {{pockets_created}} isogrid cavities: {{prt_path}}")
     except Exception as e:
         theSession.LogFile.WriteLine(f"[NX Open] Save note: {{e}}")
 
@@ -143,6 +181,31 @@ if __name__ == '__main__':
         with open(output_script, "w", encoding="utf-8") as f:
             f.write(script_content)
         return output_script
+
+    def open_in_nx_gui(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0, target_prt="primary_mirror_560mm.prt"):
+        """
+        Launches Siemens NX GUI (ugraf.exe) with -run-journal flag so NX opens
+        and executes the journal script right on screen.
+        """
+        journal_path = self.generate_nx_journal_script(D, Dc, H, tf, tw, L, rf, target_prt=target_prt)
+        abs_journal = os.path.abspath(journal_path)
+        ugraf_exe = os.path.join(self.nx_bin_dir, "ugraf.exe") if self.nx_bin_dir else None
+
+        if not ugraf_exe or not os.path.exists(ugraf_exe):
+            return {
+                "status": "ERROR",
+                "message": f"Siemens NX GUI (ugraf.exe) not found at {ugraf_exe}",
+                "journal_path": abs_journal
+            }
+
+        cmd = [ugraf_exe, "-run-journal", abs_journal]
+        subprocess.Popen(cmd)
+        return {
+            "status": "NX_GUI_LAUNCHED",
+            "message": "Siemens NX GUI launched! The model is being drawn live in NX.",
+            "journal_path": abs_journal,
+            "target_prt": os.path.abspath(target_prt)
+        }
 
     def create_3d_prt(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0, target_prt="primary_mirror_560mm.prt"):
         """
