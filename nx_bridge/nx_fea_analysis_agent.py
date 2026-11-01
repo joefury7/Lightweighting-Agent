@@ -194,11 +194,12 @@ if __name__ == '__main__':
         ugraf_exe = os.path.join(self.nx_bin_dir, "ugraf.exe") if self.nx_bin_dir else None
 
         # 1. Use the exact exported journal from the UI if provided
+        abs_prt_fwd = abs_prt.replace('\\', '/')
         if journal_code and len(journal_code.strip()) > 50:
             patched_code = journal_code
             new_workpart_check = f'''    workPart = session.Parts.Work
     if workPart is None:
-        prt_path = r"{abs_prt}"
+        prt_path = r"{abs_prt_fwd}"
         try:
             import os
             if os.path.exists(prt_path):
@@ -214,13 +215,14 @@ if __name__ == '__main__':
 
             if old_workpart_check in patched_code:
                 patched_code = patched_code.replace(old_workpart_check, new_workpart_check)
-            elif "workPart = session.Parts.Work" in patched_code:
+            elif 'workPart = session.Parts.Work' in patched_code:
                 import re
                 patched_code = re.sub(r'workPart\s*=\s*session\.Parts\.Work\s*[\r\n]+(?:\s*if\s*workPart\s*is\s*None:[\s\S]*?return)?', new_workpart_check.strip(), patched_code)
+
             save_block = f'''    try:
         if workPart is not None:
             workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)
-            print(f"[NX Open SUCCESS] Model saved to: {abs_prt}")
+            print(f"[NX Open SUCCESS] Model saved to: {abs_prt_fwd}")
     except Exception as e_save:
         print(f"[NX Open] Save warning: {{e_save}}")
 
@@ -228,9 +230,9 @@ if __name__ == '__main__':'''
             if "if __name__ == '__main__':" in patched_code:
                 patched_code = patched_code.replace("if __name__ == '__main__':", save_block)
             else:
-                patched_code += "\n" + save_block
+                patched_code += '\n' + save_block
 
-            with open(abs_journal, "w", encoding="utf-8") as f:
+            with open(abs_journal, 'w', encoding='utf-8') as f:
                 f.write(patched_code)
             print(f"[Pillar 4 NX Bridge] Loaded exact UI exported journal ({len(patched_code)} bytes).")
         else:
