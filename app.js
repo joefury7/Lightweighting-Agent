@@ -16,7 +16,9 @@ const state = {
   faceplate: 1.5,
   conicConstant: -1.22,
   centralHoleDia: 175.0,
-  filletRadius: 10.0
+  filletRadius: 10.0,
+  optimizationMode: 'target',
+  customTargetMass: 12.0
 };
 
 const PATTERN_CATALOG = {
@@ -142,6 +144,75 @@ if (document.readyState === 'loading') {
   bootstrapApp();
 }
 
+function setOptimizationMode(mode) {
+  state.optimizationMode = mode;
+  const btnTarget = document.getElementById('btn-mode-target');
+  const btnMin = document.getElementById('btn-mode-min');
+  const targetInp = document.getElementById('inp-target-mass');
+  const hintEl = document.getElementById('hint-target-mass');
+  const optBtn = document.getElementById('btn-run-nsga2');
+  const optBtnTop = document.getElementById('btn-nsga2-top');
+
+  if (mode === 'target') {
+    if (btnTarget) {
+      btnTarget.style.borderColor = '#f093fb';
+      btnTarget.style.background = 'rgba(240,147,251,0.2)';
+      btnTarget.style.color = '#fff';
+      btnTarget.style.fontWeight = '600';
+    }
+    if (btnMin) {
+      btnMin.style.borderColor = 'rgba(0,242,254,0.4)';
+      btnMin.style.background = 'transparent';
+      btnMin.style.color = '#8a99ad';
+      btnMin.style.fontWeight = 'normal';
+    }
+    if (targetInp) {
+      targetInp.readOnly = false;
+      targetInp.style.opacity = '1';
+      targetInp.value = state.customTargetMass || 12.0;
+    }
+    if (hintEl) {
+      hintEl.innerText = 'Forces geometry to lightweight to your custom target weight within ±0.01 kg.';
+    }
+    if (optBtn) {
+      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 Optimize to Target Weight';
+    }
+    if (optBtnTop) {
+      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 AI Optimize';
+    }
+  } else {
+    if (btnMin) {
+      btnMin.style.borderColor = '#00f2fe';
+      btnMin.style.background = 'rgba(0,242,254,0.2)';
+      btnMin.style.color = '#fff';
+      btnMin.style.fontWeight = '600';
+    }
+    if (btnTarget) {
+      btnTarget.style.borderColor = 'rgba(240,147,251,0.4)';
+      btnTarget.style.background = 'transparent';
+      btnTarget.style.color = '#8a99ad';
+      btnTarget.style.fontWeight = 'normal';
+    }
+    if (targetInp) {
+      if (!isNaN(parseFloat(targetInp.value)) && parseFloat(targetInp.value) > 0) {
+        state.customTargetMass = parseFloat(targetInp.value);
+      }
+      targetInp.value = 'MIN (Optimal)';
+      targetInp.readOnly = true;
+      targetInp.style.opacity = '0.85';
+    }
+    if (hintEl) {
+      hintEl.innerText = 'Finds the absolute lightest feasible mirror meeting optical & quilting limits.';
+    }
+    if (optBtn) {
+      optBtn.innerHTML = '<i class="fa-solid fa-feather"></i> ⚡ Optimize for Minimum Weight (MIN)';
+    }
+    if (optBtnTop) {
+      optBtnTop.innerHTML = '<i class="fa-solid fa-feather"></i> ⚡ Min Weight';
+    }
+  }
+}
+
 function initEventListeners() {
   const safeAddListener = (id, event, fn) => {
     const el = document.getElementById(id);
@@ -198,16 +269,19 @@ function initEventListeners() {
     }
   });
 
+  safeAddListener('btn-mode-target', 'click', () => setOptimizationMode('target'));
+  safeAddListener('btn-mode-min', 'click', () => setOptimizationMode('min'));
+
   safeAddListener('inp-target-mass', 'input', (e) => {
     const raw = (e.target.value || '').trim().toUpperCase();
-    if (raw === 'MIN' || raw === 'MINIMUM') {
-      state.targetMass = 'MIN';
-      updateCalculation();
+    if (raw === 'MIN' || raw === 'MINIMUM' || raw.startsWith('MIN')) {
+      setOptimizationMode('min');
       return;
     }
     const val = parseFloat(e.target.value);
     if (!isNaN(val) && val > 0) {
       state.targetMass = val;
+      state.customTargetMass = val;
       updateCalculation();
     }
   });
@@ -255,7 +329,7 @@ function initEventListeners() {
     updateCalculation();
   });
 
-  safeAddListener('btn-auto-solve', 'click', autoSolveTargetMass);
+  // safeAddListener('btn-auto-solve', 'click', autoSolveTargetMass);
   safeAddListener('btn-copy-code', 'click', copyCodeToClipboard);
   safeAddListener('btn-export-py', 'click', downloadPythonFile);
   safeAddListener('btn-import', 'click', handleImportClick);
@@ -330,12 +404,13 @@ async function executeNSGA2Optimization() {
   const hVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
   
   const rawTarget = (document.getElementById('inp-target-mass').value || '').trim().toUpperCase();
-  const isMin = rawTarget === 'MIN' || rawTarget === 'MINIMUM' || state.targetMass === 'MIN';
-  const targetMass = isMin ? 999.0 : (parseFloat(rawTarget) || state.targetMass || 12.0);
+  const isMin = state.optimizationMode === 'min' || rawTarget === 'MIN' || rawTarget.includes('MIN') || state.targetMass === 'MIN';
+  const targetMass = isMin ? 999.0 : (parseFloat(rawTarget) || state.customTargetMass || 12.0);
+  const optMode = isMin ? 'min' : 'target';
 
   const statusMsg = isMin
-    ? '🧬 Running 50,000 Candidate NSGA-II to find absolute MINIMUM mass meeting optical limits...'
-    : `🧬 Running 50,000 Candidate NSGA-II Pareto Optimization for Target ≤ ${targetMass} kg...`;
+    ? '🧬 Running AI Optimizer to find absolute MINIMUM mass meeting optical limits...'
+    : `🧬 Running AI Optimizer to lightweight mirror to TARGET weight: ${targetMass.toFixed(2)} kg...`;
   showSolverStatus(statusMsg, true);
   try {
     const res = await fetch('http://127.0.0.1:8000/optimize/nsga2', {
@@ -347,6 +422,7 @@ async function executeNSGA2Optimization() {
         H_mm: hVal,
         max_mass_kg: targetMass,
         max_sag_nm: 60.0,
+        mode: optMode,
         num_candidates: 50000
       })
     });
@@ -371,9 +447,10 @@ async function executeNSGA2Optimization() {
     if (quiltEl) quiltEl.innerText = `${quilt.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(freq)} Hz`;
 
-    showSolverStatus(`🧬 NSGA-II Optimal Pareto Solution: Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
+    const modeLabel = optMode === 'target' ? `Target ${targetMass.toFixed(1)} kg` : 'Minimum Mass';
+    showSolverStatus(`🧬 AI Optimal Solution (${modeLabel}): Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
   } catch (err) {
-    showSolverStatus('NSGA-II Error: ' + err.message + '. Running fallback local solver.', false);
+    showSolverStatus('Optimizer Error: ' + err.message + '. Running fallback local solver.', false);
     autoSolveTargetMass();
   }
 }

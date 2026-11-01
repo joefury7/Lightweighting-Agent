@@ -66,7 +66,7 @@
         <i class="fa-solid fa-bolt"></i> ⚡ Instant ML
       </button>
       <button id="btn-nsga2-top" class="btn btn-secondary" style="border-color:#f093fb;color:#f093fb;">
-        <i class="fa-solid fa-dna"></i> 🧬 50k NSGA-II
+        <i class="fa-solid fa-dna"></i> 🧬 AI Optimize
       </button>
       <button id="btn-fea-top" class="btn btn-secondary" style="border-color:#ff9100;color:#ff9100;">
         <i class="fa-solid fa-microchip"></i> 🔬 FEA SOL101
@@ -228,29 +228,35 @@
           <span class="badge" style="background:rgba(0,242,254,.15);color:#00f2fe;font-size:.65rem;">FastAPI :8000</span>
         </div>
         <p class="import-desc" style="margin-top:.25rem;">Instant ML surrogate, 50k NSGA-II optimization, NASTRAN FEA ground-truth, and Siemens NX CAD creation.</p>
-        <div class="form-group" style="margin-top:.5rem;">
-          <label for="inp-target-mass">Target Final Mass (kg)</label>
+        <!-- Optimization Mode Selector: Target Weight vs Minimum Weight -->
+        <div style="display:flex;gap:0.4rem;margin-top:0.75rem;margin-bottom:0.4rem;">
+          <button type="button" id="btn-mode-target" class="btn btn-secondary" style="flex:1;padding:0.45rem 0.6rem;font-size:0.75rem;border-color:#f093fb;background:rgba(240,147,251,0.2);color:#fff;font-weight:600;">
+            <i class="fa-solid fa-bullseye"></i> 🎯 Target Weight
+          </button>
+          <button type="button" id="btn-mode-min" class="btn btn-secondary" style="flex:1;padding:0.45rem 0.6rem;font-size:0.75rem;border-color:rgba(0,242,254,0.4);background:transparent;color:#8a99ad;">
+            <i class="fa-solid fa-feather"></i> ⚡ Minimum Weight (MIN)
+          </button>
+        </div>
+        <div class="form-group" style="margin-top:.25rem;">
+          <label for="inp-target-mass" id="lbl-target-mass">Target Final Mass (kg)</label>
           <input type="text" id="inp-target-mass" value="12">
+          <small id="hint-target-mass" style="display:block;font-size:0.7rem;color:#8a99ad;margin-top:0.25rem;">Forces pocket lightweighting to hit your custom target mass within ±0.01 kg.</small>
         </div>
         <div class="solver-hub-btns">
-          <button id="btn-create-prt" class="btn btn-block top-btn-create">
-            <i class="fa-solid fa-cube"></i> 🚀 Create 3D .PRT in Siemens NX
+          <button id="btn-run-nsga2" class="btn btn-block"
+            style="background:linear-gradient(135deg, rgba(240,147,251,.25), rgba(0,242,254,.25));border:1px solid #f093fb;color:#fff;font-weight:600;">
+            <i class="fa-solid fa-dna"></i> 🧬 Optimize to Target Weight
           </button>
           <button id="btn-instant-ml" class="btn btn-block"
             style="background:rgba(0,230,118,.15);border:1px solid #00e676;color:#00e676;">
             <i class="fa-solid fa-bolt"></i> ⚡ Instant ML Predict (Pillar 2 — 0.44 ms)
           </button>
-          <button id="btn-run-nsga2" class="btn btn-block"
-            style="background:rgba(240,147,251,.15);border:1px solid #f093fb;color:#f093fb;">
-            <i class="fa-solid fa-dna"></i> 🧬 Run 50k NSGA-II Pareto GA (Pillar 3)
-          </button>
           <button id="btn-run-fea" class="btn btn-block"
             style="background:rgba(255,145,0,.15);border:1px solid #ff9100;color:#ff9100;">
             <i class="fa-solid fa-microchip"></i> 🔬 Run NASTRAN SOL 101 FEA (Pillar 4)
           </button>
-          <button id="btn-auto-solve" class="btn btn-block"
-            style="background:rgba(79,172,254,.15);border:1px solid #4facfe;color:#4facfe;">
-            <i class="fa-solid fa-calculator"></i> ⚡ Yoder Physics Solver (Engine 1)
+          <button id="btn-create-prt" class="btn btn-block top-btn-create">
+            <i class="fa-solid fa-cube"></i> 🚀 Create 3D .PRT in Siemens NX
           </button>
         </div>
         <div id="solver-status-box" class="import-status" style="display:none;"></div>
@@ -488,6 +494,6 @@
   </div>
 </div>
 
-<script src="app.js?v=20261031_v6"></script>
+<script src="app.js?v=20261101_v8"></script>
 </body>
 </html>

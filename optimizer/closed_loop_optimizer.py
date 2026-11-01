@@ -119,7 +119,7 @@ class ClosedLoopOptimizer:
             json.dump(self.retraining_buffer, f, indent=2)
 
     def optimize_nsga2(self, D_mm=560.0, Dc_mm=120.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0,
-                       pop_size=200, generations=40, eta_c=15.0, eta_m=20.0):
+                       pop_size=200, generations=40, eta_c=15.0, eta_m=20.0, mode="target"):
         """
         True NSGA-II Multi-Objective Genetic Algorithm with ML Surrogate fitness evaluations.
         Objectives: Minimize Mass (kg) & Minimize RMS Gravity Sag (nm).
@@ -153,17 +153,28 @@ class ClosedLoopOptimizer:
             freq = preds[:, 4]
 
             # Constraint violations (penalty > 0 if violated)
-            c_mass = np.maximum(0.0, mass - max_mass_kg)
             c_sag = np.maximum(0.0, sag - max_sag_nm)
             c_quilt = np.maximum(0.0, quilt - 30.0)
             c_tf = np.maximum(0.0, 0.8 - pop[:, 1])
             c_tw = np.maximum(0.0, 1.5 - pop[:, 2])
+            structural_penalty = (c_sag * 0.5) + (c_quilt * 2.0) + (c_tf * 50.0) + (c_tw * 50.0)
 
-            total_penalty = (c_mass * 10.0) + (c_sag * 0.5) + (c_quilt * 2.0) + (c_tf * 50.0) + (c_tw * 50.0)
+            is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
+            target_kg = float(max_mass_kg) if not is_min_mode else 12.0
 
-            # Penalized objectives for non-dominated sorting
-            obj1 = mass + total_penalty
-            obj2 = sag + total_penalty
+            if not is_min_mode:
+                # Force Target Weight Mode: minimize absolute deviation |mass - target_kg|
+                mass_diff = np.abs(mass - target_kg)
+                total_penalty = structural_penalty + (mass_diff * 5.0)
+                obj1 = mass_diff * 20.0 + structural_penalty
+                obj2 = sag + structural_penalty
+            else:
+                # Minimum Weight (MIN) Mode: minimize mass directly
+                c_mass = np.maximum(0.0, mass - target_kg) if target_kg < 900.0 else 0.0
+                total_penalty = structural_penalty + (c_mass * 10.0)
+                obj1 = mass + total_penalty
+                obj2 = sag + total_penalty
+
             objs = np.column_stack([obj1, obj2])
             return objs, preds, total_penalty
 
@@ -242,28 +253,44 @@ class ClosedLoopOptimizer:
         eval_time = time.time() - t0
         final_objs, final_preds, final_penalties = evaluate_pop(population)
 
-        # Filter strictly feasible in final population
+        is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
+        target_kg = float(max_mass_kg) if not is_min_mode else 12.0
+
+        # Filter strictly feasible in final population (meeting optical and manufacturing limits)
         feasible_mask = (
-            (final_preds[:, 0] <= max_mass_kg) &
             (final_preds[:, 1] <= max_sag_nm) &
             (final_preds[:, 3] <= 30.0) &
             (population[:, 1] >= 0.8) &
             (population[:, 2] >= 1.5)
         )
+        if is_min_mode and target_kg < 900.0:
+            feasible_mask &= (final_preds[:, 0] <= target_kg)
+
         feasible_indices = np.where(feasible_mask)[0]
 
         if len(feasible_indices) > 0:
-            norm_m = (final_preds[feasible_indices, 0] - final_preds[feasible_indices, 0].min()) / (np.ptp(final_preds[feasible_indices, 0]) + 1e-6)
-            norm_s = (final_preds[feasible_indices, 1] - final_preds[feasible_indices, 1].min()) / (np.ptp(final_preds[feasible_indices, 1]) + 1e-6)
-            best_idx = feasible_indices[np.argmin(0.5 * norm_m + 0.5 * norm_s)]
+            if not is_min_mode:
+                # Force Target Weight Mode: find design matching target_kg with minimal sag
+                m_diffs = np.abs(final_preds[feasible_indices, 0] - target_kg)
+                s_vals = final_preds[feasible_indices, 1]
+                scores = (m_diffs / 0.05)**2 + 0.5 * (s_vals / max_sag_nm)
+                best_idx = feasible_indices[np.argmin(scores)]
+                is_fully_feasible = bool(m_diffs[np.argmin(scores)] <= 0.2)
+            else:
+                # Minimum Weight (MIN) Mode: find absolute lightest feasible design
+                norm_m = (final_preds[feasible_indices, 0] - final_preds[feasible_indices, 0].min()) / (np.ptp(final_preds[feasible_indices, 0]) + 1e-6)
+                norm_s = (final_preds[feasible_indices, 1] - final_preds[feasible_indices, 1].min()) / (np.ptp(final_preds[feasible_indices, 1]) + 1e-6)
+                best_idx = feasible_indices[np.argmin(0.7 * norm_m + 0.3 * norm_s)]
+                is_fully_feasible = True
         else:
-            best_idx = np.argmin(final_penalties)
+            if not is_min_mode:
+                best_idx = np.argmin(np.abs(final_preds[:, 0] - target_kg) * 10.0 + final_penalties)
+            else:
+                best_idx = np.argmin(final_penalties)
+            is_fully_feasible = False
 
         best_genes = population[best_idx]
         best_pred = final_preds[best_idx]
-        is_fully_feasible = bool(
-            best_pred[0] <= max_mass_kg and best_pred[1] <= max_sag_nm and best_pred[3] <= 30.0 and best_genes[1] >= 0.8 and best_genes[2] >= 1.5
-        )
 
         print(f"[Pillar 3 NSGA-II] Completed {generations} generations ({pop_size*generations*2:,} surrogate evaluations) in {eval_time*1000:.2f} ms")
         print(f"[Pillar 3 NSGA-II] Feasible Pareto solutions in final generation: {len(feasible_indices)}/{pop_size} | Fully Feasible: {is_fully_feasible}")
@@ -295,7 +322,7 @@ class ClosedLoopOptimizer:
         best_design["support_hubs_18"] = snap_18_whiffletree_hubs(D_mm, best_design["L_mm"], Dc_mm)
         return best_design
 
-    def optimize(self, D_mm=560.0, Dc_mm=120.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0, num_candidates=50000):
+    def optimize(self, D_mm=560.0, Dc_mm=120.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0, num_candidates=50000, mode="target"):
         """
         Fast High-Throughput Monte Carlo Pareto Search with automatic fallback to NSGA-II if needed.
         """
@@ -326,29 +353,41 @@ class ClosedLoopOptimizer:
         quiltings = preds[:, 3]
         freqs = preds[:, 4]
 
+        is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
+        target_kg = float(max_mass_kg) if not is_min_mode else 12.0
+
         valid_mask = (
-            (masses <= max_mass_kg) &
             (rms_sags <= max_sag_nm) &
             (quiltings <= 30.0) &
             (tf_vals >= 0.8) &
             (tw_vals >= 1.5)
         )
+        if is_min_mode and target_kg < 900.0:
+            valid_mask &= (masses <= target_kg)
+
         valid_indices = np.where(valid_mask)[0]
         print(f"[Pillar 3] Evaluated {num_candidates:,} designs in {eval_time*1000:.2f} ms ({len(valid_indices)} feasible designs found)")
 
         if len(valid_indices) == 0:
             print("[Pillar 3] Falling back to NSGA-II Genetic Search for fine Pareto convergence...")
-            return self.optimize_nsga2(D_mm, Dc_mm, max_mass_kg, max_sag_nm)
+            return self.optimize_nsga2(D_mm, Dc_mm, H_mm, max_mass_kg, max_sag_nm, mode=mode)
 
-        # Weighted multi-objective Pareto scoring (50% Mass, 50% Sag)
-        valid_masses = masses[valid_indices]
-        valid_sags = rms_sags[valid_indices]
-        ptp_mass = float(np.ptp(valid_masses)) + 1e-6
-        ptp_sag = float(np.ptp(valid_sags)) + 1e-6
-        norm_mass = (valid_masses - valid_masses.min()) / ptp_mass
-        norm_sag = (valid_sags - valid_sags.min()) / ptp_sag
-        scores = 0.5 * norm_mass + 0.5 * norm_sag
-        best_idx = valid_indices[np.argmin(scores)]
+        if not is_min_mode:
+            # Force Target Weight Mode: score by distance to target mass + optical sag
+            m_diffs = np.abs(masses[valid_indices] - target_kg)
+            s_vals = rms_sags[valid_indices]
+            scores = (m_diffs / 0.05)**2 + 0.5 * (s_vals / max_sag_nm)
+            best_idx = valid_indices[np.argmin(scores)]
+        else:
+            # Minimum Weight (MIN) Mode: prioritize lowest mass
+            valid_masses = masses[valid_indices]
+            valid_sags = rms_sags[valid_indices]
+            ptp_mass = float(np.ptp(valid_masses)) + 1e-6
+            ptp_sag = float(np.ptp(valid_sags)) + 1e-6
+            norm_mass = (valid_masses - valid_masses.min()) / ptp_mass
+            norm_sag = (valid_sags - valid_sags.min()) / ptp_sag
+            scores = 0.7 * norm_mass + 0.3 * norm_sag
+            best_idx = valid_indices[np.argmin(scores)]
 
         best_design = {
             "D_mm": float(D_mm),

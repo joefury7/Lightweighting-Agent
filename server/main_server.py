@@ -53,6 +53,7 @@ class OptimizeRequest(BaseModel):
     max_mass_kg: float = 12.0
     max_sag_nm: float = 60.0
     num_candidates: int = 50000
+    mode: str = "target"
 
 class ChatRequest(BaseModel):
     prompt: str
@@ -92,7 +93,8 @@ def run_pareto_optimization(req: OptimizeRequest):
     try:
         best_design = optimizer.optimize(
             req.D_mm, req.Dc_mm, req.H_mm,
-            req.max_mass_kg, req.max_sag_nm, req.num_candidates
+            req.max_mass_kg, req.max_sag_nm, req.num_candidates,
+            mode=req.mode
         )
         return best_design
     except Exception as e:
@@ -132,7 +134,8 @@ def run_nsga2_optimization(req: OptimizeRequest):
     """
     try:
         best_design = optimizer.optimize_nsga2(
-            req.D_mm, req.Dc_mm, req.H_mm, req.max_mass_kg, req.max_sag_nm
+            req.D_mm, req.Dc_mm, req.H_mm, req.max_mass_kg, req.max_sag_nm,
+            mode=req.mode
         )
         return best_design
     except Exception as e:
