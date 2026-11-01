@@ -5,6 +5,7 @@ Exposes REST endpoints for real-time ML prediction, Pareto optimization, CAD gen
 
 import os
 import sys
+from typing import Optional
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -45,6 +46,7 @@ class MirrorDesignInput(BaseModel):
     tw_mm: float = 3.0
     L_mm: float = 55.5
     rf_mm: float = 3.0
+    journal_code: Optional[str] = None
 
 class OptimizeRequest(BaseModel):
     D_mm: float = 560.0
@@ -188,7 +190,8 @@ def create_nx_prt_file(design: MirrorDesignInput):
     try:
         prt_result = fea_engine.create_3d_prt(
             design.D_mm, design.Dc_mm, design.H_mm,
-            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm
+            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm,
+            journal_code=design.journal_code
         )
         return prt_result
     except Exception as e:

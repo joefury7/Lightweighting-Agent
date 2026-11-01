@@ -182,18 +182,60 @@ if __name__ == '__main__':
             f.write(script_content)
         return output_script
 
-    def create_3d_prt(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0, target_prt="primary_mirror_560mm.prt"):
+    def create_3d_prt(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0, target_prt="primary_mirror_560mm.prt", journal_code=None):
         """
         1-Click Automated Siemens NX Connection:
-        1. Compiles the exact parameterized Python journal (build_mirror_journal.py).
-        2. Pre-builds the .PRT part via run_journal.exe so the native CAD file is immediately ready on disk.
-        3. Automatically launches Siemens NX GUI (ugraf.exe -run-journal) which opens NX on screen
-           and plays the journal to draw the mirror in real time.
+        1. Compiles the exact textbook isogrid Python journal from UI (or fallback generator).
+        2. Pre-builds the exact .PRT part via run_journal.exe with full adaptive pocketing and revolve blank.
+        3. Automatically launches Siemens NX CAM GUI with -nxcam -retrieve:"<prt>" onto user's desktop.
         """
-        journal_path = self.generate_nx_journal_script(D, Dc, H, tf, tw, L, rf, target_prt=target_prt)
-        abs_journal = os.path.abspath(journal_path)
         abs_prt = os.path.abspath(target_prt)
+        abs_journal = os.path.abspath(os.path.join(os.path.dirname(__file__), "build_mirror_journal.py"))
         ugraf_exe = os.path.join(self.nx_bin_dir, "ugraf.exe") if self.nx_bin_dir else None
+
+        # 1. Use the exact exported journal from the UI if provided
+        if journal_code and len(journal_code.strip()) > 50:
+            patched_code = journal_code
+            new_workpart_check = f'''    workPart = session.Parts.Work
+    if workPart is None:
+        prt_path = r"{abs_prt}"
+        try:
+            import os
+            if os.path.exists(prt_path):
+                os.remove(prt_path)
+        except Exception:
+            pass
+        workPart = session.Parts.NewDisplay(prt_path, NXOpen.Part.Units.Millimeters)'''
+
+            old_workpart_check = '''    workPart = session.Parts.Work
+    if workPart is None:
+        log(lw, "ERROR: No active part open. Go to File -> New -> Model (mm).")
+        return'''
+
+            if old_workpart_check in patched_code:
+                patched_code = patched_code.replace(old_workpart_check, new_workpart_check)
+            elif "workPart = session.Parts.Work" in patched_code:
+                import re
+                patched_code = re.sub(r'workPart\s*=\s*session\.Parts\.Work\s*[\r\n]+(?:\s*if\s*workPart\s*is\s*None:[\s\S]*?return)?', new_workpart_check.strip(), patched_code)
+            save_block = f'''    try:
+        if workPart is not None:
+            workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)
+            print(f"[NX Open SUCCESS] Model saved to: {abs_prt}")
+    except Exception as e_save:
+        print(f"[NX Open] Save warning: {{e_save}}")
+
+if __name__ == '__main__':'''
+            if "if __name__ == '__main__':" in patched_code:
+                patched_code = patched_code.replace("if __name__ == '__main__':", save_block)
+            else:
+                patched_code += "\n" + save_block
+
+            with open(abs_journal, "w", encoding="utf-8") as f:
+                f.write(patched_code)
+            print(f"[Pillar 4 NX Bridge] Loaded exact UI exported journal ({len(patched_code)} bytes).")
+        else:
+            journal_path = self.generate_nx_journal_script(D, Dc, H, tf, tw, L, rf, target_prt=target_prt)
+            abs_journal = os.path.abspath(journal_path)
 
         if not self.is_nx_installed():
             return {
@@ -204,11 +246,15 @@ if __name__ == '__main__':
                 "nx_installed": False
             }
 
-        # 1. Execute run_journal.exe to ensure .prt is generated and saved on disk
-        print(f"[Pillar 4 NX Bridge] Pre-building native .PRT via run_journal.exe...")
+        # 2. Execute run_journal.exe to build the exact native 3D .PRT
+        print(f"[Pillar 4 NX Bridge] Pre-building exact native .PRT via run_journal.exe...")
         try:
             cmd_headless = [self.run_journal_exe, abs_journal]
-            subprocess.run(cmd_headless, capture_output=True, text=True, timeout=15)
+            res_build = subprocess.run(cmd_headless, capture_output=True, text=True, timeout=90)
+            if res_build.returncode == 0:
+                print(f"[Pillar 4 NX Bridge] Headless journal execution SUCCESS.")
+            else:
+                print(f"[Pillar 4 NX Bridge] Headless run_journal output: {res_build.stdout[-500:] if res_build.stdout else ''} {res_build.stderr[-500:] if res_build.stderr else ''}")
         except Exception as e:
             print(f"[Pillar 4 NX Bridge] Headless pre-build note: {e}")
 

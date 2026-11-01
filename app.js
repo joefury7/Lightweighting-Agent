@@ -506,7 +506,11 @@ async function executeCreateNXPart() {
   const lVal = parseFloat(document.getElementById('inp-cell-size').value) || state.cellSize;
   const rfVal = parseFloat(document.getElementById('inp-fillet-radius').value) || state.filletRadius;
 
-  showSolverStatus('🚀 Launching Siemens NX and executing journal to draw 3D part...', true);
+  // Extract exact textbook NX Open journal code from UI code-output
+  const codeEl = document.getElementById('code-output');
+  const pyJournalCode = codeEl ? codeEl.textContent : '';
+
+  showSolverStatus('Compiling exact 3D isogrid journal and building CAD part in Siemens NX...', true);
   try {
     const res = await fetch('http://127.0.0.1:8000/cad/create_prt', {
       method: 'POST',
@@ -518,16 +522,17 @@ async function executeCreateNXPart() {
         tf_mm: tfVal,
         tw_mm: twVal,
         L_mm: lVal,
-        rf_mm: rfVal
+        rf_mm: rfVal,
+        journal_code: pyJournalCode
       })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    showSolverStatus(`🚀 ${data.message || 'Siemens NX opened! Journal script played live to draw your mirror CAD model.'}`, true);
+    showSolverStatus(`${data.message || 'NX Manufacturing - NX CAM opened! Exact 3D mirror CAD model loaded on screen.'}`, true);
   } catch (err) {
     showSolverStatus('CAD Execution Error: ' + err.message + '. You can also copy the generated NX Python Journal script below and play it directly inside Siemens NX GUI.', false);
   }
-}  // ← END executeCreateNXPart
+}  // END executeCreateNXPart
 
 function handleImportClick() {
   const textarea = document.getElementById('inp-import-json');

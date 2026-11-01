@@ -15,7 +15,7 @@ def main():
     
     # Mirror Design Specifications
     D = 560.0        # Clear Aperture Diameter (mm)
-    Dc = 120.0      # Center Bore Hole (mm)
+    Dc = 175.0      # Center Bore Hole (mm)
     H = 73.7        # Overall Axial Height (mm)
     tf = 1.0      # Faceplate Thickness (mm)
     tw = 3.0      # Rib Wall Thickness (mm)
@@ -102,6 +102,13 @@ def main():
         print(f"[NX Open SUCCESS] Model generated with {pockets_created} isogrid cavities: {prt_path}")
     except Exception as e:
         theSession.LogFile.WriteLine(f"[NX Open] Save note: {e}")
+
+    try:
+        if workPart is not None:
+            workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)
+            print(f"[NX Open SUCCESS] Model saved to: C:\Users\JOEL\OneDrive\Desktop\Lightweighting Agent\primary_mirror_560mm.prt")
+    except Exception as e_save:
+        print(f"[NX Open] Save warning: {e_save}")
 
 if __name__ == '__main__':
     main()
