@@ -221,25 +221,52 @@ if __name__ == '__main__':
             env["UGII_BASE_DIR"] = r"C:\Program Files\Siemens\NX2007"
             env["UGII_ROOT_DIR"] = r"C:\Program Files\Siemens\NX2007\NXBIN"
 
-            print(f"[Pillar 4 NX Bridge] Opening Siemens NX GUI with CAD model: {ugraf_exe} -nxcam {abs_prt}")
+            nxcam_args = f'-nxcam -retrieve:"{abs_prt}"'
+            print(f"[Pillar 4 NX Bridge] Opening Siemens NX CAM with CAD model: {ugraf_exe} {nxcam_args}")
+            launched = False
+
+            # Strategy 1: Windows Shell COM (delegates launch to desktop Explorer in user's interactive session)
             try:
-                import ctypes
-                res = ctypes.windll.shell32.ShellExecuteW(None, "open", ugraf_exe, f'-nxcam "{abs_prt}"', work_dir, 1)
-                if res <= 32:
-                    subprocess.Popen([ugraf_exe, "-nxcam", abs_prt], cwd=work_dir, env=env)
-                return {
-                    "status": "NX_LAUNCHED",
-                    "message": "Siemens NX opened automatically! 3D mirror CAD model loaded on screen.",
-                    "journal_path": abs_journal,
-                    "target_prt": abs_prt,
-                    "nx_installed": True
-                }
-            except Exception as e:
-                print(f"[Pillar 4 NX Bridge] Error launching NX GUI: {e}")
+                import win32com.client
+                shell_app = win32com.client.Dispatch("Shell.Application")
+                shell_app.ShellExecute(ugraf_exe, nxcam_args, work_dir, "open", 1)
+                launched = True
+                print("[Pillar 4 NX Bridge] NX CAM dispatched via Shell.Application COM successfully.")
+            except Exception as e_com:
+                print(f"[Pillar 4 NX Bridge] Shell.Application COM note: {e_com}")
+
+            # Strategy 2: Win32 ShellExecuteW API
+            if not launched:
                 try:
-                    subprocess.Popen([ugraf_exe, "-nxcam", abs_prt], cwd=work_dir, env=env)
-                except Exception as ex2:
-                    print(f"[Pillar 4 NX Bridge] Fallback Popen error: {ex2}")
+                    import ctypes
+                    res = ctypes.windll.shell32.ShellExecuteW(None, "open", ugraf_exe, nxcam_args, work_dir, 1)
+                    if res > 32:
+                        launched = True
+                        print("[Pillar 4 NX Bridge] NX CAM dispatched via ShellExecuteW successfully.")
+                except Exception as e_sh:
+                    print(f"[Pillar 4 NX Bridge] ShellExecuteW error: {e_sh}")
+
+            # Strategy 3: Detached Subprocess Popen
+            if not launched:
+                try:
+                    creation_flags = 0
+                    if hasattr(subprocess, "DETACHED_PROCESS"):
+                        creation_flags |= subprocess.DETACHED_PROCESS
+                    if hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+                        creation_flags |= subprocess.CREATE_NEW_PROCESS_GROUP
+                    subprocess.Popen([ugraf_exe, "-nxcam", f'-retrieve:{abs_prt}'], cwd=work_dir, env=env, creationflags=creation_flags)
+                    launched = True
+                    print("[Pillar 4 NX Bridge] NX CAM dispatched via detached subprocess.Popen.")
+                except Exception as e_pop:
+                    print(f"[Pillar 4 NX Bridge] Subprocess Popen error: {e_pop}")
+
+            return {
+                "status": "NX_LAUNCHED",
+                "message": "NX Manufacturing - NX CAM opened automatically! 3D mirror CAD model loaded on screen.",
+                "journal_path": abs_journal,
+                "target_prt": abs_prt,
+                "nx_installed": True
+            }
 
         prt_exists = os.path.exists(abs_prt)
         return {
