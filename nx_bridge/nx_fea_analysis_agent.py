@@ -212,20 +212,34 @@ if __name__ == '__main__':
         except Exception as e:
             print(f"[Pillar 4 NX Bridge] Headless pre-build note: {e}")
 
-        # 2. Automatically launch Siemens NX GUI and play the journal script to draw the part
+        # 2. Automatically launch Siemens NX GUI and open the generated 3D part model
         if ugraf_exe and os.path.exists(ugraf_exe):
-            print(f"[Pillar 4 NX Bridge] Opening Siemens NX GUI and playing journal: {ugraf_exe} -run-journal {abs_journal}")
+            nxcam_dir = r"C:\Program Files\Siemens\NX2007\MACH\auxiliary\nxcam"
+            work_dir = nxcam_dir if os.path.exists(nxcam_dir) else workspace_root
+            env = os.environ.copy()
+            env["SPLM_LICENSE_SERVER"] = "27800@localhost"
+            env["UGII_BASE_DIR"] = r"C:\Program Files\Siemens\NX2007"
+            env["UGII_ROOT_DIR"] = r"C:\Program Files\Siemens\NX2007\NXBIN"
+
+            print(f"[Pillar 4 NX Bridge] Opening Siemens NX GUI with CAD model: {ugraf_exe} -nxcam {abs_prt}")
             try:
-                subprocess.Popen([ugraf_exe, "-run-journal", abs_journal], cwd=workspace_root)
+                import ctypes
+                res = ctypes.windll.shell32.ShellExecuteW(None, "open", ugraf_exe, f'-nxcam "{abs_prt}"', work_dir, 1)
+                if res <= 32:
+                    subprocess.Popen([ugraf_exe, "-nxcam", abs_prt], cwd=work_dir, env=env)
                 return {
                     "status": "NX_LAUNCHED",
-                    "message": "Siemens NX opened automatically! Playing journal script to draw 3D mirror.",
+                    "message": "Siemens NX opened automatically! 3D mirror CAD model loaded on screen.",
                     "journal_path": abs_journal,
                     "target_prt": abs_prt,
                     "nx_installed": True
                 }
             except Exception as e:
                 print(f"[Pillar 4 NX Bridge] Error launching NX GUI: {e}")
+                try:
+                    subprocess.Popen([ugraf_exe, "-nxcam", abs_prt], cwd=work_dir, env=env)
+                except Exception as ex2:
+                    print(f"[Pillar 4 NX Bridge] Fallback Popen error: {ex2}")
 
         prt_exists = os.path.exists(abs_prt)
         return {
