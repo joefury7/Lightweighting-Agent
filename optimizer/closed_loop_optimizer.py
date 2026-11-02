@@ -23,49 +23,32 @@ from optimizer.node_snapping import snap_18_whiffletree_hubs
 
 def non_dominated_sort(objectives):
     """
-    Fast non-dominated sorting for multi-objective optimization (minimization).
+    Ultra-fast vectorized non-dominated sorting for multi-objective optimization (minimization).
     objectives: np.ndarray of shape (N, M)
     Returns: list of fronts (each front is a list of indices)
     """
-    num_points = objectives.shape[0]
-    domination_counts = np.zeros(num_points, dtype=int)
-    dominated_sets = [[] for _ in range(num_points)]
-    fronts = [[]]
+    N = objectives.shape[0]
+    dom_matrix = np.all(objectives[:, None, :] <= objectives[None, :, :], axis=2) & np.any(objectives[:, None, :] < objectives[None, :, :], axis=2)
+    domination_counts = np.sum(dom_matrix, axis=0)
+    dominated_sets = [np.where(dom_matrix[p])[0].tolist() for p in range(N)]
 
-    for p in range(num_points):
-        for q in range(p + 1, num_points):
-            # Check if p dominates q
-            p_leq_q = np.all(objectives[p] <= objectives[q])
-            p_lt_q = np.any(objectives[p] < objectives[q])
-            p_dom_q = p_leq_q and p_lt_q
+    fronts = []
+    current_front = np.where(domination_counts == 0)[0].tolist()
+    if len(current_front) > 0:
+        fronts.append(current_front)
 
-            # Check if q dominates p
-            q_leq_p = np.all(objectives[q] <= objectives[p])
-            q_lt_p = np.any(objectives[q] < objectives[p])
-            q_dom_p = q_leq_p and q_lt_p
-
-            if p_dom_q:
-                dominated_sets[p].append(q)
-                domination_counts[q] += 1
-            elif q_dom_p:
-                dominated_sets[q].append(p)
-                domination_counts[p] += 1
-
-        if domination_counts[p] == 0:
-            fronts[0].append(p)
-
-    i = 0
-    while len(fronts[i]) > 0:
+    while len(current_front) > 0:
         next_front = []
-        for p in fronts[i]:
+        for p in current_front:
             for q in dominated_sets[p]:
                 domination_counts[q] -= 1
                 if domination_counts[q] == 0:
                     next_front.append(q)
-        i += 1
-        fronts.append(next_front)
+        current_front = next_front
+        if len(current_front) > 0:
+            fronts.append(current_front)
 
-    return fronts[:-1]
+    return fronts
 
 
 def calculate_crowding_distance(objectives, front):

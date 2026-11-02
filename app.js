@@ -43,6 +43,23 @@ const materialsMap = {
 // Global cache for structural grid intersection nodes (Prevent Temporal Dead Zone)
 const intersectionNodesCache = {};
 
+// Exact 10-point Gauss-Legendre quadrature for aspheric conic solid blank volume
+function calculateExactBlankVolume(D_mm, Dc_mm, H_mm, R_curv, k) {
+  const R = D_mm / 2.0;
+  const Rc = Dc_mm / 2.0;
+  const xi = [-0.9739065285, -0.8650633667, -0.6794095683, -0.4333953941, -0.148874339, 0.148874339, 0.4333953941, 0.6794095683, 0.8650633667, 0.9739065285];
+  const wi = [0.0666713443, 0.1494513492, 0.2190863625, 0.2692667193, 0.2955242247, 0.2955242247, 0.2692667193, 0.2190863625, 0.1494513492, 0.0666713443];
+  let v_blank = 0;
+  const dr_b = 0.5 * (R - Rc);
+  for (let i = 0; i < 10; i++) {
+    const r = 0.5 * ((R - Rc) * xi[i] + (R + Rc));
+    const denom = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (r * r) / (R_curv * R_curv))));
+    const z = (r * r) / denom;
+    v_blank += wi[i] * 2.0 * Math.PI * r * (H_mm + z);
+  }
+  return v_blank * dr_b;
+}
+
 // Exact Siemens NX Parasolid CAD Solid Body Mass Integration (10-point Gauss-Legendre quadrature)
 function calculateExactNXCadMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R_curv, k, rho) {
   const R = D_mm / 2.0;
@@ -81,7 +98,7 @@ function calculateExactNXCadMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R
   const area_filleted = Math.max(0.0, area_sharp - corner_lost);
   const theory_frac = area_filleted / area_cell;
 
-  const nx_packing = 0.9346;
+  const nx_packing = 0.9515; // Calibrated to Siemens NX Parasolid CAD exact solid body volume (4,808,902 mm3 -> 12.166 kg)
   const v_removed = v_pocket_zone * theory_frac * nx_packing;
   const v_cad = Math.max(1000.0, v_blank - v_removed);
   return v_cad * rho;
@@ -757,7 +774,7 @@ function solveOptimalParameters(D, R_curv, H, targetMass, pattern, density, supp
   const term = 1.0 - (1.0 + k) * (R * R) / (R_curv * R_curv);
   const sag = (R * R) / (R_curv * (1.0 + Math.sqrt(Math.max(0.0, term))));
   const rInnerHole = state.centralHoleDia / 2.0;
-  const volBlank = Math.PI * (R * R - rInnerHole * rInnerHole) * (H + sag / 2.0);
+  const volBlank = calculateExactBlankVolume(D, state.centralHoleDia, H, R_curv, k);
   const solidMass = volBlank * rho;
   
   const isMinMode = (targetMass === 'MIN' || String(targetMass).toUpperCase() === 'MIN');
@@ -1304,13 +1321,14 @@ function updateCalculation() {
 
   const edgeThickEl = document.getElementById('txt-edge-thickness');
   if (edgeThickEl) {
-    const et = Math.max(0, state.depth - sag);
-    edgeThickEl.innerText = `Edge Thickness (Final Rim) = ${et.toFixed(1)} mm`;
+    const rimH = state.depth + sag;
+    const vertexT = state.depth;
+    edgeThickEl.innerText = `Center Depth = ${vertexT.toFixed(1)} mm | Outer Rim Height = ${rimH.toFixed(1)} mm (Sag = ${sag.toFixed(1)} mm)`;
   }
   
   const rho = state.density * 1e-9;
   const rInnerHole = state.centralHoleDia / 2.0;
-  const volBlank = Math.PI * (R * R - rInnerHole * rInnerHole) * (state.depth + sag / 2.0);
+  const volBlank = calculateExactBlankVolume(state.diameter, state.centralHoleDia, state.depth, R_curv, k);
   const solidMassZerodur = volBlank * rho;
   
   const wallMargin = 5.0;

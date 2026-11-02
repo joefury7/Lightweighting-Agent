@@ -282,11 +282,20 @@ if __name__ == '__main__':'''
             print(f"[Pillar 4 NX Bridge] Opening Siemens NX CAM with CAD model: {ugraf_exe} {nxcam_args}")
             launched = False
 
+            # 2a. Terminate any previous ugraf.exe session so Siemens NX cleanly reloads the updated CAD model
+            try:
+                cleanup_cmd = "Stop-ScheduledTask -TaskName 'Launch_NX_CAM' -ErrorAction SilentlyContinue; Stop-Process -Name ugraf -Force -ErrorAction SilentlyContinue"
+                subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", cleanup_cmd], capture_output=True, timeout=8)
+                import time
+                time.sleep(1)
+            except Exception as e_clean:
+                print(f"[Pillar 4 NX Bridge] Stale ugraf cleanup note: {e_clean}")
+
             # Strategy 1: Windows Interactive Task Scheduler (Bypasses service/background desktop isolation, guarantees window on WinSta0\default)
             try:
                 ps_cmd = f'''
                 $action = New-ScheduledTaskAction -Execute "{ugraf_exe}" -Argument '-nxcam -retrieve:"{abs_prt}"' -WorkingDirectory "{work_dir}"
-                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances StopExisting
                 Register-ScheduledTask -TaskName "Launch_NX_CAM" -Action $action -Settings $settings -Force | Out-Null
                 Start-ScheduledTask -TaskName "Launch_NX_CAM"
                 '''

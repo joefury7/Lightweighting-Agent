@@ -88,7 +88,7 @@ class MirrorSurrogatePredictor:
         theory_pocket_fraction = area_filleted_pocket / area_cell
 
         # Siemens NX boundary cell packing factor & 18-hub solid node retention factor
-        nx_packing_factor = 0.9346
+        nx_packing_factor = 0.9515 # Calibrated to Siemens NX Parasolid CAD exact solid body volume (4,808,902 mm3 -> 12.166 kg)
 
         v_removed = v_pocket_zone * theory_pocket_fraction * nx_packing_factor
         v_cad = max(1000.0, v_blank - v_removed)
@@ -131,7 +131,7 @@ class MirrorSurrogatePredictor:
         area_filleted_pocket = np.maximum(0.0, area_sharp_pocket - corner_area_lost)
         theory_pocket_fraction = area_filleted_pocket / area_cell
 
-        nx_packing_factor = 0.9346
+        nx_packing_factor = 0.9515 # Calibrated to Siemens NX Parasolid CAD exact solid body volume (4,808,902 mm3 -> 12.166 kg)
         v_removed = v_pocket_zone * theory_pocket_fraction * nx_packing_factor
         v_cad = np.maximum(1000.0, v_blank - v_removed)
         return v_cad * rho
