@@ -2,13 +2,16 @@
 Validation script for all Server Endpoints & Handlers
 """
 import sys, os
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
 workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
 from server.main_server import (
     health_check, predict_metrics, run_pareto_optimization, run_nsga2_optimization,
-    run_fea_validation, generate_cad_journal, MirrorDesignInput, OptimizeRequest
+    run_fea_validation, generate_cad_journal, run_unified_optimization,
+    MirrorDesignInput, OptimizeRequest, UnifiedOptimizeRequest
 )
 
 print("="*60)
@@ -44,5 +47,15 @@ print("\n"+"="*60)
 print("6. CAD NX Journal Script Endpoint (/cad/generate_journal):")
 cad = generate_cad_journal(MirrorDesignInput(D_mm=560, Dc_mm=120, H_mm=73.7, tf_mm=1.0, tw_mm=3.0, L_mm=55.5, rf_mm=3.0))
 print(cad)
+
+print("\n"+"="*60)
+print("7. Consolidated Unified Optimizer Endpoint (/optimize/unified):")
+unified_res = run_unified_optimization(UnifiedOptimizeRequest(
+    D_mm=560, Dc_mm=120, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0,
+    mode="target", material="zerodur", topology="triangular_isogrid"
+))
+print(f"Winner: {unified_res['winner'].upper()} ({unified_res['winner_reason']})")
+print(f"Best: Mass={unified_res['best']['mass_kg']:.2f} kg, Sag={unified_res['best']['rms_sag_nm']:.2f} nm")
+print(f"Dominant Zernike Modes: {list(unified_res['best'].get('dominant_zernike_modes', {}).keys())}")
 print("="*60)
 print("ALL SERVER ENDPOINTS VERIFIED AND FUNCTIONAL!")

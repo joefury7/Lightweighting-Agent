@@ -1592,5 +1592,152 @@
     "residual_error_nm": 0.21,
     "error_pct": 0.54,
     "needs_retrain": false
+  },
+  {
+    "timestamp": "2026-11-02 22:35:01",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 65.27,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.482,
+    "residual_error_nm": 7.16,
+    "error_pct": 12.32,
+    "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-02 22:49:24",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 64.13,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.482,
+    "residual_error_nm": 6.02,
+    "error_pct": 10.36,
+    "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-02 23:11:10",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 63.46,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.482,
+    "residual_error_nm": 5.35,
+    "error_pct": 9.21,
+    "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-02 23:34:51",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 63.04,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.482,
+    "residual_error_nm": 4.93,
+    "error_pct": 8.48,
+    "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-08 12:28:32",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 62.76,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.482,
+    "residual_error_nm": 4.65,
+    "error_pct": 8.0,
+    "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-08 12:28:51",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 62.55,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.482,
+    "residual_error_nm": 4.44,
+    "error_pct": 7.64,
+    "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-08 12:29:16",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 62.41,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.482,
+    "residual_error_nm": 4.3,
+    "error_pct": 7.4,
+    "needs_retrain": true
   }
 ]

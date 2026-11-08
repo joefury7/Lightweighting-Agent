@@ -36,6 +36,7 @@ const materialsMap = {
   zerodur: { name: "Zerodur Glass-Ceramic", density: 2530, E: 90.3e9, nu: 0.24 },
   ule: { name: "ULE Titanium Silicate", density: 2210, E: 67.6e9, nu: 0.17 },
   sic: { name: "Silicon Carbide SiC", density: 3160, E: 420.0e9, nu: 0.14 },
+  beryllium: { name: "Beryllium I-220H", density: 1850, E: 303.0e9, nu: 0.08 },
   fused_silica: { name: "Fused Silica", density: 2200, E: 72.7e9, nu: 0.17 },
   al6061: { name: "Aluminum 6061-T6", density: 2700, E: 68.9e9, nu: 0.33 }
 };
@@ -197,6 +198,14 @@ function setOptimizationMode(mode) {
     if (optBtnTop) {
       optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 50k NSGA-II';
     }
+    const unifiedBtn = document.getElementById('btn-optimize-unified');
+    const unifiedBtnTop = document.getElementById('btn-optimize-unified-top');
+    if (unifiedBtn) {
+      unifiedBtn.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize Mirror (Target Weight)';
+    }
+    if (unifiedBtnTop) {
+      unifiedBtnTop.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize';
+    }
   } else {
     if (btnMin) {
       btnMin.style.borderColor = '#00f2fe';
@@ -226,6 +235,14 @@ function setOptimizationMode(mode) {
     }
     if (optBtnTop) {
       optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 50k NSGA-II (MIN)';
+    }
+    const unifiedBtnMin = document.getElementById('btn-optimize-unified');
+    const unifiedBtnTopMin = document.getElementById('btn-optimize-unified-top');
+    if (unifiedBtnMin) {
+      unifiedBtnMin.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize Mirror (MIN Weight)';
+    }
+    if (unifiedBtnTopMin) {
+      unifiedBtnTopMin.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize (MIN)';
     }
   }
 }
@@ -351,24 +368,115 @@ function initEventListeners() {
   safeAddListener('btn-export-py', 'click', downloadPythonFile);
   safeAddListener('btn-import', 'click', handleImportClick);
 
-  // 4-Pillar AI & CAD Handlers
-  safeAddListener('btn-instant-ml', 'click', executeInstantMLPredict);
-  safeAddListener('btn-instant-ml-top', 'click', executeInstantMLPredict);
-  safeAddListener('btn-run-nsga2', 'click', executeNSGA2Optimization);
-  safeAddListener('btn-nsga2-top', 'click', executeNSGA2Optimization);
-  safeAddListener('btn-run-fea', 'click', executeNastranFEASolve);
-  safeAddListener('btn-fea-top', 'click', executeNastranFEASolve);
-  safeAddListener('btn-create-prt', 'click', executeCreateNXPart);
-  safeAddListener('btn-create-prt-top', 'click', executeCreateNXPart);
+  // 4-Pillar AI & CAD Handlers with Interactive Progress
+  safeAddListener('btn-optimize-unified', 'click', () => withButtonLoading('btn-optimize-unified', 'Optimizing...', executeUnifiedOptimization));
+  safeAddListener('btn-optimize-unified-top', 'click', () => withButtonLoading('btn-optimize-unified-top', 'Optimizing...', executeUnifiedOptimization));
+  safeAddListener('btn-run-pinn-tier1', 'click', () => withButtonLoading('btn-run-pinn-tier1', 'Evaluating PINN...', executeDeepPINNPredict));
+  safeAddListener('btn-run-pinn', 'click', () => withButtonLoading('btn-run-pinn', 'Evaluating PINN...', executeDeepPINNPredict));
+  safeAddListener('btn-run-nsga2', 'click', () => withButtonLoading('btn-run-nsga2', 'Running NSGA-II...', executeNSGA2Optimization));
+  safeAddListener('btn-run-ppo', 'click', () => withButtonLoading('btn-run-ppo', 'Running PPO Policy...', executePPORLOptimization));
+  safeAddListener('btn-run-fea', 'click', () => withButtonLoading('btn-run-fea', 'Solving NASTRAN FEA...', executeNastranFEASolve));
+  safeAddListener('btn-fea-top', 'click', () => withButtonLoading('btn-fea-top', 'Solving NASTRAN FEA...', executeNastranFEASolve));
+  safeAddListener('btn-create-prt', 'click', () => withButtonLoading('btn-create-prt', 'Building CAD...', executeCreateNXPart));
+  safeAddListener('btn-create-prt-top', 'click', () => withButtonLoading('btn-create-prt-top', 'Building CAD...', executeCreateNXPart));
 }
 
-function showSolverStatus(message, isSuccess = true) {
+let activeTimerInterval = null;
+let activeStartTime = 0;
+
+function setGlobalProgress(active) {
+  let bar = document.getElementById('top-progress-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'top-progress-bar';
+    bar.className = 'top-progress-bar';
+    document.body.prepend(bar);
+  }
+  if (active) {
+    bar.classList.add('active');
+  } else {
+    bar.classList.remove('active');
+  }
+}
+
+function showSolverStatus(message, statusType = 'success') {
   const box = document.getElementById('solver-status-box');
   if (!box) return;
+
+  if (activeTimerInterval) {
+    clearInterval(activeTimerInterval);
+    activeTimerInterval = null;
+  }
+
+  let type = statusType;
+  if (statusType === true) type = 'success';
+  if (statusType === false) type = 'error';
+
   box.style.display = 'block';
-  box.className = 'import-status ' + (isSuccess ? 'success' : 'error');
-  box.innerHTML = (isSuccess ? '<i class="fa-solid fa-circle-check"></i> ' : '<i class="fa-solid fa-triangle-exclamation"></i> ') + message;
-  setTimeout(() => { if (box) box.style.display = 'none'; }, 8000);
+  box.className = 'import-status ' + type;
+
+  if (type === 'running') {
+    setGlobalProgress(true);
+    activeStartTime = Date.now();
+    const updateRunningText = () => {
+      const elapsed = ((Date.now() - activeStartTime) / 1000).toFixed(1);
+      box.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+          <span style="background:rgba(0,242,254,0.22);color:#00f2fe;font-size:0.7rem;padding:2px 8px;border-radius:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+            <i class="fa-solid fa-circle-notch fa-spin"></i> RUNNING NOW
+          </span>
+          <span style="font-family:var(--font-mono);font-size:0.75rem;color:#00f2fe;font-weight:600;">${elapsed}s elapsed</span>
+        </div>
+        <div style="font-size:0.78rem;line-height:1.4;margin-top:0.2rem;">${message}</div>
+      `;
+    };
+    updateRunningText();
+    activeTimerInterval = setInterval(updateRunningText, 100);
+  } else {
+    setGlobalProgress(false);
+    const elapsedSec = activeStartTime > 0 ? ((Date.now() - activeStartTime) / 1000).toFixed(2) : null;
+    const elapsedMsg = elapsedSec ? ` [in ${elapsedSec}s]` : '';
+    activeStartTime = 0;
+    const isSuccess = (type === 'success');
+    const badgeColor = isSuccess ? '#00e676' : '#ff5252';
+    const badgeBg = isSuccess ? 'rgba(0,230,118,0.2)' : 'rgba(255,82,82,0.2)';
+    const badgeIcon = isSuccess ? 'fa-circle-check' : 'fa-triangle-exclamation';
+    const badgeText = isSuccess ? 'COMPLETED' : 'ERROR';
+    const timeStr = new Date().toLocaleTimeString();
+
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
+        <span style="background:${badgeBg};color:${badgeColor};font-size:0.7rem;padding:2px 8px;border-radius:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+          <i class="fa-solid ${badgeIcon}"></i> ${badgeText}
+        </span>
+        <div style="display:inline-flex;align-items:center;gap:0.4rem;">
+          <span style="font-size:0.7rem;color:#8a99ad;font-family:var(--font-mono);">${timeStr}${elapsedMsg}</span>
+          <button onclick="document.getElementById('solver-status-box').style.display='none'" style="background:none;border:none;color:#8a99ad;cursor:pointer;font-size:0.9rem;padding:0 3px;line-height:1;" title="Dismiss">&times;</button>
+        </div>
+      </div>
+      <div style="font-size:0.78rem;line-height:1.4;margin-top:0.2rem;">${message}</div>
+    `;
+    // Status stays visible persistently until a new task runs or user clicks 'x'
+  }
+}
+
+async function withButtonLoading(buttonId, loadingText, taskFn) {
+  const btn = document.getElementById(buttonId);
+  const originalHtml = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('btn-executing');
+    btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${loadingText}`;
+  }
+  try {
+    return await taskFn();
+  } finally {
+    if (btn && originalHtml !== null) {
+      btn.innerHTML = originalHtml;
+      btn.disabled = false;
+      btn.classList.remove('btn-executing');
+    }
+  }
 }
 
 async function executeInstantMLPredict() {
@@ -464,6 +572,9 @@ async function executeNSGA2Optimization() {
     if (quiltEl) quiltEl.innerText = `${quilt.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(freq)} Hz`;
 
+    // Automatically update 37 Fringe Zernike Wavefront card for optimal geometry
+    setTimeout(executeDeepPINNPredict, 100);
+
     const modeLabel = optMode === 'target' ? `Target ${targetMass.toFixed(1)} kg` : 'Minimum Mass';
     showSolverStatus(`🧬 AI Optimal Solution (${modeLabel}): Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
   } catch (err) {
@@ -481,7 +592,7 @@ async function executeNastranFEASolve() {
   const lVal = parseFloat(document.getElementById('inp-cell-size').value) || state.cellSize;
   const rfVal = parseFloat(document.getElementById('inp-fillet-radius').value) || state.filletRadius;
 
-  showSolverStatus('🔬 Executing NASTRAN SOL 101 Linear Static Ground-Truth FEA Simulation...', true);
+  showSolverStatus('Executing NASTRAN SOL 101 Linear Static FEA Simulation...', 'running');
   try {
     const res = await fetch('http://127.0.0.1:8000/fea/solve', {
       method: 'POST',
@@ -527,7 +638,7 @@ async function executeCreateNXPart() {
   const codeEl = document.getElementById('code-output');
   const pyJournalCode = codeEl ? codeEl.textContent : '';
 
-  showSolverStatus('Compiling exact 3D isogrid journal and building CAD part in Siemens NX...', true);
+  showSolverStatus('Compiling exact 3D isogrid journal and building CAD part in Siemens NX...', 'running');
   try {
     const res = await fetch('http://127.0.0.1:8000/cad/create_prt', {
       method: 'POST',
@@ -3425,3 +3536,201 @@ window.addEventListener('DOMContentLoaded', () => {
   window.agentEngine = new GeminiAgentEngine();
   window.agentEngine.initUI();
 });
+
+
+async function executeDeepPINNPredict() {
+  const dVal = parseFloat(document.getElementById('inp-diameter').value) || state.diameter;
+  const dcVal = parseFloat(document.getElementById('inp-central-hole').value) || state.centralHoleDia;
+  const hVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
+  const tfVal = parseFloat(document.getElementById('inp-faceplate').value) || state.faceplate;
+  const twVal = parseFloat(document.getElementById('inp-rib-thick').value) || state.ribThick;
+  const lVal = parseFloat(document.getElementById('inp-cell-size').value) || state.cellSize;
+  const rfVal = parseFloat(document.getElementById('inp-fillet-radius').value) || state.filletRadius;
+  const matVal = state.material || 'zerodur';
+  const topVal = state.pattern || 'triangular_isogrid';
+
+  showSolverStatus(`Evaluating Deep Residual PINN Surrogate (${matVal.toUpperCase()} | ${topVal})...`, 'running');
+  try {
+    const res = await fetch('http://127.0.0.1:8000/pinn/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        D_mm: dVal, Dc_mm: dcVal, H_mm: hVal,
+        tf_mm: tfVal, tw_mm: twVal, L_mm: lVal, rf_mm: rfVal,
+        material: matVal, topology: topVal
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    // Update Scalar Metrics
+    const massEl = document.getElementById('val-final-mass');
+    const sagEl = document.getElementById('val-predicted-sag');
+    const quiltEl = document.getElementById('val-quilting-deflection');
+    const freqEl = document.getElementById('val-fundamental-freq');
+    if (massEl) massEl.innerText = `${data.mass_kg.toFixed(2)} kg`;
+    if (sagEl) sagEl.innerText = `${data.rms_sag_nm.toFixed(2)} nm`;
+    if (quiltEl) quiltEl.innerText = `${data.quilting_nm.toFixed(2)} nm`;
+    if (freqEl) freqEl.innerText = `${Math.round(data.frequency_hz)} Hz`;
+
+    // Update 37 Fringe Zernike Wavefront display
+    if (data.dominant_zernike_modes) {
+      const z4 = document.getElementById('val-z4');
+      const z9 = document.getElementById('val-z9');
+      const z10 = document.getElementById('val-z10');
+      const z37 = document.getElementById('val-z37');
+      const zRms = document.getElementById('val-zernike-rms');
+      if (z4) z4.innerText = `${data.dominant_zernike_modes.Z4_Defocus_nm} nm`;
+      if (z9) z9.innerText = `${data.dominant_zernike_modes.Z9_Primary_Spherical_nm} nm`;
+      if (z10) z10.innerText = `${data.dominant_zernike_modes.Z10_Primary_Trefoil_3Fold_nm} nm`;
+      if (z37) z37.innerText = `${data.dominant_zernike_modes.Z37_Hexafoil_6Fold_Whiffletree_nm} nm`;
+      if (zRms) zRms.innerText = `${data.rms_sag_nm.toFixed(2)} nm`;
+    }
+
+    showSolverStatus(`⚛️ Deep PINN Inference Complete: Mass = ${data.mass_kg} kg, Sag = ${data.rms_sag_nm} nm, Latency = ${data.inference_latency_ms} ms (37 Zernike Modes Computed)`, true);
+  } catch (err) {
+    showSolverStatus('PINN Predict Error: ' + err.message + '. Ensure backend server is running.', false);
+  }
+}
+
+async function executePPORLOptimization() {
+  const dVal = parseFloat(document.getElementById('inp-diameter').value) || state.diameter;
+  const dcVal = parseFloat(document.getElementById('inp-central-hole').value) || state.centralHoleDia;
+  const hVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
+  const matVal = state.material || 'zerodur';
+  const topVal = state.pattern || 'triangular_isogrid';
+  const targetMass = parseFloat(document.getElementById('inp-target-mass').value) || 12.0;
+
+  showSolverStatus(`🤖 Executing Continuous PPO Reinforcement Learning Policy (${matVal.toUpperCase()})...`, true);
+  try {
+    const res = await fetch('http://127.0.0.1:8000/optimize/rl_ppo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        D_mm: dVal, Dc_mm: dcVal, H_mm: hVal,
+        target_mass_kg: targetMass, max_sag_nm: 60.0,
+        material: matVal, topology: topVal
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const best = await res.json();
+
+    applyCombo(best.tf_mm, best.L_mm, best.tw_mm, best.rf_mm, best.H_mm);
+
+    const massEl = document.getElementById('val-final-mass');
+    const sagEl = document.getElementById('val-predicted-sag');
+    const quiltEl = document.getElementById('val-quilting-deflection');
+    const freqEl = document.getElementById('val-fundamental-freq');
+    if (massEl) massEl.innerText = `${best.mass_kg.toFixed(2)} kg`;
+    if (sagEl) sagEl.innerText = `${best.rms_sag_nm.toFixed(2)} nm`;
+    if (quiltEl) quiltEl.innerText = `${best.quilting_nm.toFixed(2)} nm`;
+    if (freqEl) freqEl.innerText = `${Math.round(best.frequency_hz)} Hz`;
+
+    // Automatically update 37 Fringe Zernike Wavefront card for optimal geometry
+    setTimeout(executeDeepPINNPredict, 100);
+
+    showSolverStatus(`🤖 PPO RL Optimal Solution (${matVal.toUpperCase()}): Mass = ${best.mass_kg} kg, Sag = ${best.rms_sag_nm} nm, f1 = ${Math.round(best.frequency_hz)} Hz (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
+  } catch (err) {
+    showSolverStatus('PPO RL Error: ' + err.message + '. Using NSGA-II solver fallback.', false);
+    executeNSGA2Optimization();
+  }
+}
+
+
+async function executeUnifiedOptimization() {
+  const dVal = parseFloat(document.getElementById('inp-diameter').value) || state.diameter;
+  const dcVal = parseFloat(document.getElementById('inp-central-hole').value) || state.centralHoleDia;
+  const hVal = parseFloat(document.getElementById('inp-depth').value) || state.depth;
+  const matVal = state.material || 'zerodur';
+  const topVal = state.pattern || 'triangular_isogrid';
+  
+  const rawTarget = (document.getElementById('inp-target-mass').value || '').trim().toUpperCase();
+  const isMin = state.optimizationMode === 'min' || rawTarget === 'MIN' || rawTarget.includes('MIN') || state.targetMass === 'MIN';
+  const targetMass = isMin ? 999.0 : (parseFloat(rawTarget) || state.customTargetMass || 12.0);
+  const optMode = isMin ? 'min' : 'target';
+
+  showSolverStatus(`Running Cooperative AI Pipeline: Stage 1 (NSGA-II 16k) ➔ Stage 2 (PPO RL Refinement) ➔ Stage 3 (PINN 37 Zernikes)...`, 'running');
+
+  try {
+    const res = await fetch('http://127.0.0.1:8000/optimize/unified', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        D_mm: dVal,
+        Dc_mm: dcVal,
+        H_mm: hVal,
+        max_mass_kg: targetMass,
+        max_sag_nm: 60.0,
+        mode: optMode,
+        material: matVal,
+        topology: topVal,
+        num_candidates: 50000
+      })
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const best = data.best;
+
+    // Apply solved parameters to CAD/Canvas and Inputs
+    applyCombo(best.tf_mm, best.L_mm, best.tw_mm, best.rf_mm, best.H_mm);
+
+    // Update Scalar Metrics
+    const massEl = document.getElementById('val-final-mass');
+    const sagEl = document.getElementById('val-predicted-sag');
+    const quiltEl = document.getElementById('val-quilting-deflection');
+    const freqEl = document.getElementById('val-fundamental-freq');
+    if (massEl) massEl.innerText = `${best.mass_kg.toFixed(2)} kg`;
+    if (sagEl) sagEl.innerText = `${best.rms_sag_nm.toFixed(2)} nm`;
+    if (quiltEl) quiltEl.innerText = `${best.quilting_nm.toFixed(2)} nm`;
+    if (freqEl) freqEl.innerText = `${Math.round(best.frequency_hz)} Hz`;
+
+    // Update 37 Fringe Zernike Wavefront card
+    if (best.dominant_zernike_modes) {
+      const z4 = document.getElementById('val-z4');
+      const z9 = document.getElementById('val-z9');
+      const z10 = document.getElementById('val-z10');
+      const z37 = document.getElementById('val-z37');
+      const zRms = document.getElementById('val-zernike-rms');
+      if (z4 && best.dominant_zernike_modes.Z4_Defocus_nm !== undefined) z4.innerText = `${best.dominant_zernike_modes.Z4_Defocus_nm} nm`;
+      if (z9 && best.dominant_zernike_modes.Z9_Primary_Spherical_nm !== undefined) z9.innerText = `${best.dominant_zernike_modes.Z9_Primary_Spherical_nm} nm`;
+      if (z10 && best.dominant_zernike_modes.Z10_Primary_Trefoil_3Fold_nm !== undefined) z10.innerText = `${best.dominant_zernike_modes.Z10_Primary_Trefoil_3Fold_nm} nm`;
+      if (z37 && best.dominant_zernike_modes.Z37_Hexafoil_6Fold_Whiffletree_nm !== undefined) z37.innerText = `${best.dominant_zernike_modes.Z37_Hexafoil_6Fold_Whiffletree_nm} nm`;
+      if (zRms) zRms.innerText = `${best.rms_sag_nm.toFixed(2)} nm`;
+    }
+
+    // Display Cooperative Handoff Badge
+    const badgeEl = document.getElementById('unified-winner-badge');
+    const badgeTextEl = document.getElementById('unified-winner-text');
+    const handoffDetailsEl = document.getElementById('unified-handoff-details');
+    const seedMetricsEl = document.getElementById('handoff-seed-metrics');
+    const refinedMetricsEl = document.getElementById('handoff-refined-metrics');
+
+    if (badgeEl && badgeTextEl) {
+      badgeEl.style.display = 'flex';
+      if (data.handoff) {
+        badgeTextEl.innerHTML = `<strong>Cooperative Handoff Complete:</strong> ${data.handoff.handoff_message || data.winner_reason}`;
+        if (handoffDetailsEl && data.handoff.seed_nsga2 && data.handoff.refined_ppo) {
+          handoffDetailsEl.style.display = 'grid';
+          if (seedMetricsEl) {
+            seedMetricsEl.innerText = `${data.handoff.seed_nsga2.mass_kg.toFixed(2)} kg | ${data.handoff.seed_nsga2.rms_sag_nm.toFixed(1)} nm`;
+          }
+          if (refinedMetricsEl) {
+            refinedMetricsEl.innerText = `${data.handoff.refined_ppo.mass_kg.toFixed(2)} kg | ${data.handoff.refined_ppo.rms_sag_nm.toFixed(1)} nm`;
+          }
+        }
+      } else {
+        const winnerName = data.winner === 'ppo' ? 'PPO Reinforcement Learning' : (data.winner === 'cooperative' ? 'Cooperative Two-Stage' : 'NSGA-II Pareto GA');
+        badgeTextEl.innerHTML = `<strong>${winnerName}:</strong> ${data.winner_reason || 'Optimization finished successfully.'}`;
+        if (handoffDetailsEl) handoffDetailsEl.style.display = 'none';
+      }
+    }
+
+    const sMsg = data.handoff
+      ? `🚀 Cooperative Optimization Complete! NSGA-II Seed ➔ PPO Refined to ${best.mass_kg.toFixed(2)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm (tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`
+      : `🚀 Unified Optimization Complete: Mass = ${best.mass_kg.toFixed(2)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm`;
+    showSolverStatus(sMsg, true);
+  } catch (err) {
+    showSolverStatus('Unified Optimizer Error: ' + err.message + '. Running fallback local NSGA-II solver...', false);
+    executeNSGA2Optimization();
+  }
+}
