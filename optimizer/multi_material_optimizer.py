@@ -50,14 +50,20 @@ class MultiMaterialOptimizer:
 
     def optimize_material_nsga2(self, material="zerodur", topology="triangular_isogrid",
                                 D_mm=560.0, Dc_mm=120.0, H_mm=73.7, target_mass_kg=12.0, max_sag_nm=60.0,
-                                pop_size=150, generations=30, mode="target"):
+                                pop_size=150, generations=30, mode="target", seed=42):
         """
         Runs true NSGA-II Multi-Objective Genetic Algorithm for the specified material and topology.
         Supports both 'target' mass tracking and 'min' mass reduction.
         """
+        # Fix random seed for reproducibility
+        np.random.seed(seed)
+
         t0 = time.time()
-        bounds_lower = np.array([H_mm if (H_mm and H_mm > 10.0) else 50.0, 0.8, 1.5, 25.0, 1.0])
-        bounds_upper = np.array([H_mm if (H_mm and H_mm > 10.0) else 95.0, 3.5, 5.0, 85.0, 5.0])
+        # Allow full H range so NSGA-II can explore all depth values
+        h_lo = max(45.0, H_mm * 0.7) if (H_mm and H_mm > 10.0) else 45.0
+        h_hi = min(110.0, H_mm * 1.3) if (H_mm and H_mm > 10.0) else 110.0
+        bounds_lower = np.array([h_lo, 0.8, 1.5, 25.0, 1.0])
+        bounds_upper = np.array([h_hi, 3.5, 5.5, 95.0, 5.0])
 
         population = np.random.uniform(bounds_lower, bounds_upper, (pop_size, len(bounds_lower)))
 
@@ -83,8 +89,10 @@ class MultiMaterialOptimizer:
             penalties = (c_sag * 1.0) + (c_quilt * 2.0) + (c_freq * 1.0) + (c_tf * 50.0) + (c_tw * 50.0)
 
             if mode == "target":
+                # Strong target-mass tracking: heavily penalise deviation from target.
+                # Weight 200× means 1 kg off → +200 in obj1, dwarfing all sag/freq penalties.
                 c_mass = np.abs(mass - target_mass_kg)
-                obj1 = c_mass * 15.0 + penalties
+                obj1 = c_mass * 200.0 + penalties
             else:
                 c_mass = np.maximum(0.0, mass - target_mass_kg)
                 obj1 = mass + (c_mass * 5.0) + penalties
@@ -153,7 +161,8 @@ class MultiMaterialOptimizer:
         # Best solution extraction
         final_objs, final_scalars, final_penalties = evaluate_pop(population)
         if mode == "target":
-            best_idx = np.argmin(np.abs(final_scalars[:, 0] - target_mass_kg) * 15.0 + final_penalties + (final_scalars[:, 1] * 0.1))
+            # Pick design closest to target mass (200× weight), then sag as tiebreaker
+            best_idx = np.argmin(np.abs(final_scalars[:, 0] - target_mass_kg) * 200.0 + final_penalties + (final_scalars[:, 1] * 0.1))
         else:
             best_idx = np.argmin(final_penalties + (final_scalars[:, 0] * 2.0) + (final_scalars[:, 1] * 0.2))
         best_g = population[best_idx]
@@ -219,7 +228,7 @@ class MultiMaterialOptimizer:
         nsga2_res = self.optimize_material_nsga2(
             material=material, topology=topology, D_mm=D_mm, Dc_mm=Dc_mm, H_mm=H_mm,
             target_mass_kg=target_mass_kg, max_sag_nm=max_sag_nm, mode=mode,
-            pop_size=150, generations=30
+            pop_size=150, generations=30, seed=42
         )
         t_s1_dur = time.time() - t_s1
 

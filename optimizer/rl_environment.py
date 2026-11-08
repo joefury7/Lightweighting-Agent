@@ -49,7 +49,9 @@ class OptoMechanicalMirrorEnv:
         # Geometric action bounds (delta per step)
         if self.fine_tuning:
             # Fine-tuning scales for local micro-refinement from coarse seed
-            self.step_scales = np.array([0.4, 0.04, 0.04, 0.8, 0.1], dtype=np.float32)
+            # L (cell pitch) is the dominant mass lever — allow ±4mm/step
+            # tf, tw ±0.15mm/step, H ±1.5mm/step, rf ±0.3mm/step
+            self.step_scales = np.array([1.5, 0.15, 0.15, 4.0, 0.3], dtype=np.float32)
         else:
             self.step_scales = np.array([1.5, 0.15, 0.15, 2.5, 0.25], dtype=np.float32)
 
@@ -131,11 +133,14 @@ class OptoMechanicalMirrorEnv:
         # 1. Mass Reduction / Tracking Reward
         if self.mode == "target":
             mass_err = abs(mass - self.target_mass)
-            r_mass = -2.5 * mass_err
+            # Strong gradient: -20× per kg off target so the agent always moves toward target
+            r_mass = -20.0 * mass_err
             if mass_err <= 0.02:
-                r_mass += 15.0 # Exact sub-decimal target match bonus!
+                r_mass += 50.0   # Exact sub-decimal target match bonus!
             elif mass_err <= 0.1:
-                r_mass += 6.0
+                r_mass += 25.0
+            elif mass_err <= 0.5:
+                r_mass += 5.0
         else:
             r_mass = -1.2 * max(0.0, mass - self.target_mass) + (0.05 * lw_pct)
 

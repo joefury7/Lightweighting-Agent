@@ -226,7 +226,8 @@ class PPOAgent:
 
             if env.mode == "target":
                 mass_err = abs(m - env.target_mass)
-                return (mass_err * 25.0) + penalties + (s * 0.1)
+                # Minimize mass error first (200×), then sag as secondary objective
+                return (mass_err * 200.0) + penalties + (s * 0.1)
             else:
                 return (m * 2.0) + penalties + (s * 0.1)
 
