@@ -56,8 +56,15 @@ class OptoMechanicalMirrorEnv:
             self.step_scales = np.array([1.5, 0.15, 0.15, 2.5, 0.25], dtype=np.float32)
 
         # State bounds
-        self.bounds_lower = np.array([45.0, 0.8, 1.5, 25.0, 1.0], dtype=np.float32)  # [H, tf, tw, L, rf]
-        self.bounds_upper = np.array([110.0, 4.0, 5.5, 95.0, 5.0], dtype=np.float32)
+        if initial_geom is not None and len(initial_geom) >= 1:
+            h_fixed = float(initial_geom[0])
+            self.bounds_lower = np.array([h_fixed, 0.8, 1.5, 25.0, 1.0], dtype=np.float32)
+            self.bounds_upper = np.array([h_fixed, 4.0, 5.5, 95.0, 5.0], dtype=np.float32)
+            if self.fine_tuning:
+                self.step_scales = np.array([0.0, 0.15, 0.15, 4.0, 0.3], dtype=np.float32)
+        else:
+            self.bounds_lower = np.array([45.0, 0.8, 1.5, 25.0, 1.0], dtype=np.float32)  # [H, tf, tw, L, rf]
+            self.bounds_upper = np.array([110.0, 4.0, 5.5, 95.0, 5.0], dtype=np.float32)
 
         self.reset(initial_geom=initial_geom)
 

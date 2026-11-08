@@ -59,11 +59,10 @@ class MultiMaterialOptimizer:
         np.random.seed(seed)
 
         t0 = time.time()
-        # Allow full H range so NSGA-II can explore all depth values
-        h_lo = max(45.0, H_mm * 0.7) if (H_mm and H_mm > 10.0) else 45.0
-        h_hi = min(110.0, H_mm * 1.3) if (H_mm and H_mm > 10.0) else 110.0
-        bounds_lower = np.array([h_lo, 0.8, 1.5, 25.0, 1.0])
-        bounds_upper = np.array([h_hi, 3.5, 5.5, 95.0, 5.0])
+        # Keep mirror blank depth H strictly fixed to the user's input specification (e.g. 73.7 mm)
+        h_fixed = float(H_mm) if (H_mm and H_mm > 10.0) else 73.7
+        bounds_lower = np.array([h_fixed, 0.8, 1.5, 25.0, 1.0])
+        bounds_upper = np.array([h_fixed, 3.5, 5.5, 95.0, 5.0])
 
         population = np.random.uniform(bounds_lower, bounds_upper, (pop_size, len(bounds_lower)))
 

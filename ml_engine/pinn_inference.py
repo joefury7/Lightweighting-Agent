@@ -145,6 +145,11 @@ class PINNMirrorPredictor:
     def predict_batch_fast(self, feat_geom_matrix, material="zerodur", topology="triangular_isogrid"):
         """
         High-throughput batch evaluation: evaluates tens of thousands of designs in < 30 ms.
+
+        CRITICAL FIX: The PINN neural network was trained on old (pre-calibration) mass data
+        and under-reports mass by ~3.5-4 kg systematically.  We replace column 0 (mass_kg)
+        with the same exact analytical CAD formula used in predict() so NSGA-II fitness and
+        the final answer are always consistent.
         """
         N = len(feat_geom_matrix)
         mat_key = material.lower().replace(" ", "_").strip()
@@ -163,6 +168,27 @@ class PINNMirrorPredictor:
             x_t = torch.tensor(norm_mat, dtype=torch.float32)
             scal_norm, _ = self.model(x_t)
             scalars = (scal_norm.numpy() * self.y_scalar_std) + self.y_scalar_mean
+
+        # --- Replace PINN mass (col 0) with exact analytical CAD mass ---
+        # feat_geom_matrix columns: [D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm]
+        rho_map = {
+            "zerodur": 2.53e-6, "sic": 3.21e-6, "ule": 2.205e-6, "beryllium": 1.848e-6
+        }
+        rho_kg_mm3 = rho_map.get(mat_key, 2.53e-6)
+
+        for i in range(N):
+            row = feat_geom_matrix[i]
+            D, Dc, H, tf, tw, L, rf = float(row[0]), float(row[1]), float(row[2]), \
+                                       float(row[3]), float(row[4]), float(row[5]), float(row[6])
+            try:
+                cad_gen = MirrorCADGenerator(
+                    D_mm=D, Dc_mm=Dc, H_mm=H, tf_mm=tf, tw_mm=tw,
+                    L_mm=L, rf_mm=rf, topology=top_key, material=mat_key
+                )
+                cad_mass, _, _ = cad_gen.compute_cad_mass()
+                scalars[i, 0] = float(cad_mass)
+            except Exception:
+                pass   # keep PINN value on rare edge-case geometry failures
 
         return scalars
 
