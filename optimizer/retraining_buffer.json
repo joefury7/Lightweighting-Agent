@@ -1739,5 +1739,26 @@
     "residual_error_nm": 4.3,
     "error_pct": 7.4,
     "needs_retrain": true
+  },
+  {
+    "timestamp": "2026-11-08 19:34:40",
+    "params": {
+      "D_mm": 560.0,
+      "Dc_mm": 120.0,
+      "H_mm": 73.7,
+      "tf_mm": 1.0,
+      "tw_mm": 3.0,
+      "L_mm": 55.5,
+      "rf_mm": 3.0,
+      "material": "zerodur",
+      "topology": "triangular_isogrid",
+      "journal_code": null
+    },
+    "ml_pred_sag_nm": 62.29,
+    "fea_actual_sag_nm": 58.11,
+    "fea_actual_mass_kg": 12.67,
+    "residual_error_nm": 4.18,
+    "error_pct": 7.19,
+    "needs_retrain": true
   }
 ]
