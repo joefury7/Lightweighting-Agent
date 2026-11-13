@@ -136,6 +136,18 @@ def predict_metrics(design: MirrorDesignInput):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/ml/predict")
+def predict_metrics_get(
+    D_mm: float = 560.0, Dc_mm: float = 120.0, H_mm: float = 73.7,
+    tf_mm: float = 1.0, tw_mm: float = 3.0, L_mm: float = 55.5, rf_mm: float = 3.0
+):
+    """GET endpoint for ML XGBoost surrogate evaluation with query parameters."""
+    try:
+        return predictor.predict(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/pinn/predict")
 def predict_pinn_with_zernike(design: MirrorDesignInput):
     """
@@ -147,6 +159,23 @@ def predict_pinn_with_zernike(design: MirrorDesignInput):
             D_mm=design.D_mm, Dc_mm=design.Dc_mm, H_mm=design.H_mm,
             tf_mm=design.tf_mm, tw_mm=design.tw_mm, L_mm=design.L_mm, rf_mm=design.rf_mm,
             material=design.material or "zerodur", topology=design.topology or "triangular_isogrid"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pinn/predict")
+def predict_pinn_with_zernike_get(
+    D_mm: float = 560.0, Dc_mm: float = 120.0, H_mm: float = 73.7,
+    tf_mm: float = 1.0, tw_mm: float = 3.0, L_mm: float = 55.5, rf_mm: float = 3.0,
+    material: str = "zerodur", topology: str = "triangular_isogrid"
+):
+    """GET endpoint for instant PINN surrogate evaluation with query parameters."""
+    try:
+        return pinn_predictor.predict(
+            D_mm=D_mm, Dc_mm=Dc_mm, H_mm=H_mm,
+            tf_mm=tf_mm, tw_mm=tw_mm, L_mm=L_mm, rf_mm=rf_mm,
+            material=material or "zerodur", topology=topology or "triangular_isogrid"
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
