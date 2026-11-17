@@ -61,7 +61,8 @@ class MultiMaterialOptimizer:
         t0 = time.time()
         # Keep mirror blank depth H strictly fixed to the user's input specification (e.g. 73.7 mm)
         h_fixed = float(H_mm) if (H_mm and H_mm > 10.0) else 73.7
-        bounds_lower = np.array([h_fixed, 0.8, 1.5, 25.0, 1.0])
+        # Enforce Yoder (2015) & NASA CR-124075 manufacturing domains: tf >= 1.2mm, tw >= 1.5mm
+        bounds_lower = np.array([h_fixed, 1.2, 1.5, 25.0, 1.0])
         bounds_upper = np.array([h_fixed, 3.5, 5.5, 95.0, 5.0])
 
         population = np.random.uniform(bounds_lower, bounds_upper, (pop_size, len(bounds_lower)))
@@ -78,14 +79,20 @@ class MultiMaterialOptimizer:
             quilt = np.maximum(0.1, scalars[:, 3])
             freq = np.maximum(20.0, scalars[:, 4])
 
-            # Constraints
+            # Constraints & Validity Domain Guards (P8 / Yoder / NASA CR-124075)
             c_sag = np.maximum(0.0, sag - max_sag_nm)
-            c_quilt = np.maximum(0.0, quilt - 30.0)
+            c_quilt = np.maximum(0.0, quilt - 25.0)  # Yoder lambda/25 polishing limit (25.3 nm)
             c_freq = np.maximum(0.0, 120.0 - freq)
-            c_tf = np.maximum(0.0, 0.8 - pop[:, 1])
-            c_tw = np.maximum(0.0, 1.5 - pop[:, 2])
+            c_tf = np.maximum(0.0, 1.2 - pop[:, 1])  # Min faceplate thickness guard
+            c_tw = np.maximum(0.0, 1.5 - pop[:, 2])  # Min rib thickness guard
+            
+            # Aspect ratio & slenderness guards
+            cell_aspect = pop[:, 3] / (pop[:, 1] + 1e-6)  # L / tf <= 35
+            c_aspect = np.maximum(0.0, cell_aspect - 35.0)
+            rib_slender = pop[:, 0] / (pop[:, 2] + 1e-6)  # H / tw <= 60
+            c_slender = np.maximum(0.0, rib_slender - 60.0)
 
-            penalties = (c_sag * 1.0) + (c_quilt * 2.0) + (c_freq * 1.0) + (c_tf * 50.0) + (c_tw * 50.0)
+            penalties = (c_sag * 1.5) + (c_quilt * 5.0) + (c_freq * 1.5) + (c_tf * 80.0) + (c_tw * 50.0) + (c_aspect * 10.0) + (c_slender * 10.0)
 
             if mode == "target":
                 # Strong target-mass tracking: heavily penalise deviation from target.
@@ -180,6 +187,28 @@ class MultiMaterialOptimizer:
         full_eval["L_mm"] = round(float(best_g[3]), 2)
         full_eval["rf_mm"] = round(float(best_g[4]), 2)
         full_eval["whiffletree_18_hubs"] = snap_18_whiffletree_hubs(D_mm, best_g[3], Dc_mm)
+
+        # Validity domain check (P8 / Yoder / NASA CR-124075)
+        tf_v = float(best_g[1])
+        tw_v = float(best_g[2])
+        L_v = float(best_g[3])
+        H_v = float(best_g[0])
+        q_v = float(full_eval["quilting_nm"])
+        s_v = float(full_eval["rms_sag_nm"])
+        f_v = float(full_eval["frequency_hz"])
+
+        val_details = {
+            "yoder_faceplate_thickness_passed": tf_v >= 1.0,
+            "yoder_quilting_stability_passed": q_v <= 25.0,
+            "cell_aspect_ratio_passed": (L_v / (tf_v + 1e-6)) <= 35.0,
+            "rib_slenderness_passed": (H_v / (tw_v + 1e-6)) <= 60.0,
+            "launch_stiffness_passed": f_v >= 120.0,
+            "optical_sag_passed": s_v <= max_sag_nm
+        }
+        all_passed = all(val_details.values())
+        full_eval["validity_domain_passed"] = all_passed
+        full_eval["validity_domain_details"] = val_details
+        full_eval["status"] = "OPTIMAL_VALIDATED" if all_passed else "FLAGGED_OUT_OF_DOMAIN"
         return full_eval
 
     def optimize_material_rl_ppo(self, material="zerodur", topology="triangular_isogrid",
@@ -209,6 +238,27 @@ class MultiMaterialOptimizer:
         full_eval["L_mm"] = rl_res["L_mm"]
         full_eval["rf_mm"] = rl_res["rf_mm"]
         full_eval["whiffletree_18_hubs"] = snap_18_whiffletree_hubs(D_mm, rl_res["L_mm"], Dc_mm)
+
+        tf_v = float(rl_res["tf_mm"])
+        tw_v = float(rl_res["tw_mm"])
+        L_v = float(rl_res["L_mm"])
+        H_v = float(rl_res["H_mm"])
+        q_v = float(full_eval["quilting_nm"])
+        s_v = float(full_eval["rms_sag_nm"])
+        f_v = float(full_eval["frequency_hz"])
+
+        val_details = {
+            "yoder_faceplate_thickness_passed": tf_v >= 1.0,
+            "yoder_quilting_stability_passed": q_v <= 25.0,
+            "cell_aspect_ratio_passed": (L_v / (tf_v + 1e-6)) <= 35.0,
+            "rib_slenderness_passed": (H_v / (tw_v + 1e-6)) <= 60.0,
+            "launch_stiffness_passed": f_v >= 120.0,
+            "optical_sag_passed": s_v <= target_sag_nm
+        }
+        all_passed = all(val_details.values())
+        full_eval["validity_domain_passed"] = all_passed
+        full_eval["validity_domain_details"] = val_details
+        full_eval["status"] = "OPTIMAL_VALIDATED" if all_passed else "FLAGGED_OUT_OF_DOMAIN"
         return full_eval
 
     def run_cooperative_pipeline(self, material="zerodur", topology="triangular_isogrid",
@@ -233,7 +283,7 @@ class MultiMaterialOptimizer:
 
         seed_geom = [
             float(nsga2_res.get("H_mm", H_mm)),
-            float(nsga2_res.get("tf_mm", 1.0)),
+            float(nsga2_res.get("tf_mm", 1.8)),
             float(nsga2_res.get("tw_mm", 3.0)),
             float(nsga2_res.get("L_mm", 55.5)),
             float(nsga2_res.get("rf_mm", 3.0))
@@ -271,6 +321,27 @@ class MultiMaterialOptimizer:
         final_eval["L_mm"] = refined_raw["L_mm"]
         final_eval["rf_mm"] = refined_raw["rf_mm"]
         final_eval["whiffletree_18_hubs"] = snap_18_whiffletree_hubs(D_mm, refined_raw["L_mm"], Dc_mm)
+
+        tf_v = float(refined_raw["tf_mm"])
+        tw_v = float(refined_raw["tw_mm"])
+        L_v = float(refined_raw["L_mm"])
+        H_v = float(refined_raw["H_mm"])
+        q_v = float(final_eval["quilting_nm"])
+        s_v = float(final_eval["rms_sag_nm"])
+        f_v = float(final_eval["frequency_hz"])
+
+        val_details = {
+            "yoder_faceplate_thickness_passed": tf_v >= 1.0,
+            "yoder_quilting_stability_passed": q_v <= 25.0,
+            "cell_aspect_ratio_passed": (L_v / (tf_v + 1e-6)) <= 35.0,
+            "rib_slenderness_passed": (H_v / (tw_v + 1e-6)) <= 60.0,
+            "launch_stiffness_passed": f_v >= 120.0,
+            "optical_sag_passed": s_v <= max_sag_nm
+        }
+        all_passed = all(val_details.values())
+        final_eval["validity_domain_passed"] = all_passed
+        final_eval["validity_domain_details"] = val_details
+        final_eval["status"] = "OPTIMAL_VALIDATED" if all_passed else "FLAGGED_OUT_OF_DOMAIN"
 
         # Calculate improvement deltas
         seed_mass = nsga2_res.get("mass_kg") or nsga2_res.get("predicted_mass_kg", 12.0)

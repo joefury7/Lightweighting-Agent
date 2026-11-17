@@ -7,3 +7,7 @@ __pycache__/
 Thumbs.db
 backup/
 *.zip
+*.mat
+data_new*/
+*_staging.prt
+*.prt.tmp

@@ -15,6 +15,8 @@
     "quilting_nm",
     "frequency_hz"
   ],
-  "trained_timestamp": "2026-11-01 12:07:47",
-  "model_format": "xgboost_native_json"
+  "trained_timestamp": "2026-11-14 00:30:40",
+  "model_format": "xgboost_native_json",
+  "fidelity": "Fidelity 0 (Analytic Prior)",
+  "source_dataset": "C:\\Users\\JOEL\\OneDrive\\Desktop\\Lightweighting Agent\\data\\analytic\\mirror_training_data_10k.csv"
 }

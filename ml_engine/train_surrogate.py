@@ -40,7 +40,12 @@ def load_data_from_csv(csv_path):
             targets.append([float(row[col]) for col in TARGET_COLS])
     return np.array(features, dtype=np.float32), np.array(targets, dtype=np.float32)
 
-def train_surrogate_model(data_path="data/mirror_training_data_10k.csv", models_dir="ml_engine/models"):
+def train_surrogate_model(data_path=None, models_dir="ml_engine/models"):
+    if data_path is None:
+        p_analytic = os.path.join(workspace_root, "data", "analytic", "mirror_training_data_10k.csv")
+        p_root = os.path.join(workspace_root, "data", "mirror_training_data_10k.csv")
+        data_path = p_analytic if os.path.exists(p_analytic) else p_root
+
     print(f"[Phase 2] Loading dataset from '{data_path}'...")
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"Training dataset not found at {data_path}. Run generate_training_data.py first.")
@@ -117,7 +122,9 @@ def train_surrogate_model(data_path="data/mirror_training_data_10k.csv", models_
         "features": FEATURE_COLS,
         "targets": TARGET_COLS,
         "trained_timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "model_format": "xgboost_native_json"
+        "model_format": "xgboost_native_json",
+        "fidelity": "Fidelity 0 (Analytic Prior)",
+        "source_dataset": data_path
     }
     with open(os.path.join(models_dir, "manifest.json"), "w") as f:
         json.dump(manifest, f, indent=2)

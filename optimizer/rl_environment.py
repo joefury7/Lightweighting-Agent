@@ -58,12 +58,12 @@ class OptoMechanicalMirrorEnv:
         # State bounds
         if initial_geom is not None and len(initial_geom) >= 1:
             h_fixed = float(initial_geom[0])
-            self.bounds_lower = np.array([h_fixed, 0.8, 1.5, 25.0, 1.0], dtype=np.float32)
+            self.bounds_lower = np.array([h_fixed, 1.2, 1.5, 25.0, 1.0], dtype=np.float32)
             self.bounds_upper = np.array([h_fixed, 4.0, 5.5, 95.0, 5.0], dtype=np.float32)
             if self.fine_tuning:
                 self.step_scales = np.array([0.0, 0.15, 0.15, 4.0, 0.3], dtype=np.float32)
         else:
-            self.bounds_lower = np.array([45.0, 0.8, 1.5, 25.0, 1.0], dtype=np.float32)  # [H, tf, tw, L, rf]
+            self.bounds_lower = np.array([45.0, 1.2, 1.5, 25.0, 1.0], dtype=np.float32)  # [H, tf, tw, L, rf]
             self.bounds_upper = np.array([110.0, 4.0, 5.5, 95.0, 5.0], dtype=np.float32)
 
         self.reset(initial_geom=initial_geom)
@@ -155,27 +155,44 @@ class OptoMechanicalMirrorEnv:
         c_sag = max(0.0, rms_sag - self.target_sag)
         r_sag = -0.6 * c_sag
 
-        # 3. Polishing Quilting Deflection Penalty (Quilting <= 30 nm)
-        c_quilt = max(0.0, quilt - 30.0)
-        r_quilt = -0.3 * c_quilt
+        # 3. Polishing Quilting Deflection Penalty (Quilting <= 25 nm per Yoder lambda/25)
+        c_quilt = max(0.0, quilt - 25.0)
+        r_quilt = -0.6 * c_quilt
 
         # 4. Launch Dynamic Stiffness Constraint (Launch frequency f1 >= 120 Hz)
         c_freq = max(0.0, 120.0 - freq)
         r_freq = -0.8 * c_freq
 
-        # 5. NASA CR-124075 Thin-Wall Manufacturing Penalties
+        # 5. NASA CR-124075 & Yoder Manufacturing / Stability Penalties
+        cell_aspect = L / (tf + 1e-6)
+        c_aspect = max(0.0, cell_aspect - 35.0)
+        rib_slender = H / (tw + 1e-6)
+        c_slender = max(0.0, rib_slender - 60.0)
+
         r_mfg = 0.0
-        if tf < 0.8:
-            r_mfg -= 10.0 * (0.8 - tf)
+        if tf < 1.2:
+            r_mfg -= 15.0 * (1.2 - tf)
         if tw < 1.5:
             r_mfg -= 10.0 * (1.5 - tw)
+        r_mfg -= (5.0 * c_aspect) + (5.0 * c_slender)
 
-        # 6. Flight Mission Milestone Bonus (Mass Target Met AND Sag <= 60nm AND f1 >= 120Hz)
+        # 6. Validity Domain Check
+        val_details = {
+            "yoder_faceplate_thickness_passed": tf >= 1.0,
+            "yoder_quilting_stability_passed": quilt <= 25.0,
+            "cell_aspect_ratio_passed": cell_aspect <= 35.0,
+            "rib_slenderness_passed": rib_slender <= 60.0,
+            "launch_stiffness_passed": freq >= 120.0,
+            "optical_sag_passed": rms_sag <= self.target_sag
+        }
+        val_passed = all(val_details.values())
+
+        # Flight Mission Milestone Bonus
         if self.mode == "target":
-            all_passed = (abs(mass - self.target_mass) <= 0.15) and (rms_sag <= self.target_sag) and (quilt <= 30.0) and (freq >= 120.0)
+            all_passed = (abs(mass - self.target_mass) <= 0.15) and val_passed
         else:
-            all_passed = (mass <= self.target_mass) and (rms_sag <= self.target_sag) and (quilt <= 30.0) and (freq >= 120.0)
-        bonus = 15.0 if all_passed else 0.0
+            all_passed = (mass <= self.target_mass) and val_passed
+        bonus = 20.0 if all_passed else 0.0
 
         reward = float(r_mass + r_sag + r_quilt + r_freq + r_mfg + bonus)
 
@@ -189,6 +206,8 @@ class OptoMechanicalMirrorEnv:
             "frequency_hz": freq,
             "lightweight_pct": lw_pct,
             "all_passed": all_passed,
+            "validity_domain_passed": val_passed,
+            "validity_domain_details": val_details,
             "H_mm": round(float(H), 2),
             "tf_mm": round(float(tf), 2),
             "tw_mm": round(float(tw), 2),
