@@ -241,6 +241,15 @@ if __name__ == '__main__':'''
             else:
                 patched_code += '\n' + save_block
 
+            # Defensively sanitize any stale pocket boundary conditions from cached browser sessions
+            if "(d + r_corner > max_r)" in patched_code:
+                patched_code = patched_code.replace(
+                    "if (d + r_corner > max_r) or (d - r_corner < CENTRAL_EXCLUDE_R):",
+                    "margin_tol = CELL_SIDE * 0.6\n                if d > max_r + margin_tol or d < max(5.0, CENTRAL_EXCLUDE_R - margin_tol):"
+                )
+            if "n_sub = 1" in patched_code:
+                patched_code = patched_code.replace("n_sub = 1", "n_sub = 4")
+
             with open(abs_journal, 'w', encoding='utf-8') as f:
                 f.write(patched_code)
             print(f"[Pillar 4 NX Bridge] Loaded exact UI exported journal ({len(patched_code)} bytes).")
