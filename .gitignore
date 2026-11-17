@@ -6,8 +6,16 @@ __pycache__/
 .DS_Store
 Thumbs.db
 backup/
-# Files exceeding GitHub's 100MB hard limit (must be downloaded or stored externally):
+# Files exceeding GitHub's 100MB hard limit:
 *.mat
 data_new*/
 *.zip
 !data/real/tier2_metaxfam/*.zip
+
+# Large raw scientific binary grids/archives (>5MB; tracked via MANIFEST.md & download scripts)
+data/real/tier2_rubin_lsst_fea/*grid*.fits.gz
+data/real/tier2_rubin_lsst_fea/*influence*.fits.gz
+data/real/tier2_rubin_lsst_fea/*shape*.fits.gz
+data/real/tier2_rubin_bending_modes/*_grid.fits.gz
+data/real/tier2_selto_topology/*_train.tar.gz
+data/real/tier3_ntrs_jwst/NTRS_20230002601.pdf
