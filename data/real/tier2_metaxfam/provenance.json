@@ -1,0 +1,11 @@
+{
+  "dataset_name": "MetaXFam-D Cross-Topology Metamaterial Benchmark",
+  "source_doi": "10.5281/zenodo.22167146",
+  "source_url": "https://zenodo.org/records/22167146",
+  "year": 2025,
+  "license": "CC-BY-4.0",
+  "http_status": 200,
+  "fidelity": "simulation",
+  "fidelity_tier": "Fidelity 1",
+  "description": "Numerical benchmark of 5,072 unit cells across 22 structural metamaterial families, providing effective stiffness, compliance, and buckling parameters including auxetic topologies."
+}

@@ -1,0 +1,11 @@
+{
+  "dataset_name": "Nearfield Acoustic Holography (NAH) Rectangular Plate Simulation Dataset",
+  "source_doi": "10.5281/zenodo.5702615",
+  "source_url": "https://zenodo.org/records/5702615",
+  "year": 2021,
+  "license": "CC-BY-4.0",
+  "http_status": 200,
+  "fidelity": "simulation",
+  "fidelity_tier": "Fidelity 1",
+  "description": "COMSOL Multiphysics numerical vibration and modal field maps for rectangular plates; 496 MB MATLAB v5 format simulation of natural frequencies and 2D modal fields."
+}

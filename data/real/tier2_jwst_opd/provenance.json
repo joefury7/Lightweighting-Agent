@@ -1,0 +1,11 @@
+{
+  "dataset_name": "JWST Measured Optical Path Difference (OPD) & Trending Metrology",
+  "source_url": "https://mast.stsci.edu/",
+  "institution": "Space Telescope Science Institute (STScI) / MAST",
+  "license": "Public Domain / US Government Work",
+  "http_status": 200,
+  "fidelity": "measured",
+  "fidelity_tier": "Fidelity 3",
+  "role": "validation_only",
+  "description": "Live retrieval harness for official STScI/MAST in-flight Optical Path Difference (OPD) maps, RMS wavefront error trending, and Zernike fits for JWST PMSA segments."
+}

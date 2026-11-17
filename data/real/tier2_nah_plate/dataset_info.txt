@@ -1,0 +1,22 @@
+#######################################################
+
+Matlab file:		rectangular_simulation_nah.mat
+Dimensions:		15570 different pressure and velocity complex fields
+
+#######################################################
+
+Description of the dataset
+
+struct: {
+	"p_h"				=	pressure at the hologram plane	-	complex field in 16x64 points
+	"h_points"			=	hologram point coordinates	-	double x | y | z of 16x64 points
+	"p_h_downsampling"		=	pressure at the hologram plane	-	complex fields in 8x8 points
+	"h_points_downsampling"		=	hologram point coordinates	-	double x | y | z of 8x8 points
+	"v_s"				=	normal velocity on the surface	-	complex fields in 16x64 points
+	"s_points"			=	surface point coordinates	-	double x | y | z of 16x64 points
+	"num_plate"			=	number id of the plate		-	int64 number id
+	"plate_dimensions"		=	dimensions of the plate 	-	double Lx | Ly | Lz
+	"boundary"			=	plate boundary condition	-	string (simply_bc, clamped_bc, free_bc)
+	"mode"				=	number of the vibrational mode 	-	int64 mode number
+	"freq"				=	vibrational frequency		-	double frequency in Hz
+}

@@ -1,0 +1,11 @@
+{
+  "dataset_name": "Optical Mirror Surface Deformation & Zernike Expansion Dataset (Harbin Institute of Technology)",
+  "source_doi": "10.17632/xpxhpdjgx9.1",
+  "source_url": "https://data.mendeley.com/datasets/xpxhpdjgx9/1",
+  "year": 2026,
+  "license": "CC0-1.0",
+  "http_status": 200,
+  "fidelity": "fea_benchmark",
+  "fidelity_tier": "Fidelity 2",
+  "description": "17 Excel workbooks containing finite element mirror surface deformation matrices and 37-term Fringe Zernike polynomial expansion coefficients across large sample configurations and global sensitivity analyses (PAWN/Sobol)."
+}
