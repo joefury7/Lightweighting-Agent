@@ -247,8 +247,8 @@ if __name__ == '__main__':'''
                     "if (d + r_corner > max_r) or (d - r_corner < CENTRAL_EXCLUDE_R):",
                     "margin_tol = CELL_SIDE * 0.6\n                if d > max_r + margin_tol or d < max(5.0, CENTRAL_EXCLUDE_R - margin_tol):"
                 )
-            if "n_sub = 1" in patched_code:
-                patched_code = patched_code.replace("n_sub = 1", "n_sub = 4")
+            if "n_sub = 4" in patched_code:
+                patched_code = patched_code.replace("n_sub = 4", "n_sub = 1")
 
             with open(abs_journal, 'w', encoding='utf-8') as f:
                 f.write(patched_code)
@@ -279,13 +279,23 @@ if __name__ == '__main__':'''
         print(f"[Pillar 4 NX Bridge] Pre-building exact native .PRT via run_journal.exe...")
         try:
             cmd_headless = [self.run_journal_exe, abs_journal]
-            res_build = subprocess.run(cmd_headless, capture_output=True, text=True, timeout=240)
+            res_build = subprocess.run(cmd_headless, capture_output=True, text=True, timeout=360)
             if res_build.returncode == 0:
                 print(f"[Pillar 4 NX Bridge] Headless journal execution SUCCESS.")
             else:
                 print(f"[Pillar 4 NX Bridge] Headless run_journal output: {res_build.stdout[-500:] if res_build.stdout else ''} {res_build.stderr[-500:] if res_build.stderr else ''}")
         except Exception as e:
             print(f"[Pillar 4 NX Bridge] Headless pre-build note: {e}")
+
+        # Check that part file was successfully generated before launching GUI
+        if not os.path.exists(abs_prt):
+            return {
+                "status": "BUILD_FAILED",
+                "message": f"Siemens NX headless journal compilation did not finish. Part file '{target_prt}' was not created.",
+                "journal_path": abs_journal,
+                "target_prt": abs_prt,
+                "nx_installed": True
+            }
 
         # 4. Automatically launch Siemens NX GUI and open the generated 3D part model
         if ugraf_exe and os.path.exists(ugraf_exe):
@@ -304,7 +314,7 @@ if __name__ == '__main__':'''
             try:
                 ps_cmd = f'''
                 $action = New-ScheduledTaskAction -Execute "{ugraf_exe}" -Argument '-nxcam -retrieve:"{abs_prt}"' -WorkingDirectory "{work_dir}"
-                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances StopExisting
+                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
                 Register-ScheduledTask -TaskName "Launch_NX_CAM" -Action $action -Settings $settings -Force | Out-Null
                 Start-ScheduledTask -TaskName "Launch_NX_CAM"
                 '''
