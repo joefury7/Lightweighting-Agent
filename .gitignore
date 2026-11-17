@@ -6,14 +6,8 @@ __pycache__/
 .DS_Store
 Thumbs.db
 backup/
-*.zip
+# Files exceeding GitHub's 100MB hard limit (must be downloaded or stored externally):
 *.mat
 data_new*/
-*_staging.prt
-*.prt.tmp
-
-# Large real-world scientific binary datasets (>25MB; tracked via MANIFEST.md & automated_data_harvester.py)
-data/real/tier2_rubin_lsst_fea/*.fits.gz
-data/real/tier2_rubin_bending_modes/*.fits.gz
-data/real/tier2_selto_topology/*.tar.gz
-data/real/tier3_ntrs_jwst/*.pdf
+*.zip
+!data/real/tier2_metaxfam/*.zip
