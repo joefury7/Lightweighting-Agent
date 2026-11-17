@@ -95,17 +95,16 @@ def main():
     
     hubs = {hubs}  # 18 Snapped Whiffletree Hub Coordinates
     
-    final_prt_path = r"{abs_prt}"
-    staging_prt_path = r"{abs_prt}".replace('.prt', '_staging.prt')
+    prt_path = r"{abs_prt}"
     
-    # 1. Create or open display part in staging file
+    # 1. Create or open display part
     try:
-        if os.path.exists(staging_prt_path):
-            os.remove(staging_prt_path)
+        if os.path.exists(prt_path):
+            os.remove(prt_path)
     except Exception:
         pass
         
-    workPart = theSession.Parts.NewDisplay(staging_prt_path, NXOpen.Part.Units.Millimeters)
+    workPart = theSession.Parts.NewDisplay(prt_path, NXOpen.Part.Units.Millimeters)
     theSession.LogFile.WriteLine(f"[NX Open] Generating 3D Mirror CAD: D={{D}}mm, H={{H}}mm, tf={{tf}}mm, tw={{tw}}mm, L={{L}}mm...")
     
     # 2. Cylindrical Solid Blank Feature
@@ -179,11 +178,8 @@ def main():
     # 5. Save Native NX Part
     try:
         workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)
-        import shutil
-        if os.path.exists(staging_prt_path):
-            shutil.copyfile(staging_prt_path, final_prt_path)
-        theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Saved native CAD model to: {{final_prt_path}}")
-        print(f"[NX Open SUCCESS] Model generated with {{pockets_created}} isogrid cavities: {{final_prt_path}}")
+        theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Saved native CAD model to: {{prt_path}}")
+        print(f"[NX Open SUCCESS] Model generated with {{pockets_created}} isogrid cavities: {{prt_path}}")
     except Exception as e:
         theSession.LogFile.WriteLine(f"[NX Open] Save note: {{e}}")
 
@@ -208,20 +204,18 @@ if __name__ == '__main__':
 
         # 1. Use the exact exported journal from the UI if provided
         abs_prt_fwd = abs_prt.replace('\\', '/')
-        staging_prt_fwd = abs_prt_fwd.replace('.prt', '_staging.prt')
         if journal_code and len(journal_code.strip()) > 50:
             patched_code = journal_code
             new_workpart_check = f'''    workPart = session.Parts.Work
-    final_prt_path = r"{abs_prt_fwd}"
-    staging_prt_path = r"{staging_prt_fwd}"
     if workPart is None:
+        prt_path = r"{abs_prt_fwd}"
         try:
             import os
-            if os.path.exists(staging_prt_path):
-                os.remove(staging_prt_path)
+            if os.path.exists(prt_path):
+                os.remove(prt_path)
         except Exception:
             pass
-        workPart = session.Parts.NewDisplay(staging_prt_path, NXOpen.Part.Units.Millimeters)'''
+        workPart = session.Parts.NewDisplay(prt_path, NXOpen.Part.Units.Millimeters)'''
 
             old_workpart_check = '''    workPart = session.Parts.Work
     if workPart is None:
@@ -237,11 +231,6 @@ if __name__ == '__main__':
             save_block = f'''    try:
         if workPart is not None:
             workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)
-            import shutil, os
-            final_path = r"{abs_prt_fwd}"
-            staging_path = r"{staging_prt_fwd}"
-            if os.path.exists(staging_path):
-                shutil.copyfile(staging_path, final_path)
             print(f"[NX Open SUCCESS] Model saved to: {abs_prt_fwd}")
     except Exception as e_save:
         print(f"[NX Open] Save warning: {{e_save}}")
@@ -268,11 +257,20 @@ if __name__ == '__main__':'''
                 "nx_installed": False
             }
 
-        # 2. Execute run_journal.exe to build the exact native 3D .PRT
+        # 2. Terminate any previous ugraf.exe session first so Siemens NX releases any file lock on .PRT
+        try:
+            cleanup_cmd = "Stop-ScheduledTask -TaskName 'Launch_NX_CAM' -ErrorAction SilentlyContinue; Stop-Process -Name ugraf -Force -ErrorAction SilentlyContinue"
+            subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", cleanup_cmd], capture_output=True, timeout=8)
+            import time
+            time.sleep(1)
+        except Exception as e_clean:
+            print(f"[Pillar 4 NX Bridge] Stale ugraf cleanup note: {e_clean}")
+
+        # 3. Execute run_journal.exe to build the exact native 3D .PRT
         print(f"[Pillar 4 NX Bridge] Pre-building exact native .PRT via run_journal.exe...")
         try:
             cmd_headless = [self.run_journal_exe, abs_journal]
-            res_build = subprocess.run(cmd_headless, capture_output=True, text=True, timeout=360)
+            res_build = subprocess.run(cmd_headless, capture_output=True, text=True, timeout=240)
             if res_build.returncode == 0:
                 print(f"[Pillar 4 NX Bridge] Headless journal execution SUCCESS.")
             else:
@@ -280,16 +278,7 @@ if __name__ == '__main__':'''
         except Exception as e:
             print(f"[Pillar 4 NX Bridge] Headless pre-build note: {e}")
 
-        if not os.path.exists(abs_prt):
-            return {
-                "status": "BUILD_FAILED",
-                "message": f"Siemens NX headless journal compilation did not produce '{target_prt}'. Check journal logs.",
-                "journal_path": abs_journal,
-                "target_prt": abs_prt,
-                "nx_installed": True
-            }
-
-        # 2. Automatically launch Siemens NX GUI and open the generated 3D part model
+        # 4. Automatically launch Siemens NX GUI and open the generated 3D part model
         if ugraf_exe and os.path.exists(ugraf_exe):
             nxcam_dir = r"C:\Program Files\Siemens\NX2007\MACH\auxiliary\nxcam"
             work_dir = nxcam_dir if os.path.exists(nxcam_dir) else workspace_root
@@ -302,20 +291,11 @@ if __name__ == '__main__':'''
             print(f"[Pillar 4 NX Bridge] Opening Siemens NX CAM with CAD model: {ugraf_exe} {nxcam_args}")
             launched = False
 
-            # 2a. Terminate any previous ugraf.exe session so Siemens NX cleanly reloads the updated CAD model
-            try:
-                cleanup_cmd = "Stop-ScheduledTask -TaskName 'Launch_NX_CAM' -ErrorAction SilentlyContinue; Stop-Process -Name ugraf -Force -ErrorAction SilentlyContinue"
-                subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", cleanup_cmd], capture_output=True, timeout=8)
-                import time
-                time.sleep(1)
-            except Exception as e_clean:
-                print(f"[Pillar 4 NX Bridge] Stale ugraf cleanup note: {e_clean}")
-
             # Strategy 1: Windows Interactive Task Scheduler (Bypasses service/background desktop isolation, guarantees window on WinSta0\default)
             try:
                 ps_cmd = f'''
                 $action = New-ScheduledTaskAction -Execute "{ugraf_exe}" -Argument '-nxcam -retrieve:"{abs_prt}"' -WorkingDirectory "{work_dir}"
-                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances IgnoreNew
+                $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -MultipleInstances StopExisting
                 Register-ScheduledTask -TaskName "Launch_NX_CAM" -Action $action -Settings $settings -Force | Out-Null
                 Start-ScheduledTask -TaskName "Launch_NX_CAM"
                 '''
