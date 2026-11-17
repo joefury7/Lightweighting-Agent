@@ -1,0 +1,15 @@
+{
+  "dataset_name": "NASA Technical Reports Server (NTRS) JWST Flight Commissioning Metrology",
+  "source_url": "https://ntrs.nasa.gov",
+  "ntrs_document_ids": [
+    "20220013205",
+    "20230011349",
+    "20230002601"
+  ],
+  "license": "Public Domain / US Government Work",
+  "http_status": 200,
+  "fidelity": "measured",
+  "fidelity_tier": "Fidelity 3",
+  "role": "validation_only",
+  "description": "Official peer-reviewed NASA commissioning publications: NTRS 20220013205 (Lightsey et al., Optical Telescope Element Commissioning), NTRS 20230011349 (Acton et al., Phasing the Webb Telescope), NTRS 20230002601 (Smith et al., Image-Based Wavefront Sensing)."
+}

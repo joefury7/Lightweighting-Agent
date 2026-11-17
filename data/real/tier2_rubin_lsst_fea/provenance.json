@@ -1,0 +1,12 @@
+{
+  "dataset_name": "Rubin Observatory Simonyi Survey Telescope \u2014 FEA perturbation files",
+  "source_doi": "10.5281/zenodo.8384326",
+  "source_url": "https://zenodo.org/records/8384326",
+  "year": 2023,
+  "license": "CC-BY-4.0",
+  "http_status": 200,
+  "fidelity": "fea_benchmark",
+  "fidelity_tier": "Fidelity 2",
+  "description": "24 FITS archives providing FEA perturbation files for LSST/Rubin M1M3 and M2 optical assemblies under horizon/zenith gravity sag and thermal loads.",
+  "caveat": "Meniscus mirror geometry actively supported; serves as real physics analog for gravity sag node displacements and Zernike fitting."
+}

@@ -1,0 +1,11 @@
+{
+  "dataset_name": "SELTO Dataset \u2014 3-D Topology Optimization",
+  "source_doi": "10.5281/zenodo.7781392",
+  "source_url": "https://zenodo.org/records/7781392",
+  "year": 2023,
+  "license": "CC-BY-4.0",
+  "http_status": 200,
+  "fidelity": "simulation",
+  "fidelity_tier": "Fidelity 1",
+  "description": "8 archives with 3D voxel topology optimization problem definitions and converged solutions (Ariane Group / Synera solver) on disc and sphere geometries for structural mass and compliance minimization."
+}

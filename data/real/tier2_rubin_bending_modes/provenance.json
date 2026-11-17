@@ -1,0 +1,11 @@
+{
+  "dataset_name": "Rubin Observatory Legacy Bending-Mode Data (M1/M2/M3)",
+  "source_doi": "10.5281/zenodo.8383823",
+  "source_url": "https://zenodo.org/records/8383823",
+  "year": 2023,
+  "license": "CC-BY-4.0",
+  "http_status": 200,
+  "fidelity": "fea_benchmark",
+  "fidelity_tier": "Fidelity 2",
+  "description": "13 FITS archives + bend.yaml giving bending modes represented both as Zernike coefficient vectors and bicubic spline deformation grids."
+}
