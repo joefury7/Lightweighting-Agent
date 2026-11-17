@@ -67,7 +67,7 @@ class NXFEAAnalysisEngine:
         6. Native .PRT file export
         """
         hubs = snap_18_whiffletree_hubs(D, L, Dc)
-        abs_prt = os.path.abspath(target_prt).replace("\\", "\\\\")
+        abs_prt = os.path.abspath(target_prt).replace("\\", "/")
 
         script_content = f'''# ==============================================================================
 # Siemens NX Open Python Journal: Automated Space Mirror 3D CAD Modeler
