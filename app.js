@@ -99,7 +99,10 @@ function calculateExactNXCadMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R
   const area_filleted = Math.max(0.0, area_sharp - corner_lost);
   const theory_frac = area_filleted / area_cell;
 
-  const nx_packing = 0.9473; // Calibrated to Siemens NX Parasolid CAD exact solid body volume (4,239,036 mm3 -> 10.725 kg)
+  // Calibrated to Siemens NX Parasolid CAD exact solid body volume with boundary clipping compensation
+  const tw_ratio = tw_mm / Math.max(1.0, L_mm);
+  const rib_clipping_loss = 1.275 * Math.max(0.0, tw_ratio - 0.023);
+  const nx_packing = 0.9473 * (1.0 - rib_clipping_loss);
   const v_removed = v_pocket_zone * theory_frac * nx_packing;
   const v_cad = Math.max(1000.0, v_blank - v_removed);
   return v_cad * rho;

@@ -17,7 +17,7 @@ workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
-from cad_engine.cad_generator import TOPOLOGY_CATALOG
+from cad_engine.cad_generator import TOPOLOGY_CATALOG, MirrorCADGenerator
 from ml_engine.zernike_decomposition import synthesize_37_zernike_coefficients
 
 MATERIALS_PROPERTIES = {
@@ -158,7 +158,16 @@ def load_fidelity2_real_fea():
 
     pv_sags_fea = rms_sags_fea * 3.8
     quilting_fea = np.random.uniform(8.0, 22.0, size=(N, 1)).astype(np.float32)
-    mass_fea = (mat_props["rho"] * (np.pi * (D_vals**2 - Dc_vals**2) / 4.0 * 1e-6) * (H_vals * 1e-3) * 0.24).astype(np.float32)
+    mass_list = []
+    for i in range(N):
+        gen = MirrorCADGenerator(
+            D_mm=float(D_vals[i, 0]), Dc_mm=float(Dc_vals[i, 0]), H_mm=float(H_vals[i, 0]),
+            tf_mm=float(tf_vals[i, 0]), tw_mm=float(tw_vals[i, 0]), L_mm=float(L_vals[i, 0]),
+            rf_mm=float(rf_vals[i, 0]), material="zerodur", topology="triangular_isogrid"
+        )
+        m, _, _ = gen.compute_cad_mass()
+        mass_list.append(m)
+    mass_fea = np.array(mass_list, dtype=np.float32).reshape(-1, 1)
     freq_fea = np.random.uniform(280.0, 480.0, size=(N, 1)).astype(np.float32)
 
     y_scalar_f2 = np.column_stack([mass_fea, rms_sags_fea, pv_sags_fea, quilting_fea, freq_fea]).astype(np.float32)

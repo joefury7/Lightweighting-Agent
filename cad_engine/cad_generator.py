@@ -329,14 +329,19 @@ class MirrorCADGenerator:
             area_filleted = max(0.0, area_sharp - corner_lost)
             theory_void_frac = area_filleted / area_cell
             # Calibrated to Siemens NX Parasolid CAD exact measured solid body volume
+            # Rib aspect ratio tw/L clipping compensation:
+            # Baseline thin ribs (tw=1.5, L=64.7, tw/L=0.023) -> packing = 0.9473 (10.725 kg NX match)
+            # Thick ribs (tw=5.3, L=69.0, tw/L=0.0768) -> packing = 0.8820 (17.480 kg NX match)
+            tw_ratio = self.tw / max(1.0, self.L)
+            rib_clipping_loss = 1.275 * max(0.0, tw_ratio - 0.023)
             if self.topology == "triangular_isogrid":
-                packing = 0.9473  # Exact match to Siemens NX Measure (4,239,036 mm3 -> 10.725 kg)
+                packing = 0.9473 * (1.0 - rib_clipping_loss)
             elif self.topology == "iso_radial_hybrid":
-                packing = 0.9350
+                packing = 0.9350 * (1.0 - rib_clipping_loss)
             elif self.topology == "double_arch_lightweight":
-                packing = 0.9450
+                packing = 0.9450 * (1.0 - rib_clipping_loss)
             else: # sandwich_closed_back
-                packing = 0.8850
+                packing = 0.8850 * (1.0 - rib_clipping_loss * 0.8)
         elif self.topology in ["hexagonal_gmt", "hex_radial_hybrid"]:
             pocket_side = max(1.0, self.L - self.tw / math.sqrt(3.0))
             area_cell = (3.0 * math.sqrt(3.0) / 2.0) * (self.L**2)
@@ -344,7 +349,10 @@ class MirrorCADGenerator:
             corner_lost = 6.0 * (math.sqrt(3.0) - math.pi / 3.0) * (self.rf**2)
             area_filleted = max(0.0, area_sharp - corner_lost)
             theory_void_frac = area_filleted / area_cell
-            packing = 0.9720 if self.topology == "hexagonal_gmt" else 0.9600
+            tw_ratio = self.tw / max(1.0, self.L)
+            rib_clipping_loss = 1.0 * max(0.0, tw_ratio - 0.023)
+            base_p = 0.9720 if self.topology == "hexagonal_gmt" else 0.9600
+            packing = base_p * (1.0 - rib_clipping_loss)
         elif self.topology == "square_waffle":
             pocket_side = max(1.0, self.L - self.tw)
             area_cell = self.L**2
@@ -352,7 +360,9 @@ class MirrorCADGenerator:
             corner_lost = (4.0 - math.pi) * (self.rf**2)
             area_filleted = max(0.0, area_sharp - corner_lost)
             theory_void_frac = area_filleted / area_cell
-            packing = 0.9750
+            tw_ratio = self.tw / max(1.0, self.L)
+            rib_clipping_loss = 1.0 * max(0.0, tw_ratio - 0.023)
+            packing = 0.9750 * (1.0 - rib_clipping_loss)
         else:  # radial_spoke
             theory_void_frac = max(0.40, 1.0 - 1.25 * (self.tw / self.L))
             packing = 0.9550
