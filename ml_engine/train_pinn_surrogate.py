@@ -108,66 +108,58 @@ def compute_r2(y_true, y_pred):
 
 def build_multi_fidelity_tensors(num_f0_samples=15000):
     print(f"\n[Multi-Fidelity Loader] Ingesting Fidelity 0 (Calibrated Parasolid CAD Prior, N={num_f0_samples:,})...")
-    X_f0, y_s_f0, z_f0, w_f0, fid_f0 = load_fidelity0_analytic(num_samples=num_f0_samples)
+    X_f0, y_s_f0, z_f0, w_f0, fid_f0, m_scal_f0, m_z_f0 = load_fidelity0_analytic(num_samples=num_f0_samples)
 
     X_list = [X_f0]
     y_scal_list = [y_s_f0]
     z_list = [z_f0]
     w_list = [w_f0]
     fid_list = [fid_f0]
+    m_scal_list = [m_scal_f0]
+    m_z_list = [m_z_f0]
 
     print(f"[Multi-Fidelity Loader] Ingesting Fidelity 1 (Authentic NAH Plate COMSOL Modal Vibration Simulations)...")
     f1_data = load_fidelity1_simulation()
+    n_f1 = 0
     if f1_data is not None:
-        X_f1, y_s_f1, z_f1, w_f1, fid_f1 = f1_data
-        print(f"  -> Ingested {len(X_f1)} authentic COMSOL simulation vibration records (Mode 1) with 3.0x supervision weight.")
+        X_f1, y_s_f1, z_f1, w_f1, fid_f1, m_scal_f1, m_z_f1 = f1_data
+        n_f1 = len(X_f1)
+        print(f"  -> Ingested {n_f1} authentic COMSOL simulation vibration records (Mode 1) with 3.0x supervision weight.")
         X_list.append(X_f1)
         y_scal_list.append(y_s_f1)
         z_list.append(z_f1)
         w_list.append(w_f1)
         fid_list.append(fid_f1)
+        m_scal_list.append(m_scal_f1)
+        m_z_list.append(m_z_f1)
 
     print(f"[Multi-Fidelity Loader] Ingesting Fidelity 2 (Authentic Rubin LSST FEA & Harbin Mendeley Optical Records)...")
     f2_data = load_fidelity2_real_fea()
+    n_f2 = 0
     if f2_data is not None:
-        X_f2, y_s_f2, z_f2, w_f2, fid_f2 = f2_data
-        print(f"  -> Ingested {len(X_f2)} authentic Rubin LSST FEA & Harbin optical records with 5.0x supervision weight.")
+        X_f2, y_s_f2, z_f2, w_f2, fid_f2, m_scal_f2, m_z_f2 = f2_data
+        n_f2 = len(X_f2)
+        print(f"  -> Ingested {n_f2} authentic Rubin LSST FEA & Harbin optical records with 5.0x supervision weight.")
         X_list.append(X_f2)
         y_scal_list.append(y_s_f2)
         z_list.append(z_f2)
         w_list.append(w_f2)
         fid_list.append(fid_f2)
+        m_scal_list.append(m_scal_f2)
+        m_z_list.append(m_z_f2)
 
     X_all = np.vstack(X_list)
     y_scalar_all = np.vstack(y_scal_list)
     zernike_all = np.vstack(z_list)
     weights_all = np.vstack(w_list)
     fidelity_all = np.vstack(fid_list)
-
-    # Supervision Masks (Strict Physics Guardrail G1-G5: zero fabricated targets)
-    # F0 & F2: Authentic Optical Mirrors -> supervise all 5 scalar targets + 37 Zernikes
-    # F1 (NAH Plate): Authentic Structural Plates -> supervise mass (col 0) & frequency (col 4) ONLY
-    n_f0 = len(X_f0)
-    n_f1 = len(X_f1) if f1_data is not None else 0
-    n_f2 = len(X_f2) if f2_data is not None else 0
-
-    m_scal_f0 = np.ones((n_f0, 5), dtype=np.float32)
-    m_z_f0 = np.ones((n_f0, 1), dtype=np.float32)
-
-    m_scal_f1 = np.zeros((n_f1, 5), dtype=np.float32)
-    m_scal_f1[:, 0] = 1.0  # mass_kg
-    m_scal_f1[:, 4] = 1.0  # frequency_hz (authentic COMSOL FEA natural frequency)
-    m_z_f1 = np.zeros((n_f1, 1), dtype=np.float32)  # Plates have no optical Zernikes
-
-    m_scal_f2 = np.ones((n_f2, 5), dtype=np.float32)
-    m_z_f2 = np.ones((n_f2, 1), dtype=np.float32)
-
-    mask_scal_all = np.vstack([m_scal_f0, m_scal_f1, m_scal_f2])
-    mask_z_all = np.vstack([m_z_f0, m_z_f1, m_z_f2])
+    mask_scal_all = np.vstack(m_scal_list)
+    mask_z_all = np.vstack(m_z_list)
 
     total_real = n_f1 + n_f2
     print(f"[Multi-Fidelity Loader] Successfully merged {len(X_all):,} total samples ({total_real:,} authentic simulation & FEA records from data_new).")
     print(f"  -> {n_f2} authentic spaceborne optical mirror records (Harbin Mendeley & Rubin LSST FEA)")
+    print(f"  -> {n_f1} authentic COMSOL FEA vibration simulation records (NAH Plate Mode 1)")
     print(f"  -> {n_f1} authentic COMSOL FEA vibration simulation records (NAH Plate Mode 1)")
 
     # Normalization Statistics computed strictly on relevant valid masks
@@ -262,15 +254,16 @@ def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
             data_loss = loss_scalar + loss_zernike
 
             # Physics-Informed Wavefront Loss (Parseval's Identity: sqrt(sum(Z_j^2)) == RMS_sag)
-            # Evaluated strictly on authentic optical mirror samples
+            # Evaluated strictly on authentic optical mirror samples in normalized units
             pred_z_unnorm = pred_z * z_std_t
             pred_scal_unnorm = pred_scal * y_scalar_std_t + y_scalar_mean_t
 
             pred_rms_sag = pred_scal_unnorm[:, 1]
             wavefront_rms_computed = torch.sqrt(torch.sum(pred_z_unnorm[:, 3:]**2, dim=1) + 1e-6)
-            loss_parseval = torch.mean(b_m_z.squeeze(-1) * (wavefront_rms_computed - pred_rms_sag)**2) / 100.0
+            # Dimensionless Parseval loss normalized by RMS sag standard deviation
+            loss_parseval = torch.mean(b_m_z.squeeze(-1) * ((wavefront_rms_computed - pred_rms_sag) / y_scalar_std_t[1])**2)
 
-            total_loss = data_loss + 0.15 * loss_parseval
+            total_loss = data_loss + 0.05 * loss_parseval
             total_loss.backward()
             optimizer.step()
 

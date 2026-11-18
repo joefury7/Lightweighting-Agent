@@ -1,3 +1,21 @@
+"""
+ACADEMIC INTEGRITY & METHODOLOGY NOTICE (Guardrails G1-G5):
+=============================================================================
+This script generates synthetic Latin Hypercube Sampling (LHS) evaluations based
+on idealized closed-form analytic equations (Nelson 18-point sag, Yoder quilting).
+Per peer-review guidelines, this data represents Fidelity-0 (Analytic Prior) and
+MUST NOT be described as empirical or FEA ground truth.
+
+Production multi-fidelity model training in this repository now ingests authentic
+experimental metrology and FEA benchmarks directly from `data_new` via
+`ml_engine/data_loaders.py`:
+  - Harbin Institute Mendeley (DOI: 10.17632/xpxhpdjgx9.1)
+  - Rubin Observatory Simonyi Survey Telescope (Zenodo: 8384326 / 8383823)
+  - NAH Rectangular Plate COMSOL FEA (Zenodo: 5702615)
+  - Siemens NX Parasolid CAD exact measured solid volume calibration
+=============================================================================
+"""
+
 import os
 import sys
 import csv

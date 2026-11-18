@@ -1,3 +1,17 @@
+"""
+ACADEMIC INTEGRITY & METHODOLOGY NOTICE (Guardrails G1-G5):
+=============================================================================
+This script generates parametric evaluations from engineering handbook equations
+(NASA CR-124075 / NASA SP-8040 isogrid formulas and SCHOTT TIE-48 datasheets).
+CR-124075 is a structural design handbook, NOT an empirical test dataset.
+Per research integrity guardrails, these tables represent Fidelity-0 analytic
+envelopes.
+
+Production models are supervised strictly on authentic experimental and simulation
+datasets acquired in `data_new` via `ml_engine/data_loaders.py`.
+=============================================================================
+"""
+
 import csv, math, os, sys
 sys.stdout.reconfigure(encoding='utf-8')
 

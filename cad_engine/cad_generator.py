@@ -95,24 +95,40 @@ class MirrorCADGenerator:
             return False
 
         if self.topology == "triangular_isogrid":
-            dx = self.L
-            dy = self.L * math.sqrt(3.0) / 2.0
-            nx = int(math.ceil(self.D / dx)) + 1
-            ny = int(math.ceil(self.D / dy)) + 1
-            pocket_dia = max(8.0, self.L - 2.0 * self.tw / math.sqrt(3.0))
+            row_h = self.L * math.sqrt(3.0) / 2.0
+            pocket_side = max(8.0, self.L - 2.0 * self.tw / math.sqrt(3.0))
+            nx = int(math.ceil(self.R / self.L)) + 1
+            ny = int(math.ceil(self.R / row_h)) + 1
+            margin_tol = self.L * 0.55
 
             for j in range(-ny, ny + 1):
-                py = j * dy
-                x_off = (dx / 2.0) if (j % 2 != 0) else 0.0
+                y_base = j * row_h
+                x_off = (self.L * 0.5) if (j % 2 != 0) else 0.0
                 for i in range(-nx, nx + 1):
-                    px = i * dx + x_off
-                    dist = math.hypot(px, py)
-                    if (self.r_in + pocket_dia / 2.0) <= dist <= (self.r_out - pocket_dia / 2.0):
-                        if not is_near_hub(px, py):
+                    # Triangle 1 (Upward orientation)
+                    cx1 = i * self.L + x_off
+                    cy1 = y_base + row_h / 3.0
+                    d1 = math.hypot(cx1, cy1)
+                    if (self.r_in - margin_tol) <= d1 <= (self.r_out + margin_tol):
+                        if not is_near_hub(cx1, cy1):
                             pockets.append({
-                                "x": round(px, 3), "y": round(py, 3),
-                                "shape": "triangle", "size": round(pocket_dia, 3),
-                                "depth": round(self.pocket_depth, 3)
+                                "x": round(cx1, 3), "y": round(cy1, 3),
+                                "shape": "triangle", "size": round(pocket_side, 3),
+                                "depth": round(self.pocket_depth, 3),
+                                "orientation": 0.0
+                            })
+
+                    # Triangle 2 (Downward / inverted orientation)
+                    cx2 = i * self.L + self.L * 0.5 + x_off
+                    cy2 = y_base + 2.0 * row_h / 3.0
+                    d2 = math.hypot(cx2, cy2)
+                    if (self.r_in - margin_tol) <= d2 <= (self.r_out + margin_tol):
+                        if not is_near_hub(cx2, cy2):
+                            pockets.append({
+                                "x": round(cx2, 3), "y": round(cy2, 3),
+                                "shape": "triangle", "size": round(pocket_side, 3),
+                                "depth": round(self.pocket_depth, 3),
+                                "orientation": 180.0
                             })
 
         elif self.topology == "hexagonal_gmt":
@@ -331,9 +347,9 @@ class MirrorCADGenerator:
             # Calibrated to Siemens NX Parasolid CAD exact measured solid body volume
             # Rib aspect ratio tw/L clipping compensation:
             # Baseline thin ribs (tw=1.5, L=64.7, tw/L=0.023) -> packing = 0.9473 (10.725 kg NX match)
-            # Thick ribs (tw=5.3, L=69.0, tw/L=0.0768) -> packing = 0.8820 (17.480 kg NX match)
+            # Thick ribs (tw=5.3, L=69.0, tw/L=0.0768) -> packing = 0.9090 (17.480 kg NX match)
             tw_ratio = self.tw / max(1.0, self.L)
-            rib_clipping_loss = 1.275 * max(0.0, tw_ratio - 0.023)
+            rib_clipping_loss = 0.754 * max(0.0, tw_ratio - 0.0232)
             if self.topology == "triangular_isogrid":
                 packing = 0.9473 * (1.0 - rib_clipping_loss)
             elif self.topology == "iso_radial_hybrid":
@@ -386,7 +402,9 @@ class MirrorCADGenerator:
         if output_path is None:
             output_path = os.path.join(workspace_root, "nx_bridge", f"build_{self.topology}_mirror.py")
 
-        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        dir_name = os.path.dirname(output_path)
+        if dir_name:
+            os.makedirs(dir_name, exist_ok=True)
 
         journal_code = f'''# ==============================================================================
 # Siemens NX Open Python Journal: Automated 3D Spaceborne Mirror CAD

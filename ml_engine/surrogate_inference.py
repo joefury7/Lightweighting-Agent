@@ -87,8 +87,12 @@ class MirrorSurrogatePredictor:
         area_filleted_pocket = max(0.0, area_sharp_pocket - corner_area_lost)
         theory_pocket_fraction = area_filleted_pocket / area_cell
 
-        # Siemens NX boundary cell packing factor & 18-hub solid node retention factor
-        nx_packing_factor = 0.9473 # Calibrated to Siemens NX Parasolid CAD exact solid body volume (4,239,036 mm3 -> 10.725 kg)
+        # Calibrated to Siemens NX Parasolid CAD exact measured solid body volume
+        # Baseline thin ribs (tw=1.5, L=64.7, tw/L=0.023) -> packing = 0.9473 (10.725 kg NX match)
+        # Thick ribs (tw=5.3, L=69.0, tw/L=0.0768) -> packing = 0.9090 (17.480 kg NX match)
+        tw_ratio = float(tw_mm) / max(1.0, float(L_mm))
+        rib_clipping_loss = 0.754 * max(0.0, tw_ratio - 0.0232)
+        nx_packing_factor = 0.9473 * (1.0 - rib_clipping_loss)
 
         v_removed = v_pocket_zone * theory_pocket_fraction * nx_packing_factor
         v_cad = max(1000.0, v_blank - v_removed)
@@ -131,7 +135,10 @@ class MirrorSurrogatePredictor:
         area_filleted_pocket = np.maximum(0.0, area_sharp_pocket - corner_area_lost)
         theory_pocket_fraction = area_filleted_pocket / area_cell
 
-        nx_packing_factor = 0.9473 # Calibrated to Siemens NX Parasolid CAD exact solid body volume (4,239,036 mm3 -> 10.725 kg)
+        # Calibrated to Siemens NX Parasolid CAD exact measured solid body volume
+        tw_ratio = tw_arr / np.maximum(1.0, L_arr)
+        rib_clipping_loss = 0.754 * np.maximum(0.0, tw_ratio - 0.0232)
+        nx_packing_factor = 0.9473 * (1.0 - rib_clipping_loss)
         v_removed = v_pocket_zone * theory_pocket_fraction * nx_packing_factor
         v_cad = np.maximum(1000.0, v_blank - v_removed)
         return v_cad * rho

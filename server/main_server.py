@@ -92,6 +92,7 @@ class UnifiedOptimizeRequest(BaseModel):
     Dc_mm: float = 120.0
     H_mm: float = 73.7
     max_mass_kg: float = 12.0
+    target_mass_kg: Optional[float] = None
     max_sag_nm: float = 60.0
     num_candidates: int = 50000
     mode: str = "target"
@@ -264,6 +265,7 @@ def run_unified_optimization(req: UnifiedOptimizeRequest):
     """
     mat = req.material or "zerodur"
     top = req.topology or "triangular_isogrid"
+    eff_target_mass = req.target_mass_kg if req.target_mass_kg is not None else req.max_mass_kg
 
     try:
         coop_res = multi_mat_optimizer.run_cooperative_pipeline(
@@ -272,7 +274,7 @@ def run_unified_optimization(req: UnifiedOptimizeRequest):
             D_mm=req.D_mm,
             Dc_mm=req.Dc_mm,
             H_mm=req.H_mm,
-            target_mass_kg=req.max_mass_kg,
+            target_mass_kg=eff_target_mass,
             max_sag_nm=req.max_sag_nm,
             mode=req.mode or "target"
         )
@@ -283,7 +285,7 @@ def run_unified_optimization(req: UnifiedOptimizeRequest):
         traceback.print_exc()
         try:
             nsga2_res = optimizer.optimize_nsga2(
-                req.D_mm, req.Dc_mm, req.H_mm, req.max_mass_kg, req.max_sag_nm,
+                req.D_mm, req.Dc_mm, req.H_mm, eff_target_mass, req.max_sag_nm,
                 mode=req.mode or "target"
             )
             pinn_eval = pinn_predictor.predict(

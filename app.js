@@ -100,8 +100,10 @@ function calculateExactNXCadMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R
   const theory_frac = area_filleted / area_cell;
 
   // Calibrated to Siemens NX Parasolid CAD exact solid body volume with boundary clipping compensation
+  // Thin ribs (1.5mm / 64.7mm): packing = 0.9473 (10.725 kg NX match)
+  // Thick ribs (5.3mm / 69.0mm): packing = 0.9090 (17.480 kg NX match)
   const tw_ratio = tw_mm / Math.max(1.0, L_mm);
-  const rib_clipping_loss = 1.275 * Math.max(0.0, tw_ratio - 0.023);
+  const rib_clipping_loss = 0.754 * Math.max(0.0, tw_ratio - 0.0232);
   const nx_packing = 0.9473 * (1.0 - rib_clipping_loss);
   const v_removed = v_pocket_zone * theory_frac * nx_packing;
   const v_cad = Math.max(1000.0, v_blank - v_removed);
@@ -1476,13 +1478,14 @@ function updateCalculation() {
         const cx = i * state.cellSize + xOff;
         const cy = yBase + rowH / 3.0;
         const d1 = Math.hypot(cx, cy);
-        if (d1 + pocketRadius <= maxR && d1 - pocketRadius >= centralExcludeR) {
+        const marginTol = state.cellSize * 0.55;
+        if (d1 <= maxR + marginTol && d1 >= centralExcludeR - marginTol) {
           if (!isCloseToSupport(cx, cy, hubs, threshold)) pocketCount++;
         }
         const cx2 = i * state.cellSize + state.cellSize * 0.5 + xOff;
         const cy2 = yBase + 2.0 * rowH / 3.0;
         const d2 = Math.hypot(cx2, cy2);
-        if (d2 + pocketRadius <= maxR && d2 - pocketRadius >= centralExcludeR) {
+        if (d2 <= maxR + marginTol && d2 >= centralExcludeR - marginTol) {
           if (!isCloseToSupport(cx2, cy2, hubs, threshold)) pocketCount++;
         }
       }
