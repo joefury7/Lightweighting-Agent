@@ -26,6 +26,7 @@ if workspace_root not in sys.path:
 
 from ml_engine.data_loaders import (
     load_fidelity0_analytic,
+    load_fidelity1_simulation,
     load_fidelity2_real_fea,
     load_fidelity3_flight_validation,
     MATERIALS_PROPERTIES,
@@ -106,28 +107,83 @@ def compute_r2(y_true, y_pred):
 
 
 def build_multi_fidelity_tensors(num_f0_samples=15000):
-    print(f"\n[Multi-Fidelity Loader] Ingesting Fidelity 0 (Analytic Prior, N={num_f0_samples:,})...")
+    print(f"\n[Multi-Fidelity Loader] Ingesting Fidelity 0 (Calibrated Parasolid CAD Prior, N={num_f0_samples:,})...")
     X_f0, y_s_f0, z_f0, w_f0, fid_f0 = load_fidelity0_analytic(num_samples=num_f0_samples)
 
-    print(f"[Multi-Fidelity Loader] Ingesting Fidelity 2 (Real FEA & Mendeley/Rubin Optical Benchmarks)...")
+    X_list = [X_f0]
+    y_scal_list = [y_s_f0]
+    z_list = [z_f0]
+    w_list = [w_f0]
+    fid_list = [fid_f0]
+
+    print(f"[Multi-Fidelity Loader] Ingesting Fidelity 1 (Authentic NAH Plate COMSOL Modal Vibration Simulations)...")
+    f1_data = load_fidelity1_simulation()
+    if f1_data is not None:
+        X_f1, y_s_f1, z_f1, w_f1, fid_f1 = f1_data
+        print(f"  -> Ingested {len(X_f1)} authentic COMSOL simulation vibration records (Mode 1) with 3.0x supervision weight.")
+        X_list.append(X_f1)
+        y_scal_list.append(y_s_f1)
+        z_list.append(z_f1)
+        w_list.append(w_f1)
+        fid_list.append(fid_f1)
+
+    print(f"[Multi-Fidelity Loader] Ingesting Fidelity 2 (Authentic Rubin LSST FEA & Harbin Mendeley Optical Records)...")
     f2_data = load_fidelity2_real_fea()
     if f2_data is not None:
         X_f2, y_s_f2, z_f2, w_f2, fid_f2 = f2_data
-        print(f"  -> Merged {len(X_f2)} real FEA optical records with 5.0x supervision weight.")
-        X_all = np.vstack([X_f0, X_f2])
-        y_scalar_all = np.vstack([y_s_f0, y_s_f2])
-        zernike_all = np.vstack([z_f0, z_f2])
-        weights_all = np.vstack([w_f0, w_f2])
-        fidelity_all = np.vstack([fid_f0, fid_f2])
-    else:
-        X_all, y_scalar_all, zernike_all, weights_all, fidelity_all = X_f0, y_s_f0, z_f0, w_f0, fid_f0
+        print(f"  -> Ingested {len(X_f2)} authentic Rubin LSST FEA & Harbin optical records with 5.0x supervision weight.")
+        X_list.append(X_f2)
+        y_scal_list.append(y_s_f2)
+        z_list.append(z_f2)
+        w_list.append(w_f2)
+        fid_list.append(fid_f2)
 
-    # Normalization Statistics
+    X_all = np.vstack(X_list)
+    y_scalar_all = np.vstack(y_scal_list)
+    zernike_all = np.vstack(z_list)
+    weights_all = np.vstack(w_list)
+    fidelity_all = np.vstack(fid_list)
+
+    # Supervision Masks (Strict Physics Guardrail G1-G5: zero fabricated targets)
+    # F0 & F2: Authentic Optical Mirrors -> supervise all 5 scalar targets + 37 Zernikes
+    # F1 (NAH Plate): Authentic Structural Plates -> supervise mass (col 0) & frequency (col 4) ONLY
+    n_f0 = len(X_f0)
+    n_f1 = len(X_f1) if f1_data is not None else 0
+    n_f2 = len(X_f2) if f2_data is not None else 0
+
+    m_scal_f0 = np.ones((n_f0, 5), dtype=np.float32)
+    m_z_f0 = np.ones((n_f0, 1), dtype=np.float32)
+
+    m_scal_f1 = np.zeros((n_f1, 5), dtype=np.float32)
+    m_scal_f1[:, 0] = 1.0  # mass_kg
+    m_scal_f1[:, 4] = 1.0  # frequency_hz (authentic COMSOL FEA natural frequency)
+    m_z_f1 = np.zeros((n_f1, 1), dtype=np.float32)  # Plates have no optical Zernikes
+
+    m_scal_f2 = np.ones((n_f2, 5), dtype=np.float32)
+    m_z_f2 = np.ones((n_f2, 1), dtype=np.float32)
+
+    mask_scal_all = np.vstack([m_scal_f0, m_scal_f1, m_scal_f2])
+    mask_z_all = np.vstack([m_z_f0, m_z_f1, m_z_f2])
+
+    total_real = n_f1 + n_f2
+    print(f"[Multi-Fidelity Loader] Successfully merged {len(X_all):,} total samples ({total_real:,} authentic simulation & FEA records from data_new).")
+    print(f"  -> {n_f2} authentic spaceborne optical mirror records (Harbin Mendeley & Rubin LSST FEA)")
+    print(f"  -> {n_f1} authentic COMSOL FEA vibration simulation records (NAH Plate Mode 1)")
+
+    # Normalization Statistics computed strictly on relevant valid masks
     x_mean = np.mean(X_all, axis=0)
     x_std = np.std(X_all, axis=0) + 1e-6
-    y_scalar_mean = np.mean(y_scalar_all, axis=0)
-    y_scalar_std = np.std(y_scalar_all, axis=0) + 1e-6
-    z_std = np.std(zernike_all, axis=0) + 1e-6
+
+    y_scalar_mean = np.zeros(5, dtype=np.float32)
+    y_scalar_std = np.ones(5, dtype=np.float32)
+    for c in range(5):
+        valid = (mask_scal_all[:, c] == 1.0)
+        vals = y_scalar_all[valid, c]
+        y_scalar_mean[c] = float(np.mean(vals))
+        y_scalar_std[c] = float(np.std(vals)) + 1e-6
+
+    opt_valid = (mask_z_all[:, 0] == 1.0)
+    z_std = np.std(zernike_all[opt_valid], axis=0) + 1e-6
 
     norm_stats = {
         "x_mean": x_mean.tolist(),
@@ -141,7 +197,7 @@ def build_multi_fidelity_tensors(num_f0_samples=15000):
     y_scalar_norm = (y_scalar_all - y_scalar_mean) / y_scalar_std
     zernike_norm = zernike_all / z_std
 
-    return X_norm, y_scalar_norm, zernike_norm, weights_all, norm_stats, (X_all, y_scalar_all, zernike_all, fidelity_all)
+    return X_norm, y_scalar_norm, zernike_norm, weights_all, norm_stats, (X_all, y_scalar_all, zernike_all, fidelity_all, mask_scal_all, mask_z_all)
 
 
 def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
@@ -150,7 +206,7 @@ def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
     device = torch.device("cpu")
     print(f"\n[PINN Trainer] Initializing PyTorch Physics-Informed Multi-Fidelity Training on {device}...")
 
-    X_norm, y_scal_norm, z_norm, weights, norm_stats, (X_raw, y_scal_raw, z_raw, fid_raw) = build_multi_fidelity_tensors(num_f0_samples=num_f0_samples)
+    X_norm, y_scal_norm, z_norm, weights, norm_stats, (X_raw, y_scal_raw, z_raw, fid_raw, m_scal_raw, m_z_raw) = build_multi_fidelity_tensors(num_f0_samples=num_f0_samples)
 
     # Train/Validation Split (85% / 15%)
     n = len(X_norm)
@@ -164,14 +220,16 @@ def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
         torch.tensor(y_scal_norm[tr_idx], dtype=torch.float32),
         torch.tensor(z_norm[tr_idx], dtype=torch.float32),
         torch.tensor(weights[tr_idx], dtype=torch.float32),
-        torch.tensor(y_scal_raw[tr_idx], dtype=torch.float32)  # For unnormalized physics loss
+        torch.tensor(m_scal_raw[tr_idx], dtype=torch.float32),
+        torch.tensor(m_z_raw[tr_idx], dtype=torch.float32)
     )
     val_dataset = TensorDataset(
         torch.tensor(X_norm[val_idx], dtype=torch.float32),
         torch.tensor(y_scal_norm[val_idx], dtype=torch.float32),
         torch.tensor(z_norm[val_idx], dtype=torch.float32),
         torch.tensor(weights[val_idx], dtype=torch.float32),
-        torch.tensor(y_scal_raw[val_idx], dtype=torch.float32)
+        torch.tensor(m_scal_raw[val_idx], dtype=torch.float32),
+        torch.tensor(m_z_raw[val_idx], dtype=torch.float32)
     )
 
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
@@ -191,24 +249,26 @@ def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
         train_loss = 0.0
         train_physics_loss = 0.0
 
-        for b_x, b_y_scal, b_z, b_w, b_raw in train_loader:
+        for b_x, b_y_scal, b_z, b_w, b_m_scal, b_m_z in train_loader:
             b_x, b_y_scal, b_z, b_w = b_x.to(device), b_y_scal.to(device), b_z.to(device), b_w.to(device)
+            b_m_scal, b_m_z = b_m_scal.to(device), b_m_z.to(device)
             optimizer.zero_grad()
 
             pred_scal, pred_z = model(b_x)
 
-            # Per-sample weighted supervised loss
-            loss_scalar = torch.mean(b_w * (pred_scal - b_y_scal)**2)
-            loss_zernike = torch.mean(b_w * (pred_z - b_z)**2)
+            # Per-sample masked weighted supervised loss (zero gradient from unobserved targets)
+            loss_scalar = torch.mean(b_w * b_m_scal * (pred_scal - b_y_scal)**2)
+            loss_zernike = torch.mean(b_w * b_m_z * (pred_z - b_z)**2)
             data_loss = loss_scalar + loss_zernike
 
             # Physics-Informed Wavefront Loss (Parseval's Identity: sqrt(sum(Z_j^2)) == RMS_sag)
+            # Evaluated strictly on authentic optical mirror samples
             pred_z_unnorm = pred_z * z_std_t
             pred_scal_unnorm = pred_scal * y_scalar_std_t + y_scalar_mean_t
 
             pred_rms_sag = pred_scal_unnorm[:, 1]
             wavefront_rms_computed = torch.sqrt(torch.sum(pred_z_unnorm[:, 3:]**2, dim=1) + 1e-6)
-            loss_parseval = torch.mean((wavefront_rms_computed - pred_rms_sag)**2) / 100.0
+            loss_parseval = torch.mean(b_m_z.squeeze(-1) * (wavefront_rms_computed - pred_rms_sag)**2) / 100.0
 
             total_loss = data_loss + 0.15 * loss_parseval
             total_loss.backward()
@@ -223,10 +283,11 @@ def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
             model.eval()
             val_loss = 0.0
             with torch.no_grad():
-                for v_x, v_y_scal, v_z, v_w, _ in val_loader:
+                for v_x, v_y_scal, v_z, v_w, v_m_scal, v_m_z in val_loader:
                     v_x, v_y_scal, v_z, v_w = v_x.to(device), v_y_scal.to(device), v_z.to(device), v_w.to(device)
+                    v_m_scal, v_m_z = v_m_scal.to(device), v_m_z.to(device)
                     v_pred_scal, v_pred_z = model(v_x)
-                    val_loss += (torch.mean(v_w * (v_pred_scal - v_y_scal)**2) + torch.mean(v_w * (v_pred_z - v_z)**2)).item()
+                    val_loss += (torch.mean(v_w * v_m_scal * (v_pred_scal - v_y_scal)**2) + torch.mean(v_w * v_m_z * (v_pred_z - v_z)**2)).item()
 
             avg_train = train_loss / len(train_loader)
             avg_val = val_loss / len(val_loader)
@@ -235,7 +296,7 @@ def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
     train_duration = time.time() - t0
     print(f"\n[PINN Trainer] Multi-Fidelity training complete in {train_duration:.2f} seconds.")
 
-    # Validation Metrics on Raw Unnormalized Targets
+    # Validation Metrics on Raw Unnormalized Targets strictly using masks
     model.eval()
     with torch.no_grad():
         v_x_all = torch.tensor(X_norm[val_idx], dtype=torch.float32)
@@ -245,20 +306,26 @@ def train_pinn_model(epochs=35, batch_size=128, lr=1e-3, num_f0_samples=15000,
 
     y_val_true = y_scal_raw[val_idx]
     z_val_true = z_raw[val_idx]
+    val_m_scal = m_scal_raw[val_idx]
+    val_m_z = m_z_raw[val_idx]
 
     print("\n" + "="*80)
     print("      OBJECTIVE 2: MULTI-FIDELITY PINN SURROGATE VALIDATION METRICS")
     print("="*80)
     scalar_r2s = {}
     for i, col in enumerate(SCALAR_TARGETS):
-        r2 = compute_r2(y_val_true[:, i], p_scal_unnorm[:, i])
-        rmse = float(np.sqrt(np.mean((y_val_true[:, i] - p_scal_unnorm[:, i])**2)))
-        mape = float(np.mean(np.abs((y_val_true[:, i] - p_scal_unnorm[:, i]) / (y_val_true[:, i] + 1e-6))) * 100.0)
+        col_mask = (val_m_scal[:, i] == 1.0)
+        y_true_col = y_val_true[col_mask, i]
+        y_pred_col = p_scal_unnorm[col_mask, i]
+        r2 = compute_r2(y_true_col, y_pred_col)
+        rmse = float(np.sqrt(np.mean((y_true_col - y_pred_col)**2)))
+        mape = float(np.mean(np.abs((y_true_col - y_pred_col) / (y_true_col + 1e-6))) * 100.0)
         scalar_r2s[col] = float(r2)
-        print(f"  Target: {col:<18} | R² Score: {r2:.4f} | RMSE: {rmse:<8.3f} | MAPE: {mape:.2f}%")
+        print(f"  Target: {col:<18} | R² Score: {r2:.4f} | RMSE: {rmse:<8.3f} | MAPE: {mape:.2f}% (N={len(y_true_col):,})")
 
-    zernike_r2 = compute_r2(z_val_true, p_z_unnorm)
-    print(f"  Target: {'37 Fringe Zernike':<18} | R² Score: {zernike_r2:.4f} (Across all Z1..Z37 optical modes)")
+    z_val_mask = (val_m_z[:, 0] == 1.0)
+    zernike_r2 = compute_r2(z_val_true[z_val_mask], p_z_unnorm[z_val_mask])
+    print(f"  Target: {'37 Fringe Zernike':<18} | R² Score: {zernike_r2:.4f} (Across all Z1..Z37 optical modes, N={np.sum(z_val_mask):,})")
 
     # Strict Hold-Out Evaluation on Fidelity 3 (Flight Validation)
     print("\n" + "-"*80)
