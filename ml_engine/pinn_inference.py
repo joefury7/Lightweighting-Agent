@@ -1,209 +1,48 @@
 """
-Physics-Informed Neural Network (PINN) High-Speed Surrogate Predictor (Objective 2)
-Provides sub-millisecond evaluation of scalar optomechanics and 37-term Fringe Zernike wavefront coefficients.
-Seamlessly handles Zerodur, Silicon Carbide (SiC), ULE, Beryllium, and all 8 pocket topologies.
-"""
+Zernike-resolved surrogate prediction (replaces the former "PINN").
 
+The previous network was trained mostly on closed-form formulas plus external datasets mapped
+onto invented geometry; its sag predictions were uncorrelated with physics (r = -0.18).
+This module now serves predictions from ml_engine/fea_surrogate.py, which is trained only on
+finite-element results of the exact NX-journal geometry, including 37 Fringe Zernike
+coefficients fitted to the FE surface deflection.
+
+`PINNMirrorPredictor` is kept as an alias so existing imports / the /pinn/predict endpoint work.
+"""
 import os
 import sys
-import json
 import time
-import math
-import numpy as np
-import torch
 
-# Ensure workspace root is in sys.path
 workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
-from ml_engine.train_pinn_surrogate import (
-    PhysicsInformedMirrorSurrogate, MATERIALS_PROPERTIES, SCALAR_TARGETS
-)
-from cad_engine.cad_generator import TOPOLOGY_CATALOG, MirrorCADGenerator
-from ml_engine.zernike_decomposition import reconstruct_wavefront_grid
+from ml_engine.surrogate_inference import MirrorSurrogatePredictor  # noqa: E402
 
 
-class PINNMirrorPredictor:
-    """
-    Sub-millisecond PyTorch Physics-Informed Neural Surrogate Inference Engine.
-    """
+class ZernikeSurrogatePredictor:
     def __init__(self, models_dir=None):
-        if models_dir is None:
-            models_dir = os.path.join(workspace_root, "ml_engine", "models")
+        self.base = MirrorSurrogatePredictor()
 
-        self.model_path = os.path.join(models_dir, "pinn_mirror_surrogate.pt")
-        self.meta_path = os.path.join(models_dir, "pinn_metadata.json")
-
-        if not os.path.exists(self.model_path) or not os.path.exists(self.meta_path):
-            raise FileNotFoundError(f"PINN weights not found in {models_dir}. Train using train_pinn_surrogate.py first.")
-
-        with open(self.meta_path, "r", encoding="utf-8") as f:
-            self.metadata = json.load(f)
-
-        self.norm = self.metadata["norm_stats"]
-        self.x_mean = np.array(self.norm["x_mean"], dtype=np.float32)
-        self.x_std = np.array(self.norm["x_std"], dtype=np.float32)
-        self.y_scalar_mean = np.array(self.norm["y_scalar_mean"], dtype=np.float32)
-        self.y_scalar_std = np.array(self.norm["y_scalar_std"], dtype=np.float32)
-        self.z_std = np.array(self.norm["z_std"], dtype=np.float32)
-
-        self.device = torch.device("cpu")
-        self.model = PhysicsInformedMirrorSurrogate(in_features=18, hidden_dim=256)
-        state_dict = torch.load(self.model_path, map_location=self.device)
-        self.model.load_state_dict(state_dict)
-        self.model.to(self.device)
-        self.model.eval()
-
-        # Warm-up inference
-        dummy_in = torch.zeros((1, 18), dtype=torch.float32)
-        with torch.no_grad():
-            self.model(dummy_in)
-
-    def _encode_input_vector(self, D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm,
-                             material="zerodur", topology="triangular_isogrid"):
-        mat_key = material.lower().replace(" ", "_").strip()
-        mat_props = MATERIALS_PROPERTIES.get(mat_key, MATERIALS_PROPERTIES["zerodur"])
-        
-        top_key = topology.lower().replace("-", "_").strip()
-        top_idx = TOPOLOGY_CATALOG.index(top_key) if top_key in TOPOLOGY_CATALOG else 0
-
-        geom = [float(D_mm), float(Dc_mm), float(H_mm), float(tf_mm), float(tw_mm), float(L_mm), float(rf_mm)]
-        mat = [float(mat_props["E"]), float(mat_props["rho"]), float(mat_props["nu"])]
-        
-        top_one_hot = [0.0] * len(TOPOLOGY_CATALOG)
-        top_one_hot[top_idx] = 1.0
-
-        raw_vec = np.array(geom + mat + top_one_hot, dtype=np.float32)
-        norm_vec = (raw_vec - self.x_mean) / self.x_std
-        return torch.tensor(norm_vec, dtype=torch.float32).unsqueeze(0), raw_vec
-
-    def predict(self, D_mm=560.0, Dc_mm=120.0, H_mm=73.7, tf_mm=1.0, tw_mm=3.0, L_mm=55.5, rf_mm=3.0,
+    def predict(self, D_mm=560.0, Dc_mm=175.0, H_mm=73.7, tf_mm=1.0, tw_mm=3.0, L_mm=55.5, rf_mm=3.0,
                 material="zerodur", topology="triangular_isogrid"):
-        """
-        Executes sub-millisecond forward pass predicting both scalar metrics and 37-term Fringe Zernike spectrum.
-        """
         t0 = time.perf_counter()
-        x_tensor, raw_vec = self._encode_input_vector(
-            D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, material, topology
-        )
-
-        with torch.no_grad():
-            scal_norm, z_norm = self.model(x_tensor)
-            
-            scalars_unnorm = (scal_norm.squeeze(0).numpy() * self.y_scalar_std) + self.y_scalar_mean
-            zernike_unnorm = z_norm.squeeze(0).numpy() * self.z_std
-
-        elapsed_ms = (time.perf_counter() - t0) * 1000.0
-
-        # Exact Gauss-Legendre Quadrature Solid CAD Mass Calibration
-        cad_gen = MirrorCADGenerator(
-            D_mm=D_mm, Dc_mm=Dc_mm, H_mm=H_mm, tf_mm=tf_mm, tw_mm=tw_mm,
-            L_mm=L_mm, rf_mm=rf_mm, topology=topology, material=material
-        )
-        cad_mass_kg, solid_mass_kg, lw_pct = cad_gen.compute_cad_mass()
-
-        mass_kg = round(float(cad_mass_kg), 2)
-        rms_sag_nm = max(1.0, round(float(scalars_unnorm[1]), 2))
-        pv_sag_nm = max(2.0, round(float(scalars_unnorm[2]), 2))
-        quilting_nm = max(0.1, round(float(scalars_unnorm[3]), 2))
-        frequency_hz = max(20.0, round(float(scalars_unnorm[4]), 1))
-
-        # Re-verify Parseval normalization on Zernike modes
-        optical_rms = math.sqrt(float(np.sum(zernike_unnorm[3:]**2)))
-        if optical_rms > 1e-4:
-            zernike_unnorm[3:] *= (rms_sag_nm / optical_rms)
-
-        zernike_list = [round(float(c), 3) for c in zernike_unnorm]
-
-        # Optical Figure and Launch Limits Verification
-        status = "PASS" if (rms_sag_nm <= 60.0 and mass_kg <= 12.0 and quilting_nm <= 30.0 and frequency_hz >= 120.0) else "REVIEW"
-
-        return {
-            "mass_kg": mass_kg,
-            "mass_solid_kg": solid_mass_kg,
-            "lightweight_pct": lw_pct,
-            "rms_sag_nm": rms_sag_nm,
-            "pv_sag_nm": pv_sag_nm,
-            "quilting_nm": quilting_nm,
-            "frequency_hz": frequency_hz,
-            "zernike_37_coefficients": zernike_list,
-            "dominant_zernike_modes": {
-                "Z4_Defocus_nm": zernike_list[3],
-                "Z9_Primary_Spherical_nm": zernike_list[8],
-                "Z10_Primary_Trefoil_3Fold_nm": zernike_list[9],
-                "Z16_Secondary_Spherical_nm": zernike_list[15],
-                "Z37_Hexafoil_6Fold_Whiffletree_nm": zernike_list[36]
-            },
-            "status": status,
-            "inference_latency_ms": round(elapsed_ms, 3),
-            "surrogate_architecture": "Deep Residual PINN (Dual-Head PyTorch)",
-            "material": material,
-            "topology": topology
+        if topology not in ("triangular_isogrid", "isogrid"):
+            raise ValueError(f"No FEA training data for topology '{topology}' (only triangular isogrid).")
+        r = self.base.predict(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, material=material, topology=topology)
+        z = r["zernike_fringe_37_nm"]
+        r["zernike_37_coefficients"] = z
+        r["dominant_zernike_modes"] = {
+            "Z4_Defocus_nm": round(z[3], 3),
+            "Z9_Primary_Spherical_nm": round(z[8], 3),
+            "Z10_Primary_Trefoil_3Fold_nm": round(z[9], 3),
+            "Z16_Secondary_Spherical_nm": round(z[15], 3),
+            "Z37_Hexafoil_6Fold_Whiffletree_nm": round(z[36], 3),
         }
-
-    def predict_batch_fast(self, feat_geom_matrix, material="zerodur", topology="triangular_isogrid"):
-        """
-        High-throughput batch evaluation: evaluates tens of thousands of designs in < 30 ms.
-
-        CRITICAL FIX: The PINN neural network was trained on old (pre-calibration) mass data
-        and under-reports mass by ~3.5-4 kg systematically.  We replace column 0 (mass_kg)
-        with the same exact analytical CAD formula used in predict() so NSGA-II fitness and
-        the final answer are always consistent.
-        """
-        N = len(feat_geom_matrix)
-        mat_key = material.lower().replace(" ", "_").strip()
-        mat_props = MATERIALS_PROPERTIES.get(mat_key, MATERIALS_PROPERTIES["zerodur"])
-        top_key = topology.lower().replace("-", "_").strip()
-        top_idx = TOPOLOGY_CATALOG.index(top_key) if top_key in TOPOLOGY_CATALOG else 0
-
-        mat_arr = np.tile([mat_props["E"], mat_props["rho"], mat_props["nu"]], (N, 1))
-        top_arr = np.zeros((N, len(TOPOLOGY_CATALOG)), dtype=np.float32)
-        top_arr[:, top_idx] = 1.0
-
-        raw_mat = np.column_stack([feat_geom_matrix, mat_arr, top_arr]).astype(np.float32)
-        norm_mat = (raw_mat - self.x_mean) / self.x_std
-
-        with torch.no_grad():
-            x_t = torch.tensor(norm_mat, dtype=torch.float32)
-            scal_norm, _ = self.model(x_t)
-            scalars = (scal_norm.numpy() * self.y_scalar_std) + self.y_scalar_mean
-
-        # --- Replace PINN mass (col 0) with exact analytical CAD mass ---
-        # feat_geom_matrix columns: [D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm]
-        rho_map = {
-            "zerodur": 2.53e-6, "sic": 3.21e-6, "ule": 2.205e-6, "beryllium": 1.848e-6
-        }
-        rho_kg_mm3 = rho_map.get(mat_key, 2.53e-6)
-
-        for i in range(N):
-            row = feat_geom_matrix[i]
-            D, Dc, H, tf, tw, L, rf = float(row[0]), float(row[1]), float(row[2]), \
-                                       float(row[3]), float(row[4]), float(row[5]), float(row[6])
-            try:
-                cad_gen = MirrorCADGenerator(
-                    D_mm=D, Dc_mm=Dc, H_mm=H, tf_mm=tf, tw_mm=tw,
-                    L_mm=L, rf_mm=rf, topology=top_key, material=mat_key
-                )
-                cad_mass, _, _ = cad_gen.compute_cad_mass()
-                scalars[i, 0] = float(cad_mass)
-            except Exception:
-                pass   # keep PINN value on rare edge-case geometry failures
-
-        return scalars
+        r["inference_latency_ms"] = round((time.perf_counter() - t0) * 1000, 2)
+        r["surrogate_architecture"] = "Gaussian-process surrogate trained on FEA of the exact geometry"
+        r["material"], r["topology"] = material, topology
+        return r
 
 
-if __name__ == "__main__":
-    predictor = PINNMirrorPredictor()
-    print("\n--- Testing PINN Inference on 560mm Zerodur Benchmark ---")
-    res_zerodur = predictor.predict(D_mm=560.0, Dc_mm=120.0, H_mm=73.7, tf_mm=1.0, tw_mm=3.0, L_mm=55.5, rf_mm=3.0,
-                                    material="zerodur", topology="triangular_isogrid")
-    for k, v in res_zerodur.items():
-        if k != "zernike_37_coefficients":
-            print(f"  {k}: {v}")
-
-    print("\n--- Testing Cross-Material Generalization on 560mm Mirror ---")
-    for mat in ["sic", "ule", "beryllium"]:
-        res_m = predictor.predict(D_mm=560.0, Dc_mm=120.0, H_mm=73.7, tf_mm=1.0, tw_mm=3.0, L_mm=55.5, rf_mm=3.0,
-                                  material=mat, topology="hexagonal_gmt")
-        print(f"[{mat.upper()}] Mass: {res_m['mass_kg']} kg | RMS Sag: {res_m['rms_sag_nm']} nm | f1: {res_m['frequency_hz']} Hz | Latency: {res_m['inference_latency_ms']} ms")
+PINNMirrorPredictor = ZernikeSurrogatePredictor   # backwards-compatible name

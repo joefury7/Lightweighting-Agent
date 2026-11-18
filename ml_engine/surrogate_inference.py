@@ -1,200 +1,129 @@
 """
-Instant Physics Surrogate Predictor Class (Pillar 2)
-Loads native XGBoost JSON models for ultra-fast, robust inference.
-"""
+Mirror performance predictor used by the server, optimizers and RL environment.
 
+  mass_kg              EXACT  - computed from the NX journal geometry (cad_engine/exact_mass.py);
+                                identical to the NX-built part when every pocket is cut.
+  rms_sag_nm, pv_sag_nm FEA-TRAINED surrogate (ml_engine/fea_surrogate.py), trained only on
+                                genuine FE gravity analyses of the exact geometry; returns a
+                                1-sigma uncertainty and a validity-domain flag.
+  quilting_nm          ANALYTIC estimate (Yoder Eq. 2.35 polishing-pressure quilting of one
+                                pocket cell) - labelled as such, not FEA.
+  frequency_hz         ANALYTIC estimate (Leissa free circular plate, smeared isogrid
+                                rigidity) - labelled as such, not FEA.
+
+No calibration constants, packing factors or formula-vs-formula "active learning" remain.
+"""
+import math
 import os
 import sys
-import json
-import numpy as np
-import math
-import xgboost as xgb
 
-# Ensure workspace root is in sys.path
+import numpy as np
+
 workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
+from cad_engine.exact_mass import isogrid_exact_mass, isogrid_exact_mass_fast  # noqa: E402
+from ml_engine.fea_surrogate import get_surrogate, MATERIALS  # noqa: E402
+
 FEATURE_COLS = ["D_mm", "Dc_mm", "H_mm", "tf_mm", "tw_mm", "L_mm", "rf_mm"]
 TARGET_COLS = ["mass_kg", "rms_sag_nm", "pv_sag_nm", "quilting_nm", "frequency_hz"]
+POLISH_PRESSURE_PA = 1378.95  # 0.2 psi polishing pressure (Yoder)
+
+
+def analytic_quilting_nm(tf_mm, tw_mm, L_mm, E_pa):
+    """Yoder & Vukobratovich Eq. 2.35: quilting under polishing pressure, triangular cell
+    (inscribed-circle span B = pocket side / sqrt(3)). Analytic estimate, not FEA."""
+    pocket_side = max(1.0, L_mm - 2.0 * tw_mm / math.sqrt(3.0))
+    B = (pocket_side / math.sqrt(3.0)) * 1e-3
+    tf = tf_mm * 1e-3
+    return 0.00151 * POLISH_PRESSURE_PA * B ** 4 / (E_pa * tf ** 3) * 1e9
+
+
+def analytic_frequency_hz(mass_kg, D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, E_pa, nu):
+    """Leissa: lowest elastic mode of a free circular plate (2 nodal diameters, lambda^2 = 5.25)
+    using smeared isogrid bending rigidity (NASA CR-124075). Analytic estimate, not FEA."""
+    tf = tf_mm * 1e-3
+    h = max(1e-3, (H_mm - tf_mm)) * 1e-3
+    alpha = (2.0 / math.sqrt(3.0)) * (tw_mm / L_mm)
+    delta = h / tf
+    D0 = E_pa * tf ** 3 / (12 * (1 - nu ** 2))
+    num = (1 + alpha * delta) ** 2 + 3 * alpha * delta * (1 + delta) ** 2 + alpha ** 2 * delta ** 4
+    Dstar = D0 * num / max(0.01, 1 + alpha * delta)
+    a = D_mm / 2000.0
+    area = math.pi * (a ** 2 - (Dc_mm / 2000.0) ** 2)
+    m_area = mass_kg / area
+    return 5.25 / (2 * math.pi * a ** 2) * math.sqrt(Dstar / m_area)
+
 
 class MirrorSurrogatePredictor:
     def __init__(self, models_dir=None):
-        if models_dir is None:
-            base_dir = os.path.dirname(os.path.abspath(__file__))
-            models_dir = os.path.join(base_dir, "models")
-            
-        manifest_path = os.path.join(models_dir, "manifest.json")
-        if not os.path.exists(manifest_path):
-            raise FileNotFoundError(f"Surrogate models not found in {models_dir}. Train them first using train_surrogate.py.")
-            
         self.features = FEATURE_COLS
         self.targets = TARGET_COLS
-        self.boosters = {}
-        
-        for col in TARGET_COLS:
-            model_path = os.path.join(models_dir, f"xgb_{col}.json")
-            booster = xgb.Booster()
-            booster.load_model(model_path)
-            self.boosters[col] = booster
 
-        # Active Learning Online Residual Compensator (calibrated to Siemens NX FEA ground truth)
-        from ml_engine.active_learner import ActiveLearningCompensator
-        self.active_learner = ActiveLearningCompensator()
+    @property
+    def sur(self):
+        s = get_surrogate()
+        if not s.models:
+            raise RuntimeError("FEA surrogate has no training data yet - run fea_engine/generate_fea_dataset.py")
+        return s
 
     @staticmethod
-    def compute_exact_cad_mass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R_curv=1085.0, k=-1.22, rho=2530e-9):
-        """
-        Computes the EXACT 3D solid body mass of the native Siemens NX Parasolid CAD model
-        (matching NX Analysis -> Measure volume within <= 0.005 kg / 5 grams).
-        Accounts for:
-        1. Exact revolved parabolic optical front surface contour
-        2. Solid 5.0 mm outer bezel mounting rim wall
-        3. Solid 5.0 mm inner central bore hub wall
-        4. Corner fillet radii (rf_mm) in every triangular isogrid cell
-        5. 18 Whiffletree kinematic support star-node solid retention
-        """
-        R = float(D_mm) / 2.0
-        Rc = float(Dc_mm) / 2.0
-        w_rim = 5.0
-        r_in = Rc + w_rim
-        r_out = R - w_rim
-
-        # 10-point Gauss-Legendre quadrature nodes & weights on [-1, 1]
-        xi, wi = np.polynomial.legendre.leggauss(10)
-
-        # 1. Exact Blank Volume Integral: 2*pi*r*(H + z_front(r)) dr over [Rc, R]
-        r_b = 0.5 * ((R - Rc) * xi + (R + Rc))
-        dr_b = 0.5 * (R - Rc)
-        denom_b = R_curv * (1.0 + np.sqrt(np.maximum(0.0001, 1.0 - (1.0 + k) * (r_b**2) / (R_curv**2))))
-        z_b = (r_b**2) / denom_b
-        integrand_b = 2.0 * np.pi * r_b * (float(H_mm) + z_b)
-        v_blank = np.sum(integrand_b * wi) * dr_b
-
-        # 2. Exact Gross Pocket Zone Integral: 2*pi*r*(H - tf + z_front(r)) dr over [r_in, r_out]
-        r_p = 0.5 * ((r_out - r_in) * xi + (r_out + r_in))
-        dr_p = 0.5 * (r_out - r_in)
-        denom_p = R_curv * (1.0 + np.sqrt(np.maximum(0.0001, 1.0 - (1.0 + k) * (r_p**2) / (R_curv**2))))
-        z_p = (r_p**2) / denom_p
-        integrand_p = 2.0 * np.pi * r_p * (float(H_mm) - float(tf_mm) + z_p)
-        v_pocket_zone = np.sum(integrand_p * wi) * dr_p
-
-        # 3. Filleted Isogrid Pocket Cavity Fraction
-        pocket_side = max(1.0, float(L_mm) - 2.0 * float(tw_mm) / math.sqrt(3.0))
-        area_cell = (math.sqrt(3.0) / 4.0) * (float(L_mm)**2)
-        area_sharp_pocket = (math.sqrt(3.0) / 4.0) * (pocket_side**2)
-        corner_area_lost = 3.0 * (math.sqrt(3.0) - math.pi / 3.0) * (float(rf_mm)**2)
-        area_filleted_pocket = max(0.0, area_sharp_pocket - corner_area_lost)
-        theory_pocket_fraction = area_filleted_pocket / area_cell
-
-        # Calibrated to Siemens NX Parasolid CAD exact measured solid body volume
-        # Baseline thin ribs (tw=1.5, L=64.7, tw/L=0.023) -> packing = 0.9473 (10.725 kg NX match)
-        # Thick ribs (tw=5.3, L=69.0, tw/L=0.0768) -> packing = 0.9090 (17.480 kg NX match)
-        tw_ratio = float(tw_mm) / max(1.0, float(L_mm))
-        rib_clipping_loss = 0.754 * max(0.0, tw_ratio - 0.0232)
-        nx_packing_factor = 0.9473 * (1.0 - rib_clipping_loss)
-
-        v_removed = v_pocket_zone * theory_pocket_fraction * nx_packing_factor
-        v_cad = max(1000.0, v_blank - v_removed)
-        return v_cad * rho
+    def compute_exact_cad_mass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, rho=2530e-9, **_):
+        return isogrid_exact_mass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, rho_kg_m3=rho * 1e9)["mass_kg"]
 
     @staticmethod
-    def compute_exact_cad_mass_batch(D_arr, Dc_arr, H_arr, tf_arr, tw_arr, L_arr, rf_arr, R_curv=1085.0, k=-1.22, rho=2530e-9):
-        """
-        High-throughput vectorized calculation of exact Siemens NX CAD solid body mass for 50,000+ candidates in < 40 ms.
-        """
-        R = D_arr / 2.0
-        Rc = Dc_arr / 2.0
-        w_rim = 5.0
-        r_in = Rc + w_rim
-        r_out = R - w_rim
+    def compute_exact_cad_mass_batch(D_arr, Dc_arr, H_arr, tf_arr, tw_arr, L_arr, rf_arr, rho=2530e-9, **_):
+        rho = np.broadcast_to(np.asarray(rho, float), np.shape(D_arr))
+        return np.array([isogrid_exact_mass_fast(d, dc, h, tf, tw, l, rf, rho_kg_m3=r * 1e9)["mass_kg"]
+                         for d, dc, h, tf, tw, l, rf, r in zip(D_arr, Dc_arr, H_arr, tf_arr, tw_arr, L_arr, rf_arr, rho)])
 
-        xi, wi = np.polynomial.legendre.leggauss(10)
-
-        # 1. Blank Volume:
-        r_b = 0.5 * (np.outer(R - Rc, xi) + np.outer(R + Rc, np.ones_like(xi)))
-        dr_b = 0.5 * (R - Rc)
-        denom_b = R_curv * (1.0 + np.sqrt(np.maximum(0.0001, 1.0 - (1.0 + k) * (r_b**2) / (R_curv**2))))
-        z_b = (r_b**2) / denom_b
-        integrand_b = 2.0 * np.pi * r_b * (np.outer(H_arr, np.ones_like(xi)) + z_b)
-        v_blank = np.sum(integrand_b * wi, axis=1) * dr_b
-
-        # 2. Pocket Zone Volume:
-        r_p = 0.5 * (np.outer(r_out - r_in, xi) + np.outer(r_out + r_in, np.ones_like(xi)))
-        dr_p = 0.5 * (r_out - r_in)
-        denom_p = R_curv * (1.0 + np.sqrt(np.maximum(0.0001, 1.0 - (1.0 + k) * (r_p**2) / (R_curv**2))))
-        z_p = (r_p**2) / denom_p
-        integrand_p = 2.0 * np.pi * r_p * (np.outer(H_arr - tf_arr, np.ones_like(xi)) + z_p)
-        v_pocket_zone = np.sum(integrand_p * wi, axis=1) * dr_p
-
-        # 3. Filleted Pocket Fraction:
-        pocket_side = np.maximum(1.0, L_arr - 2.0 * tw_arr / np.sqrt(3.0))
-        area_cell = (np.sqrt(3.0) / 4.0) * (L_arr**2)
-        area_sharp_pocket = (np.sqrt(3.0) / 4.0) * (pocket_side**2)
-        corner_area_lost = 3.0 * (np.sqrt(3.0) - np.pi / 3.0) * (rf_arr**2)
-        area_filleted_pocket = np.maximum(0.0, area_sharp_pocket - corner_area_lost)
-        theory_pocket_fraction = area_filleted_pocket / area_cell
-
-        # Calibrated to Siemens NX Parasolid CAD exact measured solid body volume
-        tw_ratio = tw_arr / np.maximum(1.0, L_arr)
-        rib_clipping_loss = 0.754 * np.maximum(0.0, tw_ratio - 0.0232)
-        nx_packing_factor = 0.9473 * (1.0 - rib_clipping_loss)
-        v_removed = v_pocket_zone * theory_pocket_fraction * nx_packing_factor
-        v_cad = np.maximum(1000.0, v_blank - v_removed)
-        return v_cad * rho
-
-    def predict(self, D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm):
-        """
-        Evaluate a single mirror design in < 0.5 ms.
-        Mass matches Siemens NX native 3D Parasolid CAD solid measure within <= 0.01 kg.
-        RMS Sag incorporates Active Learning closed-loop residual compensation matching NASTRAN FEA.
-        """
-        x = np.array([[float(D_mm), float(Dc_mm), float(H_mm), float(tf_mm), float(tw_mm), float(L_mm), float(rf_mm)]], dtype=np.float32)
-        dmat = xgb.DMatrix(x, feature_names=self.features)
-        
-        preds = {col: float(self.boosters[col].predict(dmat)[0]) for col in self.targets}
-        
-        # Ground-truth calibrated mass matching Siemens NX 3D CAD solid body
-        cad_mass = float(self.compute_exact_cad_mass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm))
-        
-        # Active Learning Residual Compensation for Sag
-        sag_correction = self.active_learner.predict_residual(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm)
-        calibrated_sag = max(5.0, preds["rms_sag_nm"] + sag_correction)
-        calibrated_pv = calibrated_sag * 3.82
-        
+    def predict(self, D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, material="zerodur",
+                topology="triangular_isogrid", max_sag_nm=60.0, max_mass_kg=None):
+        mat = MATERIALS.get((material or "zerodur").lower(), MATERIALS["zerodur"])
+        m = isogrid_exact_mass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, rho_kg_m3=mat["rho"], details=True)
+        ok, issues = self.sur.in_domain(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, topology=topology)
+        p = self.sur.predict(H_mm, tf_mm, tw_mm, L_mm, rf_mm, material=material)
+        quilt = analytic_quilting_nm(tf_mm, tw_mm, L_mm, mat["E"])
+        f1 = analytic_frequency_hz(m["mass_kg"], D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, mat["E"], mat["nu"])
+        sag = p["rms_sag_nm"]
+        status = "PASS" if sag <= max_sag_nm and (max_mass_kg is None or m["mass_kg"] <= max_mass_kg) else "REVIEW"
         return {
-            "mass_kg": round(cad_mass, 2),
-            "rms_sag_nm": round(calibrated_sag, 2),
-            "pv_sag_nm": round(calibrated_pv, 2),
-            "quilting_nm": round(preds["quilting_nm"], 2),
-            "frequency_hz": round(preds["frequency_hz"], 1),
-            "status": "PASS" if calibrated_sag <= 60.0 and cad_mass <= 12.0 and preds["quilting_nm"] <= 30.0 else "REVIEW",
-            "active_learning_applied": self.active_learner.is_trained,
-            "active_learning_residual_nm": round(sag_correction, 2)
+            "mass_kg": round(m["mass_kg"], 4),
+            "mass_source": "exact NX-journal geometry (no fitted factors)",
+            "solid_mass_kg": round(m["solid_mass_kg"], 3),
+            "lightweight_pct": round(m["lightweight_pct"], 2),
+            "pocket_count": m["pocket_count"],
+            "rms_sag_nm": round(sag, 3),
+            "rms_sag_std_nm": round(p["rms_sag_nm_std"], 3),
+            "pv_sag_nm": round(p["pv_sag_nm"], 3),
+            "rms_sag_power_removed_nm": round(p["rms_sag_power_removed_nm"], 3),
+            "sag_source": f"GP surrogate trained on {self.sur.meta.get('n_training_records', 0)} FEA runs of the exact geometry",
+            "quilting_nm": round(quilt, 2),
+            "quilting_source": "analytic estimate (Yoder Eq. 2.35) - not FEA",
+            "frequency_hz": round(f1, 1),
+            "frequency_source": "analytic estimate (free circular plate, smeared isogrid) - not FEA",
+            "zernike_fringe_37_nm": [round(v, 4) for v in p["zernike_fringe_37_nm"]],
+            "in_validity_domain": ok,
+            "validity_warnings": issues,
+            "status": status,
         }
 
-    def predict_batch(self, feature_matrix):
-        """
-        Vectorized batch evaluation for tens of thousands of designs in milliseconds.
-        Column 0 (mass_kg) evaluates exact Siemens NX Parasolid CAD solid body mass.
-        """
-        fm = np.asarray(feature_matrix, dtype=np.float32)
-        dmat = xgb.DMatrix(fm, feature_names=self.features)
-        cols = [self.boosters[col].predict(dmat) for col in self.targets]
-        
-        # Replace ML mass with vectorized exact Siemens NX CAD solid body mass
-        cols[0] = self.compute_exact_cad_mass_batch(
-            fm[:, 0], fm[:, 1], fm[:, 2], fm[:, 3], fm[:, 4], fm[:, 5], fm[:, 6]
-        )
-        # Apply vectorized Active Learning residual compensation to RMS sag & PV sag
-        corrections = self.active_learner.predict_residual_batch(fm)
-        cols[1] = np.maximum(5.0, cols[1] + corrections)
-        cols[2] = cols[1] * 3.82
-        return np.column_stack(cols)
+    def predict_batch(self, feature_matrix, material="zerodur"):
+        """Columns in: D, Dc, H, tf, tw, L, rf.  Columns out: mass, rms, pv, quilting, f1."""
+        fm = np.asarray(feature_matrix, dtype=float)
+        mat = MATERIALS.get((material or "zerodur").lower(), MATERIALS["zerodur"])
+        mass = np.array([isogrid_exact_mass_fast(*row, rho_kg_m3=mat["rho"])["mass_kg"] for row in fm])
+        s = self.sur.predict_batch(fm[:, [3, 4, 5, 6, 2]], material=material)
+        quilt = np.array([analytic_quilting_nm(r[3], r[4], r[5], mat["E"]) for r in fm])
+        f1 = np.array([analytic_frequency_hz(mm, r[0], r[1], r[2], r[3], r[4], r[5], mat["E"], mat["nu"])
+                       for mm, r in zip(mass, fm)])
+        return np.column_stack([mass, s["rms_sag_nm"], s["pv_sag_nm"], quilt, f1])
+
 
 if __name__ == "__main__":
-    predictor = MirrorSurrogatePredictor()
-    res = predictor.predict(D_mm=560.0, Dc_mm=120.0, H_mm=73.7, tf_mm=1.0, tw_mm=3.0, L_mm=55.5, rf_mm=3.0)
-    print("\n--- 560mm Benchmark Surrogate Test ---")
-    for k, v in res.items():
+    pr = MirrorSurrogatePredictor()
+    r = pr.predict(560.0, 175.0, 73.7, 3.2, 5.3, 46.4, 3.9)
+    r.pop("zernike_fringe_37_nm")
+    for k, v in r.items():
         print(f"  {k}: {v}")

@@ -1,7 +1,8 @@
 """
 Autonomous Agent Orchestrator & Tool Calling Engine (Pillar 1)
-Connects local Qwen2.5-Coder:7b (Ollama) to the full multi-objective, PINN surrogate,
-multi-material (Zerodur, SiC, ULE, Beryllium), and 8-topology CAD pipeline.
+Connects local Qwen2.5-Coder:7b (Ollama) to: exact NX-journal mass, FEA-trained sag surrogate,
+NSGA-II (+ PPO refinement) and genuine FEA verification (NX Nastran if installed, else CalculiX).
+All PASS/FAIL statements are computed from the numbers - nothing is hardcoded.
 """
 
 import os
@@ -17,11 +18,11 @@ if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
 from ml_engine.surrogate_inference import MirrorSurrogatePredictor
-from ml_engine.pinn_inference import PINNMirrorPredictor
+from ml_engine.pinn_inference import ZernikeSurrogatePredictor
 from optimizer.closed_loop_optimizer import ClosedLoopOptimizer
 from optimizer.multi_material_optimizer import MultiMaterialOptimizer
 from nx_bridge.nx_fea_analysis_agent import NXFEAAnalysisEngine
-from cad_engine.cad_generator import TOPOLOGY_CATALOG, MirrorCADGenerator
+TOPOLOGY_CATALOG = ["triangular_isogrid"]   # only topology with FEA training data
 
 # ─────────────────────────────────────────────
 # Engineering System Prompt for Qwen2.5-Coder
@@ -29,11 +30,13 @@ from cad_engine.cad_generator import TOPOLOGY_CATALOG, MirrorCADGenerator
 SYSTEM_PROMPT = """You are an autonomous Opto-Mechanical Design AI Agent specializing in space telescope primary mirror lightweighting.
 
 You have access to a complete intelligent engineering system:
-1. Deep PINN Surrogate (Objective 2): predicts mass, rms_sag, pv_sag, quilting, launch frequency f1, AND 37-term Fringe Zernike wavefront coefficients in < 0.5ms.
-2. Multi-Objective Optimizer (Objective 3): includes vectorized NSGA-II and PPO Reinforcement Learning agents balancing mass, optical figure, and launch stiffness.
-3. Multi-Material Substrates: SCHOTT Zerodur (E=90.3GPa), Boostec SiC (E=420GPa), Corning ULE (E=67.6GPa), and Beryllium I-220H (E=303GPa).
-4. Generative CAD Engine (Objective 1): synthesizes 8 pocket topologies (Isogrid, Honeycomb GMT, Square Waffle, Radial Spoke, Iso-Radial, Hex-Radial, Double-Arch, Sandwich Closed-Back) with an integrated 18-point Nelson whiffletree mount locked to 3-rib star vertices.
-5. NASTRAN FEA Solver: ground-truth verification via Simcenter NASTRAN SOL 101/103.
+1. Exact mass of the NX journal geometry (identical to the NX part).
+2. Gaussian-process surrogate trained on finite-element gravity analyses of the exact geometry: RMS/PV sag and 37 Fringe Zernike terms, with uncertainty.
+3. NSGA-II multi-objective optimizer (+ PPO local refinement, accepted only if it improves the design).
+4. Materials: Zerodur, ULE, SiC, Beryllium (sag scales with density/modulus).
+5. FEA verification: NX Nastran SOL 101 if installed, otherwise CalculiX (C3D10, 18-point pads, 1 g axial).
+Quilting and natural frequency are analytic estimates, not FEA. Only the triangular isogrid has FEA data.
+Never claim a requirement is met unless the numbers given to you show it.
 
 Target benchmark: D=560mm, mass<=12kg, RMS sag<=60nm, quilting<=30nm, f1>=120Hz.
 
@@ -51,7 +54,7 @@ class OptoMechanicalAgent:
         self.ollama_url = ollama_url
         self.model_name = model_name
         self.predictor  = MirrorSurrogatePredictor()
-        self.pinn       = PINNMirrorPredictor()
+        self.pinn       = ZernikeSurrogatePredictor()
         self.optimizer  = ClosedLoopOptimizer()
         self.multi_mat_opt = MultiMaterialOptimizer()
         self.fea_engine = NXFEAAnalysisEngine()
@@ -123,91 +126,43 @@ class OptoMechanicalAgent:
             "topology":    topology
         }
 
-    def run_agent_workflow(self, user_prompt):
-        """Full autonomous pipeline: Parse -> PINN Surrogate -> NSGA-II/PPO -> NASTRAN FEA -> LLM Report."""
-        print(f"\n{'='*60}")
-        print(f"[Pillar 1 Agent] User Prompt: {user_prompt}")
-        print(f"{'='*60}")
-
+    def run_agent_workflow(self, user_prompt, run_fea=True):
+        """Parse -> NSGA-II on exact mass + FEA surrogate -> genuine FEA check -> report."""
         intent = self.parse_engineering_intent(user_prompt)
         D_mm, max_mass, max_sag = intent["D_mm"], intent["max_mass_kg"], intent["max_sag_nm"]
         material, topology = intent["material"], intent["topology"]
-
-        print(f"[Agent] Parsed: D={D_mm}mm | Material={material.upper()} | Topology={topology} | Target mass<={max_mass}kg | Target sag<={max_sag}nm")
-
-        # Step 1: Deep PINN evaluation with 37 Zernike wavefront decomposition
-        pinn_eval = self.pinn.predict(
-            D_mm=D_mm, Dc_mm=D_mm * 0.214, H_mm=73.7, tf_mm=1.0, tw_mm=3.0,
-            L_mm=55.5, rf_mm=3.0, material=material, topology=topology
-        )
-
-        # Step 2: Multi-Objective Optimization (NSGA-II + PPO RL)
+        Dc_mm = 175.0
         best = self.multi_mat_opt.optimize_material_nsga2(
-            material=material, topology=topology, D_mm=D_mm, Dc_mm=D_mm * 0.214,
-            H_mm=73.7, target_mass_kg=max_mass, max_sag_nm=max_sag
-        )
+            material=material, topology=topology, D_mm=D_mm, Dc_mm=Dc_mm, H_mm=73.7,
+            target_mass_kg=max_mass, max_sag_nm=max_sag, mode="min" if intent.get("is_min") else "target")
+        fea = None
+        if run_fea:
+            fea = self.fea_engine.run_fea_solve(D_mm, Dc_mm, best["H_mm"], best["tf_mm"], best["tw_mm"],
+                                                best["L_mm"], best["rf_mm"], material=material)
+            if material == "zerodur":
+                self.optimizer.add_fea_record(best, fea["raw"] | {"zernike_fringe_37_nm": fea["zernike_fringe_37_nm"]},
+                                              source="nx_nastran" if "Nastran" in fea["solver"] else "calculix")
+        report = self._generate_report(best, fea, material, topology, max_mass, max_sag)
+        return {"prompt": user_prompt, "material": material, "topology": topology,
+                "pareto_best_design": best, "fea_verification": fea, "llm_report": report}
 
-        # Step 3: NASTRAN SOL 101 Ground-Truth FEA Verification
-        fea = self.fea_engine.run_fea_solve(
-            D_mm=D_mm, Dc_mm=D_mm * 0.214, H_mm=best["H_mm"],
-            tf_mm=best["tf_mm"], tw_mm=best["tw_mm"],
-            L_mm=best["L_mm"], rf_mm=best["rf_mm"]
-        )
-
-        # Step 4: Active Learning Residual Tracking
-        residual_entry = self.optimizer.log_fea_residual(
-            {"D_mm": D_mm, "H_mm": best["H_mm"], "tf_mm": best["tf_mm"], "tw_mm": best["tw_mm"], "L_mm": best["L_mm"]},
-            best["rms_sag_nm"], fea["actual_rms_sag_nm"], fea["actual_mass_kg"]
-        )
-
-        # Step 5: Engineering Report Generation
-        report = self._generate_report(best, fea, material, topology)
-
-        return {
-            "prompt": user_prompt,
-            "material": material,
-            "topology": topology,
-            "pinn_evaluation": pinn_eval,
-            "pareto_best_design": best,
-            "fea_verification": fea,
-            "active_learning": residual_entry,
-            "llm_report": report
-        }
-
-    def _generate_report(self, best, fea, material, topology):
-        llm_prompt = f"""Summarize the following spaceborne primary mirror optimization results:
-Material: {material.upper()}
-Topology: {topology}
-Kinematic Mount: 18-Point Nelson Whiffletree (Star-Node Snapped)
-Optimized Dimensions:
-- Height H = {best['H_mm']} mm
-- Faceplate tf = {best['tf_mm']} mm
-- Rib Wall tw = {best['tw_mm']} mm
-- Cell Span L = {best['L_mm']} mm
-- Fillet Radius rf = {best['rf_mm']} mm
-
-Performance:
-- Mass: {fea['actual_mass_kg']} kg (Target <= 12.0 kg)
-- RMS Sag: {fea['actual_rms_sag_nm']} nm (Target <= 60.0 nm)
-- Quilting: {fea['actual_quilting_nm']} nm (Limit <= 30.0 nm)
-- Launch Natural Frequency f1: {best['frequency_hz']} Hz (Target >= 120.0 Hz)
-- Dominant Zernike Modes: Z4 Defocus={best['dominant_zernike_modes']['Z4_Defocus_nm']} nm, Z10 Trefoil={best['dominant_zernike_modes']['Z10_Primary_Trefoil_3Fold_nm']} nm, Z37 Hexafoil={best['dominant_zernike_modes']['Z37_Hexafoil_6Fold_Whiffletree_nm']} nm
-
-Provide an opto-mechanical engineer's assessment of flight qualification."""
-
-        llm_text = self._call_llm(llm_prompt, system=SYSTEM_PROMPT)
-        if not llm_text:
-            llm_text = (
-                f"### Opto-Mechanical Engineering Assessment\n\n"
-                f"The {material.upper()} primary mirror ({topology}) successfully passed all flight qualification gates:\n"
-                f"- **Solid Body Mass:** `{fea['actual_mass_kg']} kg` (Requirement: <= 12.0 kg) -> **PASS**\n"
-                f"- **Optical Figure Error:** `{fea['actual_rms_sag_nm']} nm RMS` (Requirement: <= 60.0 nm, lambda/10) -> **PASS**\n"
-                f"- **Cell Quilting:** `{fea['actual_quilting_nm']} nm` (Limit: <= 30.0 nm) -> **PASS**\n"
-                f"- **Launch Stiffness (f1):** `{best['frequency_hz']} Hz` (Requirement: >= 120 Hz) -> **PASS**\n"
-                f"- **Support Kinematics:** All 18 Nelson whiffletree pads securely locked to 3-rib star intersection vertices.\n"
-                f"- **Zernike Decomposition:** 3-fold trefoil (Z10) and 6-fold hexafoil (Z37) are well within diffraction-limited optical tolerances."
-            )
-        return llm_text
+    def _generate_report(self, best, fea, material, topology, max_mass, max_sag):
+        sag = fea["actual_rms_sag_nm"] if fea else best["rms_sag_nm"]
+        sag_src = fea["solver"] if fea else "FEA-trained surrogate (not verified by a new FEA run)"
+        mass = best["mass_kg"]
+        lines = [
+            f"Material: {material.upper()} | Topology: {topology} | 18-point Hindle whiffletree pads",
+            f"Geometry: H={best['H_mm']} mm, tf={best['tf_mm']} mm, tw={best['tw_mm']} mm, L={best['L_mm']} mm, rf={best['rf_mm']} mm",
+            f"Mass (exact NX geometry): {mass:.3f} kg vs target {max_mass} kg -> {'PASS' if mass <= max_mass + 0.1 else 'FAIL'}",
+            f"RMS gravity sag ({sag_src}): {sag:.2f} nm vs limit {max_sag} nm -> {'PASS' if sag <= max_sag else 'FAIL'}",
+            f"Surrogate predicted {best['rms_sag_nm']:.2f} +/- {best.get('rms_sag_std_nm', 0):.2f} nm"
+            + (f"; FEA/surrogate gap {100*(best['rms_sag_nm']-sag)/sag:+.1f}%" if fea else ""),
+            f"Quilting (analytic estimate): {best['predicted_quilting_nm']:.1f} nm; f1 (analytic estimate): {best['predicted_freq_hz']:.0f} Hz",
+        ]
+        facts = "\n".join(lines)
+        llm_text = self._call_llm("Write a short engineering assessment of these results. Use only these numbers:\n" + facts,
+                                  system=SYSTEM_PROMPT)
+        return ("### Results\n" + facts + ("\n\n### Assessment\n" + llm_text if llm_text else ""))
 
     def chat(self, user_message):
         """Conversational interface with intent classification."""

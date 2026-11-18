@@ -1,437 +1,212 @@
 """
-Closed-Loop Active Learning Multi-Objective Optimizer (Pillar 3)
-Features:
-1. Fast Vectorized NSGA-II Genetic Algorithm (Non-dominated Sorting, Crowding Distance, SBX, Polynomial Mutation)
-2. High-throughput Monte Carlo Pareto Exploration with Surrogate Inference (<120 ms for 50k evaluations)
-3. Active Learning Residual Buffer for Ground-Truth Drift Tracking
-"""
+NSGA-II multi-objective optimiser (Pillar 3) for the isogrid mirror.
 
+Fitness evaluations use:
+  * exact mass of the NX-journal geometry (cad_engine/exact_mass.py) - not a model,
+  * RMS gravity sag from the FEA-trained Gaussian-process surrogate (ml_engine/fea_surrogate.py),
+  * analytic polishing-quilting estimate (Yoder Eq. 2.35) as a manufacturing constraint.
+
+Decision variables: faceplate tf, rib tw, cell L, fillet rf (blank depth H fixed to the user's blank,
+or free when H is not given).  Bounds = the FEA-sampled validity domain, plus the journal's own
+geometric validity rule rf <= 0.45 * pocket circumradius.
+
+The closed loop: run genuine FEA on the optimum (/fea/solve), the record is appended to the FEA
+dataset and the surrogate is refitted (that is the active-learning step - with real FEA, not a
+second formula).
+"""
+import json
+import math
 import os
 import sys
-import json
 import time
+
 import numpy as np
 
-# Ensure workspace root is in sys.path
 workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
-from ml_engine.surrogate_inference import MirrorSurrogatePredictor
-from optimizer.node_snapping import snap_18_whiffletree_hubs
+from ml_engine.surrogate_inference import MirrorSurrogatePredictor  # noqa: E402
+from ml_engine.fea_surrogate import BOUNDS, get_surrogate  # noqa: E402
+from optimizer.node_snapping import snap_18_whiffletree_hubs  # noqa: E402
+
+FEA_DATASET = os.path.join(workspace_root, "data", "fea", "isogrid_fea_dataset.jsonl")
+MAX_QUILT_NM = 30.0
 
 
 def non_dominated_sort(objectives):
-    """
-    Ultra-fast vectorized non-dominated sorting for multi-objective optimization (minimization).
-    objectives: np.ndarray of shape (N, M)
-    Returns: list of fronts (each front is a list of indices)
-    """
     N = objectives.shape[0]
-    dom_matrix = np.all(objectives[:, None, :] <= objectives[None, :, :], axis=2) & np.any(objectives[:, None, :] < objectives[None, :, :], axis=2)
-    domination_counts = np.sum(dom_matrix, axis=0)
-    dominated_sets = [np.where(dom_matrix[p])[0].tolist() for p in range(N)]
-
-    fronts = []
-    current_front = np.where(domination_counts == 0)[0].tolist()
-    if len(current_front) > 0:
-        fronts.append(current_front)
-
-    while len(current_front) > 0:
-        next_front = []
-        for p in current_front:
-            for q in dominated_sets[p]:
-                domination_counts[q] -= 1
-                if domination_counts[q] == 0:
-                    next_front.append(q)
-        current_front = next_front
-        if len(current_front) > 0:
-            fronts.append(current_front)
-
+    dom = np.all(objectives[:, None, :] <= objectives[None, :, :], axis=2) & \
+        np.any(objectives[:, None, :] < objectives[None, :, :], axis=2)
+    counts = dom.sum(axis=0)
+    dominated = [np.where(dom[p])[0].tolist() for p in range(N)]
+    fronts, cur = [], np.where(counts == 0)[0].tolist()
+    while cur:
+        fronts.append(cur)
+        nxt = []
+        for p in cur:
+            for q in dominated[p]:
+                counts[q] -= 1
+                if counts[q] == 0:
+                    nxt.append(q)
+        cur = nxt
     return fronts
 
 
 def calculate_crowding_distance(objectives, front):
-    """
-    Computes crowding distances for solutions in a given Pareto front.
-    """
-    if len(front) == 0:
-        return np.array([])
     if len(front) <= 2:
         return np.full(len(front), np.inf)
+    d = np.zeros(len(front))
+    F = objectives[front]
+    for m in range(F.shape[1]):
+        o = np.argsort(F[:, m])
+        d[o[0]] = d[o[-1]] = np.inf
+        rng = F[o[-1], m] - F[o[0], m] + 1e-12
+        d[o[1:-1]] += (F[o[2:], m] - F[o[:-2], m]) / rng
+    return d
 
-    distances = np.zeros(len(front))
-    front_objs = objectives[front]
-    num_objs = objectives.shape[1]
 
-    for m in range(num_objs):
-        sorted_indices = np.argsort(front_objs[:, m])
-        distances[sorted_indices[0]] = np.inf
-        distances[sorted_indices[-1]] = np.inf
-
-        obj_min = front_objs[sorted_indices[0], m]
-        obj_max = front_objs[sorted_indices[-1], m]
-        obj_range = obj_max - obj_min + 1e-9
-
-        for i in range(1, len(front) - 1):
-            distances[sorted_indices[i]] += (
-                front_objs[sorted_indices[i + 1], m] - front_objs[sorted_indices[i - 1], m]
-            ) / obj_range
-
-    return distances
+def max_fillet(L, tw):
+    return 0.45 * (L - tw * 2.0 / math.sqrt(3.0)) / math.sqrt(3.0)
 
 
 class ClosedLoopOptimizer:
-    def __init__(self, buffer_file="optimizer/retraining_buffer.json"):
+    def __init__(self, buffer_file=None):
         self.predictor = MirrorSurrogatePredictor()
-        self.buffer_file = buffer_file
-        self.retraining_buffer = self._load_buffer()
 
-    def _load_buffer(self):
-        if os.path.exists(self.buffer_file):
-            try:
-                with open(self.buffer_file, "r") as f:
-                    return json.load(f)
-            except Exception:
-                return []
-        return []
+    # --------------------------------------------------------------
+    def _evaluate(self, pop, D, Dc, material):
+        N = len(pop)
+        fm = np.column_stack([np.full(N, D), np.full(N, Dc), pop[:, 4], pop[:, 0], pop[:, 1], pop[:, 2], pop[:, 3]])
+        return self.predictor.predict_batch(fm, material=material)
 
-    def _save_buffer(self):
-        os.makedirs(os.path.dirname(self.buffer_file), exist_ok=True)
-        with open(self.buffer_file, "w") as f:
-            json.dump(self.retraining_buffer, f, indent=2)
-
-    def optimize_nsga2(self, D_mm=560.0, Dc_mm=120.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0,
-                       pop_size=200, generations=40, eta_c=15.0, eta_m=20.0, mode="target"):
-        """
-        True NSGA-II Multi-Objective Genetic Algorithm with ML Surrogate fitness evaluations.
-        Objectives: Minimize Mass (kg) & Minimize RMS Gravity Sag (nm).
-        Constraints: mass <= max_mass_kg, rms_sag <= max_sag_nm, quilting <= 30.0 nm, tf >= 0.8 mm, tw >= 1.5 mm.
-        """
+    def optimize_nsga2(self, D_mm=560.0, Dc_mm=175.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0,
+                       pop_size=120, generations=40, eta_c=15.0, eta_m=20.0, mode="target",
+                       material="zerodur", seed=42):
+        rng = np.random.default_rng(seed)
         t0 = time.time()
-        print(f"\n[Pillar 3 NSGA-II] Initializing Multi-Objective GA (Pop={pop_size}, Gen={generations}) for D={D_mm}mm, Dc={Dc_mm}mm, H={H_mm}mm...")
-
-        # Gene bounds: [H, tf, tw, L, rf]
-        # When H_mm is specified (e.g. 73.7mm from UI blank geometry), fix H so pocket geometry is optimized for the actual blank depth
+        lo = np.array([BOUNDS["faceplate"][0], BOUNDS["ribThick"][0], BOUNDS["cellSize"][0], BOUNDS["filletRadius"][0], BOUNDS["depth"][0]])
+        hi = np.array([BOUNDS["faceplate"][1], BOUNDS["ribThick"][1], BOUNDS["cellSize"][1], BOUNDS["filletRadius"][1], BOUNDS["depth"][1]])
         if H_mm is not None and H_mm > 5.0:
-            bounds_lower = np.array([H_mm, 0.8, 1.5, 25.0, 1.0])
-            bounds_upper = np.array([H_mm, 3.5, 5.0, 80.0, 5.0])
-        else:
-            bounds_lower = np.array([55.0, 0.8, 1.5, 25.0, 1.0])
-            bounds_upper = np.array([95.0, 3.5, 5.0, 80.0, 5.0])
+            lo[4] = hi[4] = float(H_mm)
+        is_min = str(mode).lower() == "min" or str(max_mass_kg).upper() == "MIN" or float(max_mass_kg) >= 900.0
+        target = None if is_min else float(max_mass_kg)
 
-        # Initial Population
-        population = np.random.uniform(bounds_lower, bounds_upper, (pop_size, len(bounds_lower)))
+        def repair(P):
+            P = np.clip(P, lo, hi)
+            P[:, 3] = np.minimum(P[:, 3], np.maximum(lo[3], [max_fillet(L, tw) for L, tw in zip(P[:, 2], P[:, 1])]))
+            return np.round(P, 1)   # the journal writes every dimension with 0.1 mm resolution
 
-        def evaluate_pop(pop):
-            N = pop.shape[0]
-            D_arr = np.full(N, D_mm)
-            Dc_arr = np.full(N, Dc_mm)
-            feat = np.column_stack([D_arr, Dc_arr, pop[:, 0], pop[:, 1], pop[:, 2], pop[:, 3], pop[:, 4]])
-            preds = self.predictor.predict_batch(feat)
-            mass = preds[:, 0]
-            sag = preds[:, 1]
-            pv = preds[:, 2]
-            quilt = preds[:, 3]
-            freq = preds[:, 4]
+        def objectives(P):
+            Y = self._evaluate(P, D_mm, Dc_mm, material)
+            mass, sag, quilt = Y[:, 0], Y[:, 1], Y[:, 3]
+            viol = np.maximum(0, sag - max_sag_nm) / max_sag_nm + np.maximum(0, quilt - MAX_QUILT_NM) / MAX_QUILT_NM
+            o1 = (np.abs(mass - target) if target is not None else mass) + 1e3 * viol
+            o2 = sag + 1e3 * viol
+            return np.column_stack([o1, o2]), Y, viol
 
-            # Constraint violations (penalty > 0 if violated)
-            c_sag = np.maximum(0.0, sag - max_sag_nm)
-            c_quilt = np.maximum(0.0, quilt - 30.0)
-            c_tf = np.maximum(0.0, 0.8 - pop[:, 1])
-            c_tw = np.maximum(0.0, 1.5 - pop[:, 2])
-            structural_penalty = (c_sag * 0.5) + (c_quilt * 2.0) + (c_tf * 50.0) + (c_tw * 50.0)
+        pop = repair(lo + rng.random((pop_size, 5)) * (hi - lo))
+        for _ in range(generations):
+            F, _, _ = objectives(pop)
+            fronts = non_dominated_sort(F)
+            rank = np.zeros(pop_size, int)
+            crowd = np.zeros(pop_size)
+            for r, fr in enumerate(fronts):
+                rank[fr] = r
+                crowd[fr] = calculate_crowding_distance(F, fr)
 
-            is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
-            target_kg = float(max_mass_kg) if not is_min_mode else None
-
-            if not is_min_mode:
-                # Force Target Weight Mode: minimize absolute deviation |mass - target_kg|
-                mass_diff = np.abs(mass - target_kg)
-                total_penalty = structural_penalty + (mass_diff * 5.0)
-                obj1 = mass_diff * 20.0 + structural_penalty
-                obj2 = sag + structural_penalty
-            else:
-                # Minimum Weight (MIN) Mode: minimize mass directly without artificial ceiling
-                total_penalty = structural_penalty
-                obj1 = mass + structural_penalty
-                obj2 = sag + structural_penalty
-
-            objs = np.column_stack([obj1, obj2])
-            return objs, preds, total_penalty
-
-        for gen in range(generations):
-            # Evaluate parent population
-            objs, preds, penalties = evaluate_pop(population)
-
-            # Non-dominated sorting and crowding distance for parent population
-            parent_fronts = non_dominated_sort(objs)
-            ranks = np.zeros(pop_size, dtype=int)
-            crowding_distances = np.zeros(pop_size)
-
-            for rank_idx, front in enumerate(parent_fronts):
-                if len(front) == 0:
-                    continue
-                ranks[front] = rank_idx
-                crowding_distances[front] = calculate_crowding_distance(objs, front)
-
-            def binary_tournament():
-                i1, i2 = np.random.choice(pop_size, 2, replace=False)
-                if ranks[i1] < ranks[i2]:
-                    return population[i1]
-                elif ranks[i2] < ranks[i1]:
-                    return population[i2]
-                else:
-                    return population[i1] if crowding_distances[i1] >= crowding_distances[i2] else population[i2]
-
-            # Tournament Selection & Offspring Generation (SBX + Polynomial Mutation)
-            offspring = np.empty_like(population)
+            def tour():
+                a, b = rng.choice(pop_size, 2, replace=False)
+                if rank[a] != rank[b]:
+                    return pop[a] if rank[a] < rank[b] else pop[b]
+                return pop[a] if crowd[a] >= crowd[b] else pop[b]
+            kids = np.empty_like(pop)
             for i in range(0, pop_size, 2):
-                p1 = binary_tournament()
-                p2 = binary_tournament()
-
-                # Simulated Binary Crossover (SBX)
-                u = np.random.rand(len(bounds_lower))
-                beta = np.where(u <= 0.5, (2.0 * u) ** (1.0 / (eta_c + 1.0)), (1.0 / (2.0 * (1.0 - u))) ** (1.0 / (eta_c + 1.0)))
-                c1 = 0.5 * ((1.0 + beta) * p1 + (1.0 - beta) * p2)
-                c2 = 0.5 * ((1.0 - beta) * p1 + (1.0 + beta) * p2)
-
-                # Polynomial Mutation
-                for child in [c1, c2]:
-                    r = np.random.rand(len(bounds_lower))
-                    mut_mask = r < (1.0 / len(bounds_lower))
-                    u_mut = np.random.rand(len(bounds_lower))
-                    delta = np.where(
-                        u_mut < 0.5,
-                        (2.0 * u_mut) ** (1.0 / (eta_m + 1.0)) - 1.0,
-                        1.0 - (2.0 * (1.0 - u_mut)) ** (1.0 / (eta_m + 1.0))
-                    )
-                    child[mut_mask] += delta[mut_mask] * (bounds_upper[mut_mask] - bounds_lower[mut_mask]) * 0.1
-
-                offspring[i] = np.clip(c1, bounds_lower, bounds_upper)
+                p1, p2 = tour(), tour()
+                u = rng.random(5)
+                beta = np.where(u <= 0.5, (2 * u) ** (1 / (eta_c + 1)), (1 / (2 * (1 - u))) ** (1 / (eta_c + 1)))
+                c1 = 0.5 * ((1 + beta) * p1 + (1 - beta) * p2)
+                c2 = 0.5 * ((1 - beta) * p1 + (1 + beta) * p2)
+                for c in (c1, c2):
+                    m = rng.random(5) < 1.0 / 4
+                    um = rng.random(5)
+                    dl = np.where(um < 0.5, (2 * um) ** (1 / (eta_m + 1)) - 1, 1 - (2 * (1 - um)) ** (1 / (eta_m + 1)))
+                    c[m] += dl[m] * (hi[m] - lo[m])
+                kids[i] = c1
                 if i + 1 < pop_size:
-                    offspring[i + 1] = np.clip(c2, bounds_lower, bounds_upper)
-
-            # Combine Parent + Offspring (Elitist selection of size pop_size)
-            combined_pop = np.vstack([population, offspring])
-            comb_objs, comb_preds, comb_penalties = evaluate_pop(combined_pop)
-
-            fronts = non_dominated_sort(comb_objs)
-            new_population = []
-
-            for front in fronts:
-                if len(new_population) + len(front) <= pop_size:
-                    new_population.extend(front)
+                    kids[i + 1] = c2
+            comb = np.vstack([pop, repair(kids)])
+            Fc, _, _ = objectives(comb)
+            sel = []
+            for fr in non_dominated_sort(Fc):
+                if len(sel) + len(fr) <= pop_size:
+                    sel += fr
                 else:
-                    needed = pop_size - len(new_population)
-                    crowding_dist = calculate_crowding_distance(comb_objs, front)
-                    sorted_by_dist = np.argsort(-crowding_dist)
-                    selected_from_front = [front[idx] for idx in sorted_by_dist[:needed]]
-                    new_population.extend(selected_from_front)
+                    cd = calculate_crowding_distance(Fc, fr)
+                    sel += [fr[j] for j in np.argsort(-cd)[:pop_size - len(sel)]]
                     break
+            pop = comb[sel]
 
-            population = combined_pop[new_population]
-
-        eval_time = time.time() - t0
-        final_objs, final_preds, final_penalties = evaluate_pop(population)
-
-        is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
-        target_kg = float(max_mass_kg) if not is_min_mode else None
-
-        # Filter strictly feasible in final population (meeting optical and manufacturing limits)
-        feasible_mask = (
-            (final_preds[:, 1] <= max_sag_nm) &
-            (final_preds[:, 3] <= 30.0) &
-            (population[:, 1] >= 0.8) &
-            (population[:, 2] >= 1.5)
-        )
-
-        feasible_indices = np.where(feasible_mask)[0]
-
-        if len(feasible_indices) > 0:
-            if not is_min_mode:
-                # Force Target Weight Mode: find design matching target_kg with minimal sag
-                m_diffs = np.abs(final_preds[feasible_indices, 0] - target_kg)
-                s_vals = final_preds[feasible_indices, 1]
-                scores = (m_diffs / 0.05)**2 + 0.5 * (s_vals / max_sag_nm)
-                best_idx = feasible_indices[np.argmin(scores)]
-                is_fully_feasible = bool(m_diffs[np.argmin(scores)] <= 0.2)
+        F, Y, viol = objectives(pop)
+        feas = np.where(viol <= 0)[0]
+        if len(feas):
+            if target is not None:
+                score = np.abs(Y[feas, 0] - target) / 0.05 + 0.5 * Y[feas, 1] / max_sag_nm
             else:
-                # Minimum Weight (MIN) Mode: find absolute lightest feasible design with sag tiebreaker
-                valid_masses = final_preds[feasible_indices, 0]
-                valid_sags = final_preds[feasible_indices, 1]
-                norm_m = (valid_masses - valid_masses.min()) / (np.ptp(valid_masses) + 1e-6)
-                norm_s = (valid_sags - valid_sags.min()) / (np.ptp(valid_sags) + 1e-6)
-                best_idx = feasible_indices[np.argmin(0.85 * norm_m + 0.15 * norm_s)]
-                is_fully_feasible = True
+                score = Y[feas, 0] + 0.01 * Y[feas, 1]
+            best = feas[np.argmin(score)]
         else:
-            if not is_min_mode:
-                best_idx = np.argmin(np.abs(final_preds[:, 0] - target_kg) * 10.0 + final_penalties)
-            else:
-                best_idx = np.argmin(final_penalties)
-            is_fully_feasible = False
-
-        best_genes = population[best_idx]
-        best_pred = final_preds[best_idx]
-
-        print(f"[Pillar 3 NSGA-II] Completed {generations} generations ({pop_size*generations*2:,} surrogate evaluations) in {eval_time*1000:.2f} ms")
-        print(f"[Pillar 3 NSGA-II] Feasible Pareto solutions in final generation: {len(feasible_indices)}/{pop_size} | Fully Feasible: {is_fully_feasible}")
-
-        best_design = {
-            "D_mm": float(D_mm),
-            "Dc_mm": float(Dc_mm),
-            "H_mm": round(float(best_genes[0]), 2),
-            "tf_mm": round(float(best_genes[1]), 2),
-            "tw_mm": round(float(best_genes[2]), 2),
-            "L_mm": round(float(best_genes[3]), 2),
-            "rf_mm": round(float(best_genes[4]), 2),
-            "all_constraints_satisfied": is_fully_feasible,
-            "optimizer_method": "NSGA-II Multi-Objective Genetic Algorithm",
-            "evaluation_duration_ms": round(eval_time * 1000.0, 2),
-            "feasible_count": int(len(feasible_indices))
+            best = int(np.argmin(viol))
+        g = pop[best]
+        p = self.predictor.predict(D_mm, Dc_mm, g[4], g[0], g[1], g[2], g[3], material=material, max_sag_nm=max_sag_nm)
+        feasible_target = bool(len(feas)) and (target is None or abs(p["mass_kg"] - target) <= 0.1)
+        return {
+            "D_mm": float(D_mm), "Dc_mm": float(Dc_mm), "H_mm": float(g[4]),
+            "tf_mm": float(g[0]), "tw_mm": float(g[1]), "L_mm": float(g[2]), "rf_mm": float(g[3]),
+            "material": material,
+            "predicted_mass_kg": p["mass_kg"], "mass_kg": p["mass_kg"],
+            "predicted_rms_sag_nm": p["rms_sag_nm"], "rms_sag_nm": p["rms_sag_nm"],
+            "rms_sag_std_nm": p["rms_sag_std_nm"],
+            "predicted_pv_sag_nm": p["pv_sag_nm"], "predicted_quilting_nm": p["quilting_nm"],
+            "predicted_freq_hz": p["frequency_hz"], "frequency_source": p["frequency_source"],
+            "lightweight_pct": p["lightweight_pct"], "pocket_count": p["pocket_count"],
+            "zernike_fringe_37_nm": p["zernike_fringe_37_nm"],
+            "all_constraints_satisfied": feasible_target,
+            "feasible_count": int(len(feas)),
+            "optimizer_method": "NSGA-II (exact mass + FEA-trained sag surrogate)",
+            "evaluation_duration_ms": round((time.time() - t0) * 1000, 1),
+            "surrogate": p["sag_source"],
+            "validity_warnings": p["validity_warnings"],
+            "support_hubs_18": snap_18_whiffletree_hubs(D_mm, float(g[2]), Dc_mm),
         }
-        # Re-evaluate exactly with rounded parameters to ensure 0.000 kg discrepancy with Instant ML Predict & Siemens NX
-        p_eval = self.predictor.predict(
-            best_design["D_mm"], best_design["Dc_mm"], best_design["H_mm"],
-            best_design["tf_mm"], best_design["tw_mm"], best_design["L_mm"], best_design["rf_mm"]
-        )
-        best_design["predicted_mass_kg"] = round(p_eval["mass_kg"], 2)
-        best_design["predicted_rms_sag_nm"] = round(p_eval["rms_sag_nm"], 2)
-        best_design["predicted_pv_sag_nm"] = round(p_eval["pv_sag_nm"], 2)
-        best_design["predicted_quilting_nm"] = round(p_eval["quilting_nm"], 2)
-        best_design["predicted_freq_hz"] = round(p_eval["frequency_hz"], 1)
 
-        best_design["support_hubs_18"] = snap_18_whiffletree_hubs(D_mm, best_design["L_mm"], Dc_mm)
-        return best_design
+    def optimize(self, D_mm=560.0, Dc_mm=175.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0,
+                 num_candidates=None, mode="target", material="zerodur"):
+        """Kept for API compatibility: runs NSGA-II (the old random-search path was removed)."""
+        return self.optimize_nsga2(D_mm, Dc_mm, H_mm, max_mass_kg, max_sag_nm, mode=mode, material=material)
 
-    def optimize(self, D_mm=560.0, Dc_mm=120.0, H_mm=73.7, max_mass_kg=12.0, max_sag_nm=60.0, num_candidates=50000, mode="target"):
-        """
-        Fast High-Throughput Monte Carlo Pareto Search with automatic fallback to NSGA-II if needed.
-        """
-        print(f"\n[Pillar 3 Optimizer] Exploring {num_candidates:,} candidate geometries for D={D_mm}mm...")
-        t0 = time.time()
-
-        # Generate candidates
-        tf_vals = np.random.uniform(0.8, 3.5, num_candidates)
-        tw_vals = np.random.uniform(1.5, 4.5, num_candidates)
-        L_vals = np.random.uniform(25.0, 75.0, num_candidates)
-        rf_vals = np.random.uniform(1.0, 5.0, num_candidates)
-        if H_mm is not None and H_mm > 5.0:
-            H_vals = np.full(num_candidates, H_mm)
-        else:
-            H_vals = np.random.uniform(55.0, 95.0, num_candidates)
-
-        D_arr = np.full(num_candidates, D_mm)
-        Dc_arr = np.full(num_candidates, Dc_mm)
-
-        feature_matrix = np.column_stack([D_arr, Dc_arr, H_vals, tf_vals, tw_vals, L_vals, rf_vals])
-
-        preds = self.predictor.predict_batch(feature_matrix)
-        eval_time = time.time() - t0
-
-        masses = preds[:, 0]
-        rms_sags = preds[:, 1]
-        pv_sags = preds[:, 2]
-        quiltings = preds[:, 3]
-        freqs = preds[:, 4]
-
-        is_min_mode = (str(mode).lower() == "min") or (str(max_mass_kg).upper() == "MIN") or (float(max_mass_kg) >= 900.0)
-        target_kg = float(max_mass_kg) if not is_min_mode else None
-
-        valid_mask = (
-            (rms_sags <= max_sag_nm) &
-            (quiltings <= 30.0) &
-            (tf_vals >= 0.8) &
-            (tw_vals >= 1.5)
-        )
-
-        valid_indices = np.where(valid_mask)[0]
-        print(f"[Pillar 3] Evaluated {num_candidates:,} designs in {eval_time*1000:.2f} ms ({len(valid_indices)} feasible designs found)")
-
-        if len(valid_indices) == 0:
-            print("[Pillar 3] Falling back to NSGA-II Genetic Search for fine Pareto convergence...")
-            return self.optimize_nsga2(D_mm, Dc_mm, H_mm, max_mass_kg, max_sag_nm, mode=mode)
-
-        if not is_min_mode:
-            # Force Target Weight Mode: score by distance to target mass + optical sag
-            m_diffs = np.abs(masses[valid_indices] - target_kg)
-            s_vals = rms_sags[valid_indices]
-            scores = (m_diffs / 0.05)**2 + 0.5 * (s_vals / max_sag_nm)
-            best_idx = valid_indices[np.argmin(scores)]
-        else:
-            # Minimum Weight (MIN) Mode: prioritize lowest mass with sag tiebreaker
-            valid_masses = masses[valid_indices]
-            valid_sags = rms_sags[valid_indices]
-            ptp_mass = float(np.ptp(valid_masses)) + 1e-6
-            ptp_sag = float(np.ptp(valid_sags)) + 1e-6
-            norm_mass = (valid_masses - valid_masses.min()) / ptp_mass
-            norm_sag = (valid_sags - valid_sags.min()) / ptp_sag
-            scores = 0.85 * norm_mass + 0.15 * norm_sag
-            best_idx = valid_indices[np.argmin(scores)]
-
-        best_design = {
-            "D_mm": float(D_mm),
-            "Dc_mm": float(Dc_mm),
-            "H_mm": round(float(H_vals[best_idx]), 2),
-            "tf_mm": round(float(tf_vals[best_idx]), 2),
-            "tw_mm": round(float(tw_vals[best_idx]), 2),
-            "L_mm": round(float(L_vals[best_idx]), 2),
-            "rf_mm": round(float(rf_vals[best_idx]), 2),
-            "all_constraints_satisfied": bool(len(valid_indices) > 0),
-            "optimizer_method": "High-Throughput Vectorized Pareto Search",
-            "evaluation_duration_ms": round(eval_time * 1000.0, 2),
-            "feasible_count": int(len(valid_indices))
-        }
-        # Re-evaluate exactly with rounded parameters to ensure 0.000 kg discrepancy with Instant ML Predict & Siemens NX
-        p_eval = self.predictor.predict(
-            best_design["D_mm"], best_design["Dc_mm"], best_design["H_mm"],
-            best_design["tf_mm"], best_design["tw_mm"], best_design["L_mm"], best_design["rf_mm"]
-        )
-        best_design["predicted_mass_kg"] = round(p_eval["mass_kg"], 2)
-        best_design["predicted_rms_sag_nm"] = round(p_eval["rms_sag_nm"], 2)
-        best_design["predicted_pv_sag_nm"] = round(p_eval["pv_sag_nm"], 2)
-        best_design["predicted_quilting_nm"] = round(p_eval["quilting_nm"], 2)
-        best_design["predicted_freq_hz"] = round(p_eval["frequency_hz"], 1)
-
-        best_design["support_hubs_18"] = snap_18_whiffletree_hubs(D_mm, best_design["L_mm"], Dc_mm)
-        return best_design
-
-    def log_fea_residual(self, design_params, ml_pred_sag, fea_actual_sag, fea_actual_mass):
-        """
-        Active Learning Loop: Tracks residual error and saves to retraining buffer.
-        """
-        error_nm = abs(fea_actual_sag - ml_pred_sag)
-        pct_error = (error_nm / fea_actual_sag) * 100.0 if fea_actual_sag > 0 else 0.0
-
-        entry = {
+    # --------------------------------------------------------------
+    @staticmethod
+    def add_fea_record(design, fea_result, source="calculix"):
+        """Closed loop: append a genuine FEA result to the dataset and refit the surrogate."""
+        rec = {
+            "id": f"loop_{time.strftime('%Y%m%d_%H%M%S')}",
+            "params": {"faceplate": round(design["tf_mm"], 1), "ribThick": round(design["tw_mm"], 1),
+                       "cellSize": round(design["L_mm"], 1), "filletRadius": round(design["rf_mm"], 1),
+                       "depth": round(design["H_mm"], 1)},
+            "fixed": {"diameter": design["D_mm"], "centralHoleDia": design["Dc_mm"]},
+            "material": "zerodur",
+            "source": source,
+            **{k: v for k, v in fea_result.items() if k in (
+                "rms_sag_nm", "pv_sag_nm", "rms_sag_power_removed_nm", "zernike_fringe_37_nm",
+                "replica_mass_kg", "solver", "mesh_size_mm", "n_nodes")},
             "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "params": design_params,
-            "ml_pred_sag_nm": ml_pred_sag,
-            "fea_actual_sag_nm": fea_actual_sag,
-            "fea_actual_mass_kg": fea_actual_mass,
-            "residual_error_nm": round(error_nm, 3),
-            "error_pct": round(pct_error, 2),
-            "needs_retrain": pct_error > 5.0
         }
-
-        self.retraining_buffer.append(entry)
-        self._save_buffer()
-        print(f"[Active Learning] Residual logged: Error = {pct_error:.2f}% (Threshold: 5.0%). Buffer size: {len(self.retraining_buffer)}")
-        # Online Active Learning: retrain residual compensator immediately
-        try:
-            if hasattr(self.predictor, "active_learner"):
-                self.predictor.active_learner.train_from_buffer()
-        except Exception as e:
-            print(f"[Active Learning] Online update warning: {e}")
-        return entry
-
-
-if __name__ == "__main__":
-    opt = ClosedLoopOptimizer()
-    print("=== TEST 1: Vectorized Monte Carlo Pareto ===")
-    res_mc = opt.optimize(560.0, 120.0, 73.7, max_mass_kg=12.0, max_sag_nm=60.0, num_candidates=50000)
-    print(f"Result: Mass={res_mc['predicted_mass_kg']}kg, Sag={res_mc['predicted_rms_sag_nm']}nm, Quilt={res_mc['predicted_quilting_nm']}nm")
-
-    print("\n=== TEST 2: True NSGA-II Multi-Objective Genetic Algorithm ===")
-    res_ga = opt.optimize_nsga2(560.0, 120.0, max_mass_kg=12.0, max_sag_nm=60.0, pop_size=150, generations=30)
-    print(f"Result: Mass={res_ga['predicted_mass_kg']}kg, Sag={res_ga['predicted_rms_sag_nm']}nm, Quilt={res_ga['predicted_quilting_nm']}nm")
+        in_dom = abs(design["D_mm"] - 560.0) < 0.05 and abs(design["Dc_mm"] - 175.0) < 0.05 and \
+            design.get("material", "zerodur") == "zerodur"
+        if in_dom:
+            path = FEA_DATASET if source == "calculix" else FEA_DATASET.replace("isogrid_fea_dataset", "nx_nastran_results")
+            with open(path, "a") as f:
+                f.write(json.dumps(rec) + "\n")
+            get_surrogate(refresh=True)
+        return {"stored": in_dom, "record_id": rec["id"]}

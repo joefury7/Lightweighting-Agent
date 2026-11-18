@@ -136,80 +136,15 @@ def evaluate_fringe_zernike_term(j, rho, theta):
         raise ValueError(f"Fringe Zernike term j={j} outside supported range 1..37")
 
 
-def synthesize_37_zernike_coefficients(rms_sag_nm, quilting_nm, topology="triangular_isogrid", support_type="18point"):
-    """
-    Synthesizes the physical 37-term Fringe Zernike spectrum vector [Z_1, ..., Z_37] in nanometers (nm).
-    Accurately maps the dominant optical wavefront aberration modes induced by:
-    1. 18-Point Whiffletree Kinematic Mount (6-fold symmetry -> Z37, 3-fold whiffle-triangle symmetry -> Z10, Z19, Z30)
-    2. Gravity sag spherical bending modes (Z4 Power, Z9 Primary Spherical, Z16 Secondary Spherical, Z25 Tertiary)
-    3. Residual fabrication / gravity tilt & astigmatism (Z2, Z3, Z5, Z6)
-    4. Cellular polishing quilting ripples (high-frequency terms Z17, Z26, Z28, Z32..Z36)
-
-    Guarantees Parseval's identity: sum_{j=4}^{37} c_j^2 approx RMS_sag^2 (with tilt/piston removed).
-    """
-    z = np.zeros(37, dtype=np.float32)
-
-    # Z1: Piston (mean rigid body translation, typically zero-referenced in optics metrology)
-    z[0] = 0.0
-
-    # Z2, Z3: X and Y Tilt (kinematic mount balancing residual)
-    tilt_mag = 0.05 * rms_sag_nm
-    z[1] = 0.707 * tilt_mag
-    z[2] = 0.707 * tilt_mag
-
-    # Dominant spherical deformation modes (Power + Primary Spherical)
-    # Under gravity sag on an 18-point mount, defocus (Z4) and primary spherical (Z9) carry ~85% of power
-    z[3] = 0.72 * rms_sag_nm   # Z4: Power / Defocus
-    z[8] = 0.38 * rms_sag_nm   # Z9: Primary Spherical
-    z[15] = 0.14 * rms_sag_nm  # Z16: Secondary Spherical
-    z[24] = 0.06 * rms_sag_nm  # Z25: Tertiary Spherical
-    z[35] = 0.02 * rms_sag_nm  # Z36: Quaternary Spherical
-
-    # Whiffletree 3-Fold Triangular Balance Symmetry (Z10, Z19, Z30 Trefoil)
-    # The 18-point mount is driven by 3 primary whiffletree triangles, generating characteristic trefoil
-    z[9]  = 0.28 * rms_sag_nm  # Z10: Primary Trefoil (0 deg)
-    z[10] = 0.05 * rms_sag_nm  # Z11: Primary Trefoil (30 deg)
-    z[18] = 0.12 * rms_sag_nm  # Z19: Secondary Trefoil
-    z[29] = 0.04 * rms_sag_nm  # Z30: Tertiary Trefoil
-
-    # Whiffletree 6-Fold Hexagonal Symmetry (Z37 Hexafoil)
-    # The 6 inner pads and 12 outer pads create a distinct 6-lobed harmonic footprint
-    z[36] = 0.18 * rms_sag_nm  # Z37: Hexafoil (cos 6*theta)
-
-    # Astigmatic and Coma Terms (Z5, Z6, Z7, Z8, Z12, Z13)
-    z[4]  = 0.10 * rms_sag_nm  # Z5: Primary Astigmatism 0 deg
-    z[5]  = 0.04 * rms_sag_nm  # Z6: Primary Astigmatism 45 deg
-    z[6]  = 0.08 * rms_sag_nm  # Z7: Primary X-Coma
-    z[7]  = 0.03 * rms_sag_nm  # Z8: Primary Y-Coma
-    z[11] = 0.05 * rms_sag_nm  # Z12: Secondary Astigmatism
-    z[12] = 0.02 * rms_sag_nm  # Z13: Secondary Astigmatism 45 deg
-
-    # High-Frequency Cell Polishing Quilting Ripples (Z17, Z18, Z21, Z22, Z26..Z35)
-    quilt_scale = 0.45 * quilting_nm
-    z[16] = 0.50 * quilt_scale  # Z17: Tetrafoil
-    z[17] = 0.30 * quilt_scale  # Z18: Tetrafoil
-    z[20] = 0.25 * quilt_scale  # Z21: Tertiary Astigmatism
-    z[21] = 0.15 * quilt_scale  # Z22
-    z[25] = 0.35 * quilt_scale  # Z26: Pentafoil
-    z[27] = 0.20 * quilt_scale  # Z28
-    z[31] = 0.15 * quilt_scale  # Z32
-    z[33] = 0.10 * quilt_scale  # Z34
-
-    # Topology-specific harmonic modulation
-    if "hex" in topology:
-        z[36] *= 1.25  # Hexagonal cell orientation accentuates 6-fold harmonic
-    elif "square" in topology:
-        z[16] *= 1.40  # 4-fold orthogonal waffle amplifies tetrafoil
-    elif "radial" in topology:
-        z[8] *= 1.15   # Concentric rings accentuate radial spherical modes
-
-    # Normalize wavefront components so sqrt(sum_{j=4}^{37} z_j^2) strictly matches rms_sag_nm
-    optical_rms_unscaled = math.sqrt(float(np.sum(z[3:]**2)))
-    if optical_rms_unscaled > 1e-6:
-        scale_factor = float(rms_sag_nm) / optical_rms_unscaled
-        z[3:] *= scale_factor
-
-    return np.round(z, 3)
+def fit_fringe_zernike(x, y, w, R, nterms=37):
+    """Least-squares fit of Fringe Zernike coefficients to surface data w(x, y) on an aperture of radius R.
+    (The former hand-written fixed-ratio 'synthesis' template was removed - coefficients now always come
+    from fitting real FE surface deflections.)"""
+    rho = np.hypot(x, y) / R
+    th = np.arctan2(y, x)
+    B = np.column_stack([evaluate_fringe_zernike_term(j, rho, th) for j in range(1, nterms + 1)])
+    coef, *_ = np.linalg.lstsq(B, w, rcond=None)
+    return coef
 
 
 def reconstruct_wavefront_grid(zernike_coeffs, grid_size=64, central_obscuration_ratio=0.214):
@@ -242,13 +177,11 @@ def reconstruct_wavefront_grid(zernike_coeffs, grid_size=64, central_obscuration
 
 
 if __name__ == "__main__":
-    print("Testing 37-Term Fringe Zernike Wavefront Decomposition...")
-    coeffs = synthesize_37_zernike_coefficients(rms_sag_nm=58.11, quilting_nm=6.4, topology="triangular_isogrid")
-    print(f"Synthesized {len(coeffs)} Zernike coefficients.")
-    print("Dominant terms:")
-    print(f"  Z4  (Defocus):            {coeffs[3]} nm")
-    print(f"  Z9  (Primary Spherical):  {coeffs[8]} nm")
-    print(f"  Z10 (Primary Trefoil):    {coeffs[9]} nm (Whiffletree 3-Fold)")
-    print(f"  Z37 (Hexafoil):           {coeffs[36]} nm (Whiffletree 6-Fold)")
-    reconstructed_rms = np.sqrt(np.sum(coeffs[3:]**2))
-    print(f"Reconstructed Wavefront RMS: {reconstructed_rms:.2f} nm (Target: 58.11 nm)")
+    # self-test: fit recovers known coefficients
+    rng = np.random.default_rng(0)
+    x, y = rng.uniform(-1, 1, (2, 4000))
+    m = np.hypot(x, y) <= 1
+    x, y = x[m], y[m]
+    true = np.zeros(37); true[3], true[8], true[36] = 10.0, -4.0, 2.5
+    w = sum(true[j - 1] * evaluate_fringe_zernike_term(j, np.hypot(x, y), np.arctan2(y, x)) for j in range(1, 38))
+    print("max |fit - true| =", np.abs(fit_fringe_zernike(x, y, w, 1.0) - true).max())

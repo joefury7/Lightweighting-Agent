@@ -1,0 +1,40 @@
+{
+  "nx_volume_mm3": 3647907.8521855334,
+  "nx_mass_kg": 9.229206866029399,
+  "nx_mass_kg_as_returned_by_AskMassProps3d": 9.2292068660294,
+  "pocket_count_nx": 206,
+  "pockets_failed": 4,
+  "failed_pocket_centres_mm": [
+    [
+      -56.4,
+      -16.281
+    ],
+    [
+      56.4,
+      -16.281
+    ],
+    [
+      -56.4,
+      16.281
+    ],
+    [
+      56.4,
+      16.281
+    ]
+  ],
+  "app_predicted_mass_kg": 9.229219,
+  "app_predicted_volume_mm3": 3647912.726,
+  "parameters": {
+    "DIAMETER": 560.0,
+    "CENTRAL_HOLE_DIA": 175.0,
+    "TOTAL_DEPTH": 73.7,
+    "FACESHEET": 1.0,
+    "RIB_THICK": 1.5,
+    "CELL_SIDE": 56.4,
+    "R_CURV": 1085.0,
+    "CONIC_CONSTANT": -1.22,
+    "DENSITY_KG_M3": 2530.0,
+    "PATTERN": "isogrid"
+  },
+  "timestamp": "2026-11-19 00:19:09"
+}

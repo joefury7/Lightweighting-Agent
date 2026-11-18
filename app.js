@@ -61,53 +61,113 @@ function calculateExactBlankVolume(D_mm, Dc_mm, H_mm, R_curv, k) {
   return v_blank * dr_b;
 }
 
-// Exact Siemens NX Parasolid CAD Solid Body Mass Integration (10-point Gauss-Legendre quadrature)
+// ==============================================================================
+// EXACT NX-JOURNAL GEOMETRY MASS (no calibration / packing factors)
+// ------------------------------------------------------------------------------
+// Line-by-line replica of the isogrid pocket loop that generateNXCode() writes into
+// the NX journal: same 0.1 mm parameter rounding (toFixed), same chamfered-corner
+// triangle pockets (n_sub = 1), same adaptive pocket height and the same 5 mm outer /
+// inner wall rings re-united after pocketing.  Mass = rho * (blank - sum(pocket
+// footprint ∩ cut annulus) * pocket height).  Verified identical (< 1 g) to the
+// Python journal replica, which is itself verified against an OpenCascade solid.
+// ==============================================================================
+function _conicZ(r, Rc, k) {
+  return (r * r) / (Rc * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * r * r / (Rc * Rc)))));
+}
+function _blankVolumeExact(R, rh, H, Rc, k) {
+  // composite Simpson, 2000 panels (converged to < 1e-6 relative)
+  const n = 2000, hstep = (R - rh) / n;
+  let s = 0;
+  for (let i = 0; i <= n; i++) {
+    const r = rh + i * hstep;
+    const f = 2.0 * Math.PI * r * (H + _conicZ(r, Rc, k));
+    s += (i === 0 || i === n) ? f : (i % 2 ? 4 * f : 2 * f);
+  }
+  return s * hstep / 3.0;
+}
+function _triDiskArea(ax, ay, bx, by, R) {
+  const dx = bx - ax, dy = by - ay;
+  const a = dx * dx + dy * dy, b = 2 * (ax * dx + ay * dy), c = ax * ax + ay * ay - R * R;
+  const pts = [[ax, ay]];
+  const disc = b * b - 4 * a * c;
+  if (a > 0 && disc > 0) {
+    const sq = Math.sqrt(disc);
+    [(-b - sq) / (2 * a), (-b + sq) / (2 * a)].sort((u, v) => u - v).forEach(t => {
+      if (t > 0 && t < 1) pts.push([ax + t * dx, ay + t * dy]);
+    });
+  }
+  pts.push([bx, by]);
+  let area = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [px, py] = pts[i], [qx, qy] = pts[i + 1];
+    const mx = 0.5 * (px + qx), my = 0.5 * (py + qy);
+    if (mx * mx + my * my <= R * R) area += 0.5 * (px * qy - py * qx);
+    else area += 0.5 * R * R * Math.atan2(px * qy - py * qx, px * qx + py * qy);
+  }
+  return area;
+}
+function _polyDiskArea(poly, R) {
+  if (R <= 0) return 0;
+  let a = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length];
+    a += _triDiskArea(p[0], p[1], q[0], q[1], R);
+  }
+  return Math.abs(a);
+}
+function _polyAnnulusArea(poly, rIn, rOut) {
+  return Math.max(0, _polyDiskArea(poly, rOut) - _polyDiskArea(poly, rIn));
+}
+const _toFix = (v, d) => Number(Number(v).toFixed(d));
+
+function calculateExactIsogridMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R_curv, k, densityKgM3) {
+  // Parameters exactly as written into the journal
+  const R = _toFix(D_mm / 2.0, 1), Dc = _toFix(Dc_mm, 1), H = _toFix(H_mm, 1);
+  const tf = _toFix(tf_mm, 1), tw = _toFix(tw_mm, 1), L = _toFix(L_mm, 1), rf = _toFix(rf_mm, 1);
+  const Rc = _toFix(R_curv, 1), kk = _toFix(k, 4);
+  const rho = Number((_toFix(densityKgM3, 1) * 1e-9).toExponential(6));
+  const WALL = 5.0, rh = Dc / 2.0;
+  const vBlank = _blankVolumeExact(R, rh, H, Rc, kk);
+  const maxR = R - WALL, centralExclude = Dc / 2.0 + 3.0;
+  const rowH = L * Math.sqrt(3.0) / 2.0;
+  const pocketSide = L - tw * 2.0 / Math.sqrt(3.0);
+  const rIn = pocketSide / Math.sqrt(3.0);
+  const nRows = Math.ceil(maxR / rowH) + 1, nCols = Math.ceil(maxR / L) + 1;
+  const cutLo = rh + WALL, cutHi = R - WALL;   // wall rings are restored after pocketing
+  let vRem = 0, n = 0;
+  for (let j = -nRows; j <= nRows; j++) {
+    const yBase = j * rowH;
+    const xOff = (j % 2 !== 0) ? L * 0.5 : 0.0;
+    for (let i = -nCols; i <= nCols; i++) {
+      const cells = [[i * L + xOff, yBase + rowH / 3.0, 1], [i * L + L * 0.5 + xOff, yBase + 2.0 * rowH / 3.0, -1]];
+      for (const [cx, cy, ori] of cells) {
+        const d = Math.hypot(cx, cy);
+        const tol = L * 0.6;
+        if (d > maxR + tol || d < Math.max(5.0, centralExclude - tol)) continue;
+        const baseA = ori === 1 ? Math.PI / 2 : -Math.PI / 2;
+        const poly = [];
+        for (let q = 0; q < 3; q++) {
+          const va = baseA + q * 2 * Math.PI / 3;
+          const ccx = cx + (rIn - 2 * rf) * Math.cos(va), ccy = cy + (rIn - 2 * rf) * Math.sin(va);
+          poly.push([ccx + rf * Math.cos(va - Math.PI / 3), ccy + rf * Math.sin(va - Math.PI / 3)]);
+          poly.push([ccx + rf * Math.cos(va + Math.PI / 3), ccy + rf * Math.sin(va + Math.PI / 3)]);
+        }
+        const rMin = Math.min(Math.max(0, d - rIn), R - WALL);
+        const h = Math.round(Math.max(5.0, _conicZ(rMin, Rc, kk) - tf + H) * 1000) / 1000;  // journal: round(h, 3)
+        const a = _polyAnnulusArea(poly, cutLo, cutHi);
+        if (a > 1e-6) vRem += a * h;
+        if (_polyAnnulusArea(poly, rh, R) > 1e-6) n++;   // pockets NX actually extrudes
+      }
+    }
+  }
+  const v = vBlank - vRem;
+  return { mass: v * rho, volume: v, solidMass: vBlank * rho, pocketCount: n,
+           lightweightPct: 100 * (1 - v / vBlank) };
+}
+
+// Backwards-compatible wrapper (old name used across the UI) -> exact geometry, no fudge factors
 function calculateExactNXCadMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R_curv, k, rho) {
-  const R = D_mm / 2.0;
-  const Rc = Dc_mm / 2.0;
-  const w_rim = 5.0;
-  const r_in = Rc + w_rim;
-  const r_out = R - w_rim;
-
-  const xi = [-0.9739065285, -0.8650633667, -0.6794095683, -0.4333953941, -0.148874339, 0.148874339, 0.4333953941, 0.6794095683, 0.8650633667, 0.9739065285];
-  const wi = [0.0666713443, 0.1494513492, 0.2190863625, 0.2692667193, 0.2955242247, 0.2955242247, 0.2692667193, 0.2190863625, 0.1494513492, 0.0666713443];
-
-  let v_blank = 0;
-  const dr_b = 0.5 * (R - Rc);
-  for (let i = 0; i < 10; i++) {
-    const r = 0.5 * ((R - Rc) * xi[i] + (R + Rc));
-    const denom = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (r * r) / (R_curv * R_curv))));
-    const z = (r * r) / denom;
-    v_blank += wi[i] * 2.0 * Math.PI * r * (H_mm + z);
-  }
-  v_blank *= dr_b;
-
-  let v_pocket_zone = 0;
-  const dr_p = 0.5 * (r_out - r_in);
-  for (let i = 0; i < 10; i++) {
-    const r = 0.5 * ((r_out - r_in) * xi[i] + (r_out + r_in));
-    const denom = R_curv * (1.0 + Math.sqrt(Math.max(0.0001, 1.0 - (1.0 + k) * (r * r) / (R_curv * R_curv))));
-    const z = (r * r) / denom;
-    v_pocket_zone += wi[i] * 2.0 * Math.PI * r * (H_mm - tf_mm + z);
-  }
-  v_pocket_zone *= dr_p;
-
-  const pocket_side = Math.max(1.0, L_mm - 2.0 * tw_mm / Math.sqrt(3.0));
-  const area_cell = (Math.sqrt(3.0) / 4.0) * (L_mm * L_mm);
-  const area_sharp = (Math.sqrt(3.0) / 4.0) * (pocket_side * pocket_side);
-  const corner_lost = 3.0 * (Math.sqrt(3.0) - Math.PI / 3.0) * (rf_mm * rf_mm);
-  const area_filleted = Math.max(0.0, area_sharp - corner_lost);
-  const theory_frac = area_filleted / area_cell;
-
-  // Calibrated to Siemens NX Parasolid CAD exact solid body volume with boundary clipping compensation
-  // Thin ribs (1.5mm / 64.7mm): packing = 0.9473 (10.725 kg NX match)
-  // Thick ribs (5.3mm / 69.0mm): packing = 0.9090 (17.480 kg NX match)
-  const tw_ratio = tw_mm / Math.max(1.0, L_mm);
-  const rib_clipping_loss = 0.754 * Math.max(0.0, tw_ratio - 0.0232);
-  const nx_packing = 0.9473 * (1.0 - rib_clipping_loss);
-  const v_removed = v_pocket_zone * theory_frac * nx_packing;
-  const v_cad = Math.max(1000.0, v_blank - v_removed);
-  return v_cad * rho;
+  return calculateExactIsogridMass(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, R_curv, k, rho * 1e9).mass;
 }
 
 
@@ -140,7 +200,7 @@ function predictWhiffletreeSag(M_kg, D_mm, D_hole_mm, D_star, supportType) {
   const area_m2 = Math.PI * (R_m * R_m - R_hole_m * R_hole_m);
   const q_N_m2 = (M_kg * 9.80665) / Math.max(0.01, area_m2);
   
-  // Calibrated Nelson 18-point flexural efficiency (calibrated to Nastran SOL 101 FEA Run 305: 53.59 nm)
+  // Textbook support-efficiency coefficients (analytic estimate only; the app shows FEA-surrogate sag when the server runs)
   let K_mount = 0.004388;
   if (supportType === '9point') K_mount = 0.015870;
   else if (supportType === '3point') K_mount = 0.430560;
@@ -484,6 +544,63 @@ async function withButtonLoading(buttonId, loadingText, taskFn) {
   }
 }
 
+function _designPayload() {
+  const g = (id, fb) => { const el = document.getElementById(id); const v = el ? parseFloat(el.value) : NaN; return isNaN(v) ? fb : v; };
+  return {
+    D_mm: g('inp-diameter', state.diameter), Dc_mm: g('inp-central-hole', state.centralHoleDia),
+    H_mm: g('inp-depth', state.depth), tf_mm: g('inp-faceplate', state.faceplate),
+    tw_mm: g('inp-rib-thick', state.ribThick), L_mm: g('inp-cell-size', state.cellSize),
+    rf_mm: g('inp-fillet-radius', state.filletRadius), material: state.material || 'zerodur',
+    topology: state.pattern === 'isogrid' ? 'triangular_isogrid' : state.pattern
+  };
+}
+
+// Live FEA-surrogate sag (debounced). Falls back to a clearly-labelled analytic estimate when offline.
+let _sagTimer = null;
+function requestSurrogateSag() {
+  clearTimeout(_sagTimer);
+  _sagTimer = setTimeout(async () => {
+    const sagEl = document.getElementById('val-predicted-sag');
+    const st = document.getElementById('val-sag-status');
+    if (state.pattern !== 'isogrid') {
+      if (st) { st.className = 'status-tag status-warning'; st.innerHTML = 'Analytic estimate only (no FEA data for this pattern)'; }
+      return;
+    }
+    try {
+      const res = await fetch('http://127.0.0.1:8000/ml/predict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(_designPayload()) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      if (sagEl) sagEl.innerText = `${d.rms_sag_nm.toFixed(1)} ± ${d.rms_sag_std_nm.toFixed(1)} nm`;
+      if (st) {
+        const ok = d.rms_sag_nm <= 60.0;
+        st.className = 'status-tag ' + (ok ? 'status-safe' : 'status-warning');
+        st.innerHTML = (ok ? '✅ PASS' : '⚠️ > 60 nm') + ' · FEA surrogate' + (d.in_validity_domain ? '' : ' (outside FEA range)');
+      }
+    } catch (e) {
+      if (st) { st.className = 'status-tag status-warning'; st.innerHTML = 'Analytic estimate (backend offline)'; }
+    }
+  }, 350);
+}
+
+// Exact mass for non-isogrid patterns: the server executes the generated journal geometry.
+let _massTimer = null;
+function requestExactMassFromServer() {
+  clearTimeout(_massTimer);
+  _massTimer = setTimeout(async () => {
+    const codeEl = document.getElementById('code-output');
+    if (!codeEl || !codeEl.textContent) return;
+    try {
+      const res = await fetch('http://127.0.0.1:8000/cad/exact_mass', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ journal_code: codeEl.textContent }) });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const d = await res.json();
+      const el = document.getElementById('val-final-mass');
+      if (el) el.innerText = `${d.mass_kg.toFixed(3)} kg`;
+      const pc = document.getElementById('val-pocket-count');
+      if (pc) pc.innerText = `${d.pocket_count}`;
+    } catch (e) { /* offline: the on-screen value stays marked as an estimate */ }
+  }, 500);
+}
+
 async function executeInstantMLPredict() {
   const dVal = parseFloat(document.getElementById('inp-diameter').value) || state.diameter;
   const dcVal = parseFloat(document.getElementById('inp-central-hole').value) || state.centralHoleDia;
@@ -493,20 +610,12 @@ async function executeInstantMLPredict() {
   const lVal = parseFloat(document.getElementById('inp-cell-size').value) || state.cellSize;
   const rfVal = parseFloat(document.getElementById('inp-fillet-radius').value) || state.filletRadius;
 
-  showSolverStatus('⚡ Querying Pillar 2 Multi-Output XGBoost Surrogate Model...', true);
+  showSolverStatus('⚡ Querying exact-mass + FEA-trained surrogate...', true);
   try {
     const res = await fetch('http://127.0.0.1:8000/ml/predict', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        D_mm: dVal,
-        Dc_mm: dcVal,
-        H_mm: hVal,
-        tf_mm: tfVal,
-        tw_mm: twVal,
-        L_mm: lVal,
-        rf_mm: rfVal
-      })
+      body: JSON.stringify(_designPayload())
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
@@ -517,12 +626,12 @@ async function executeInstantMLPredict() {
     const quiltEl = document.getElementById('val-quilting-deflection');
     const freqEl = document.getElementById('val-fundamental-freq');
 
-    if (massEl) massEl.innerText = `${data.mass_kg.toFixed(2)} kg`;
-    if (sagEl) sagEl.innerText = `${data.rms_sag_nm.toFixed(2)} nm`;
+    if (massEl) massEl.innerText = `${data.mass_kg.toFixed(3)} kg`;
+    if (sagEl) sagEl.innerText = `${data.rms_sag_nm.toFixed(1)} ± ${data.rms_sag_std_nm.toFixed(1)} nm`;
     if (quiltEl) quiltEl.innerText = `${data.quilting_nm.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(data.frequency_hz)} Hz`;
 
-    showSolverStatus(`⚡ Instant ML Prediction: Mass = ${data.mass_kg.toFixed(2)} kg, Sag = ${data.rms_sag_nm.toFixed(2)} nm, Quilting = ${data.quilting_nm.toFixed(2)} nm, Latency = 0.44 ms!`, true);
+    showSolverStatus(`⚡ Mass (exact NX geometry) = ${data.mass_kg.toFixed(3)} kg | RMS sag (FEA surrogate) = ${data.rms_sag_nm.toFixed(2)} ± ${data.rms_sag_std_nm.toFixed(2)} nm | quilting & f1 are analytic estimates${data.in_validity_domain ? '' : ' | WARNING: ' + data.validity_warnings.join('; ')}`, true);
   } catch (err) {
     showSolverStatus('ML Predict Error: ' + err.message + '. Please ensure FastAPI server is running on port 8000.', false);
   }
@@ -553,7 +662,7 @@ async function executeNSGA2Optimization() {
         max_mass_kg: targetMass,
         max_sag_nm: 60.0,
         mode: optMode,
-        num_candidates: 50000
+        material: state.material || 'zerodur'
       })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -562,18 +671,18 @@ async function executeNSGA2Optimization() {
     // Apply solved parameters to UI (including evolved depth H_mm)
     applyCombo(best.tf_mm, best.L_mm, best.tw_mm, best.rf_mm, best.H_mm);
 
-    const mass = best.predicted_mass_kg !== undefined ? best.predicted_mass_kg : (best.mass_kg !== undefined ? best.mass_kg : 11.9);
-    const sag = best.predicted_rms_sag_nm !== undefined ? best.predicted_rms_sag_nm : (best.rms_sag_nm !== undefined ? best.rms_sag_nm : 58.0);
-    const quilt = best.predicted_quilting_nm !== undefined ? best.predicted_quilting_nm : (best.quilting_nm !== undefined ? best.quilting_nm : 25.0);
-    const freq = best.predicted_freq_hz !== undefined ? best.predicted_freq_hz : (best.frequency_hz !== undefined ? best.frequency_hz : 700);
+    const mass = best.predicted_mass_kg;
+    const sag = best.predicted_rms_sag_nm;
+    const quilt = best.predicted_quilting_nm;
+    const freq = best.predicted_freq_hz;
 
     const massEl = document.getElementById('val-final-mass');
     const sagEl = document.getElementById('val-predicted-sag');
     const quiltEl = document.getElementById('val-quilting-deflection');
     const freqEl = document.getElementById('val-fundamental-freq');
 
-    if (massEl) massEl.innerText = `${mass.toFixed(2)} kg`;
-    if (sagEl) sagEl.innerText = `${sag.toFixed(2)} nm`;
+    if (massEl) massEl.innerText = `${mass.toFixed(3)} kg`;
+    if (sagEl) sagEl.innerText = `${sag.toFixed(1)} ± ${best.rms_sag_std_nm.toFixed(1)} nm`;
     if (quiltEl) quiltEl.innerText = `${quilt.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(freq)} Hz`;
 
@@ -581,9 +690,10 @@ async function executeNSGA2Optimization() {
     setTimeout(executeDeepPINNPredict, 100);
 
     const modeLabel = optMode === 'target' ? `Target ${targetMass.toFixed(1)} kg` : 'Minimum Mass';
-    showSolverStatus(`🧬 AI Optimal Solution (${modeLabel}): Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
+    const feasTxt = best.all_constraints_satisfied ? 'all constraints met' : 'NOT all constraints met';
+    showSolverStatus(`🧬 NSGA-II (${modeLabel}, ${feasTxt}): Mass = ${mass.toFixed(3)} kg (exact), Sag = ${sag.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Run FEA to verify.`, !!best.all_constraints_satisfied);
   } catch (err) {
-    showSolverStatus('Optimizer Error: ' + err.message + '. Running fallback local solver.', false);
+    showSolverStatus('Optimizer Error: ' + err.message + '. Backend unavailable - running the OFFLINE analytic grid search (not FEA-based).', false);
     autoSolveTargetMass();
   }
 }
@@ -597,34 +707,25 @@ async function executeNastranFEASolve() {
   const lVal = parseFloat(document.getElementById('inp-cell-size').value) || state.cellSize;
   const rfVal = parseFloat(document.getElementById('inp-fillet-radius').value) || state.filletRadius;
 
-  showSolverStatus('Executing NASTRAN SOL 101 Linear Static FEA Simulation...', 'running');
+  showSolverStatus('Running genuine FEA of the exact geometry (NX Nastran if installed, else CalculiX) - takes 1-3 minutes...', 'running');
   try {
     const res = await fetch('http://127.0.0.1:8000/fea/solve', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        D_mm: dVal,
-        Dc_mm: dcVal,
-        H_mm: hVal,
-        tf_mm: tfVal,
-        tw_mm: twVal,
-        L_mm: lVal,
-        rf_mm: rfVal
-      })
+      body: JSON.stringify(_designPayload())
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 300));
     const data = await res.json();
     const fea = data.fea_results;
-    const residual = data.active_learning_residual;
 
     const feaCard = document.getElementById('metric-fea-actual');
     if (feaCard) feaCard.style.display = 'flex';
     const feaSagEl = document.getElementById('val-fea-sag');
     const feaResEl = document.getElementById('val-fea-residual');
     if (feaSagEl) feaSagEl.innerText = `${fea.actual_rms_sag_nm.toFixed(2)} nm`;
-    if (feaResEl) feaResEl.innerText = `ΔSag: ${residual.residual_nm.toFixed(2)} nm | Actual Mass: ${fea.actual_mass_kg.toFixed(2)} kg`;
+    if (feaResEl) feaResEl.innerText = `Surrogate gap: ${data.surrogate_vs_fea_gap_pct.toFixed(1)}% | Mass: ${fea.actual_mass_kg.toFixed(3)} kg`;
 
-    showSolverStatus(`🔬 NASTRAN SOL 101 FEA Solved! Actual Sag: ${fea.actual_rms_sag_nm.toFixed(2)} nm, Actual Mass: ${fea.actual_mass_kg.toFixed(2)} kg, Residual: ${residual.residual_nm.toFixed(2)} nm (Logged to Active Learning Buffer)`, true);
+    showSolverStatus(`🔬 ${fea.solver}: RMS sag ${fea.actual_rms_sag_nm.toFixed(2)} nm (piston/tilt removed), PV ${fea.actual_pv_sag_nm.toFixed(1)} nm, mass ${fea.actual_mass_kg.toFixed(3)} kg, ${fea.mesh.nodes} nodes, ${fea.solve_duration_sec}s. Surrogate gap ${data.surrogate_vs_fea_gap_pct.toFixed(1)}%${data.dataset_update.stored ? ' - added to FEA dataset, surrogate refitted' : ''}.`, true);
   } catch (err) {
     showSolverStatus('FEA Solve Error: ' + err.message, false);
   }
@@ -1679,9 +1780,13 @@ function updateCalculation() {
   const padVolAdded = numHubs * padArea * ribH;
   
   let finalVol = Math.max(1000.0, volBlank - (pocketCount * singlePocketArea * ribH));
+  let massIsExact = false;
   if (state.pattern === 'isogrid') {
-    const exactMass = calculateExactNXCadMass(state.diameter, state.centralHoleDia, state.depth, state.faceplate, state.ribThick, state.cellSize, state.filletRadius, state.radiusCurv, state.conicConstant, rho);
-    finalVol = exactMass / rho;
+    // EXACT: same geometry the NX journal builds (see calculateExactIsogridMass)
+    const ex = calculateExactIsogridMass(state.diameter, state.centralHoleDia, state.depth, state.faceplate, state.ribThick, state.cellSize, state.filletRadius, state.radiusCurv, state.conicConstant, state.density);
+    finalVol = ex.volume;
+    pocketCount = ex.pocketCount;
+    massIsExact = true;
   } else if (state.pattern === 'hexagonal') {
     const netVol = (typeof hexVolRemoved !== 'undefined' ? hexVolRemoved : 0) * 0.8743;
     finalVol = Math.max(1000.0, volBlank - netVol);
@@ -1696,10 +1801,10 @@ function updateCalculation() {
   const matName = materialsMap[state.material] ? materialsMap[state.material].name : "Selected Material";
   setTxt('val-solid-mass', `${solidMassZerodur.toFixed(1)} kg`);
   setTxt('val-solid-material', matName);
-  const displayMass = state.forcedMass ? state.forcedMass : ((state.importedMass && state.importedMass > 0) ? state.importedMass : finalMass);
-  // REMOVED ARTIFICIAL CLAMP: Display true physical integrated mass directly
+  // Always display the real mass of the geometry on screen (never a target or forced value)
+  const displayMass = finalMass;
   const uiMass = displayMass;
-  setTxt('val-final-mass', `${uiMass.toFixed(1)} kg`);
+  setTxt('val-final-mass', massIsExact ? `${uiMass.toFixed(3)} kg` : `≈${uiMass.toFixed(1)} kg (estimate)`);
   setTxt('val-pocket-count', `${pocketCount}`);
 
   // 1. Yoder Mass Reduction %
@@ -1758,10 +1863,10 @@ function updateCalculation() {
   if (freqStatusEl) {
     if (f_n >= 200) {
       freqStatusEl.className = 'status-tag status-safe';
-      freqStatusEl.innerHTML = `✅ SAFE (Pass)`;
+      freqStatusEl.innerHTML = `✅ ≥ 200 Hz (analytic estimate)`;
     } else {
       freqStatusEl.className = 'status-tag status-warning';
-      freqStatusEl.innerHTML = `⚠️ LOW RIGIDITY (< 200 Hz)`;
+      freqStatusEl.innerHTML = `⚠️ < 200 Hz (analytic estimate)`;
     }
   }
 
@@ -1785,22 +1890,19 @@ function updateCalculation() {
   }
   setTxt('val-mass-status', statusText);
   
-  // 4. Predicted 18-Point Whiffletree Gravity Sag (NASA Isogrid Equivalent Plate + Nelson Hindle)
+  // 4. Gravity sag: the FEA-trained surrogate is requested from the server (requestSurrogateSag).
+  //    Until it answers (or if offline) a textbook plate estimate is shown and LABELLED as such.
   const matObj = materialsMap[state.material] || { E: 90.3e9, nu: 0.24 };
   const D_star_val = calculateEquivalentPlateStiffness(state.faceplate, state.ribThick, state.cellSize, state.depth, matObj.E, matObj.nu, state.pattern);
   const predictedSag_nm = predictWhiffletreeSag(uiMass, state.diameter, state.centralHoleDia, D_star_val, state.supportType);
-  
-  setTxt('val-predicted-sag', `${predictedSag_nm.toFixed(1)} nm`);
+  setTxt('val-predicted-sag', `≈${predictedSag_nm.toFixed(1)} nm`);
   const sagStatusEl = document.getElementById('val-sag-status');
   if (sagStatusEl) {
-    if (predictedSag_nm <= 60.0) {
-      sagStatusEl.className = 'status-tag status-safe';
-      sagStatusEl.innerHTML = `✅ PASS (< 60 nm Target)`;
-    } else {
-      sagStatusEl.className = 'status-tag status-warning';
-      sagStatusEl.innerHTML = `⚠️ SAG > 60 nm (${predictedSag_nm.toFixed(0)} nm)`;
-    }
+    sagStatusEl.className = 'status-tag status-warning';
+    sagStatusEl.innerHTML = 'Analytic estimate - waiting for FEA surrogate';
   }
+  requestSurrogateSag();
+  if (!massIsExact) requestExactMassFromServer();
 
   const pdInp = document.getElementById('inp-pocket-depth');
   if (pdInp) {
@@ -2645,6 +2747,7 @@ function generateNXCode(pocketCount, finalMass) {
     '    bool_unite = NXOpen.GeometricUtilities.BooleanOperation.BooleanType.Unite',
     '    max_r = RADIUS - WALL_MARGIN',
     '    pocket_count = 0',
+    '    failed_pockets = []  # pockets NX could not cut (reported to the app for mass cross-checking)',
     '',
     '    def snap_to_isogrid_vertex(x, y, cell_size):',
     '        row_h = cell_size * math.sqrt(3.0) / 2.0',
@@ -2930,6 +3033,8 @@ function generateNXCode(pocketCount, finalMass) {
       '                hp     = NXOpen.Point3d(cx, cy, BACK_Z)',
       '                if extrude_pocket_boolean(workPart, curves, revolved_body, z_direction, h_ext, bool_sub, hp):',
       '                    pocket_count += 1',
+      '                else:',
+      '                    failed_pockets.append([round(cx, 3), round(cy, 3)])',
       '                for c in curves:',
       '                    try: c.Blank()',
       '                    except Exception: pass'
@@ -3248,9 +3353,42 @@ function generateNXCode(pocketCount, finalMass) {
   );
 
   pyCode.push(
+    '',
+    '    # NX MASS REPORT: NX-measured mass written next to the part so the app can compare (no geometry change)',
+    '    try:',
+    '        import json as _json, os as _os, time as _time',
+    '        _uf = NXOpen.UF.UFSession.GetUFSession()',
+    '        _res = _uf.Modeling.AskMassProps3d([revolved_body.Tag], 1, 1, 4, 1.0, 1, [0.99] + [0.0] * 10)',
+    '        _vol_mm3 = float(_res[0][1]) * 1e9',
+    '        try:',
+    '            _mp = workPart.MeasureManager.NewMassProperties([revolved_body], 0.99, True)',
+    '            if _mp.Volume > 10.0: _vol_mm3 = float(_mp.Volume)',
+    '        except Exception:',
+    '            pass',
+    '        _report = {',
+    '            "nx_volume_mm3": _vol_mm3,',
+    '            "nx_mass_kg": _vol_mm3 * DENSITY_KG_MM3,',
+    '            "nx_mass_kg_as_returned_by_AskMassProps3d": float(_res[0][2]),',
+    '            "pocket_count_nx": int(pocket_count),',
+    '            "pockets_failed": len(failed_pockets),',
+    '            "failed_pocket_centres_mm": failed_pockets,',
+    '            "app_predicted_mass_kg": ' + finalMass.toFixed(6) + ',',
+    '            "app_predicted_volume_mm3": ' + (finalMass / (densityKgM3 * 1e-9)).toFixed(3) + ',',
+    '            "parameters": {"DIAMETER": DIAMETER, "CENTRAL_HOLE_DIA": CENTRAL_HOLE_DIA, "TOTAL_DEPTH": TOTAL_DEPTH,',
+    '                           "FACESHEET": FACESHEET, "RIB_THICK": RIB_THICK, "CELL_SIDE": CELL_SIDE,',
+    '                           "R_CURV": R_CURV, "CONIC_CONSTANT": CONIC_CONSTANT, "DENSITY_KG_M3": DENSITY_KG_M3,',
+    '                           "PATTERN": "' + state.pattern + '"},',
+    '            "timestamp": _time.strftime("%Y-%m-%d %H:%M:%S")',
+    '        }',
+    '        _dir = _os.path.dirname(workPart.FullPath) if getattr(workPart, "FullPath", "") else _os.getcwd()',
+    '        with open(_os.path.join(_dir, "nx_mass_report.json"), "w") as _f:',
+    '            _json.dump(_report, _f, indent=2)',
+    '        log(lw, "NX measured mass: %.6f kg | app predicted: %.6f kg | difference: %.1f g | failed pockets: %d" % (_report["nx_mass_kg"], _report["app_predicted_mass_kg"], (_report["nx_mass_kg"] - _report["app_predicted_mass_kg"]) * 1000.0, len(failed_pockets)))',
+    '    except Exception as _e_rep:',
+    '        log(lw, "Mass report note: " + str(_e_rep))',
     '    log(lw, "")',
     '    log(lw, "======================================================================")',
-    '    log(lw, "  CAD MODEL COMPLETED: TARGET MASS ~' + finalMass.toFixed(1) + ' kg MET!")',
+    '    log(lw, "  CAD MODEL COMPLETED")',
     '    log(lw, "======================================================================")'
   );
 
@@ -3398,19 +3536,18 @@ class GeminiAgentEngine {
         this.logResult(`🤖 OptoMechanical Agent (Qwen 2.5 Coder):\n${backendRes.response}`);
         if (backendRes.best_design) {
           const bd = backendRes.best_design;
-          const mass = bd.predicted_mass_kg !== undefined ? bd.predicted_mass_kg : (bd.mass_kg !== undefined ? bd.mass_kg : 11.7);
-          const sag = bd.predicted_rms_sag_nm !== undefined ? bd.predicted_rms_sag_nm : (bd.rms_sag_nm !== undefined ? bd.rms_sag_nm : 54.0);
-          const quilt = bd.predicted_quilting_nm !== undefined ? bd.predicted_quilting_nm : (bd.quilting_nm !== undefined ? bd.quilting_nm : 10.0);
+          const mass = bd.predicted_mass_kg !== undefined ? bd.predicted_mass_kg : bd.mass_kg;
+          const sag = bd.predicted_rms_sag_nm !== undefined ? bd.predicted_rms_sag_nm : bd.rms_sag_nm;
+          const quilt = bd.predicted_quilting_nm !== undefined ? bd.predicted_quilting_nm : bd.quilting_nm;
           
           applyCombo(bd.tf_mm, bd.L_mm, bd.tw_mm, bd.rf_mm, bd.H_mm);
           this.logAction(`Applied Optimal Geometry to CAD: tf=${bd.tf_mm} mm, tw=${bd.tw_mm} mm, L=${bd.L_mm} mm, rf=${bd.rf_mm} mm`);
-          this.logResult(`Verified Metrics: Mass = ${mass.toFixed(2)} kg, Sag = ${sag.toFixed(2)} nm, Quilting = ${quilt.toFixed(2)} nm`);
+          this.logResult(`Predicted: Mass = ${mass.toFixed(3)} kg (exact geometry), Sag = ${sag.toFixed(2)} nm (FEA surrogate), Quilting = ${quilt.toFixed(2)} nm (analytic)`);
         }
         if (backendRes.fea) {
           const fea = backendRes.fea;
-          const feaSag = fea.actual_rms_sag_nm !== undefined ? fea.actual_rms_sag_nm : 58.11;
-          const feaMass = fea.actual_mass_kg !== undefined ? fea.actual_mass_kg : 11.98;
-          this.logResult(`Ground Truth FEA: Sag = ${feaSag.toFixed(2)} nm, Mass = ${feaMass.toFixed(2)} kg (FEA Pass ✅)`);
+          const feaPass = fea.actual_rms_sag_nm <= 60.0;
+          this.logResult(`${fea.solver}: Sag = ${fea.actual_rms_sag_nm.toFixed(2)} nm, Mass = ${fea.actual_mass_kg.toFixed(3)} kg (${feaPass ? 'PASS ✅' : 'FAIL ❌'} vs 60 nm)`);
         }
       } else {
         // Fallback Client-side Agent Logic
@@ -3468,13 +3605,13 @@ class GeminiAgentEngine {
           applyCombo(solved.faceplate, solved.cellSize, solved.ribThick, solved.filletRadius);
           this.logResult(`Auto-Solve Completed! Applied ${state.pattern.toUpperCase()} Pattern: tf=${state.faceplate}mm, Cell=${state.cellSize}mm, tw=${state.ribThick}mm (${solved.mass.toFixed(1)} kg).`);
         } else {
-          state.forcedMass = targetMass;
+          state.forcedMass = null;
           applyCombo(solved.unsafeFaceplate, solved.unsafeCellSize, solved.unsafeRibThick, solved.unsafeFilletRadius);
-          this.logResult(`FORCED TARGET (${targetMass.toFixed(1)} kg) on ${state.pattern.toUpperCase()}: Applied tf=${state.faceplate}mm, Cell=${state.cellSize}mm, tw=${state.ribThick}mm.`);
+          this.logResult(`Target ${targetMass.toFixed(1)} kg NOT achievable within limits on ${state.pattern.toUpperCase()}; closest design applied (tf=${state.faceplate}mm, Cell=${state.cellSize}mm, tw=${state.ribThick}mm) - displayed mass is that design's real mass.`);
         }
       }
 
-      this.logThought('Agent Iteration Complete: All structural, quilting (< λ/20), and FEA stress constraints satisfied!');
+      this.logThought('Agent iteration complete (offline analytic logic unless an FEA result is shown above).');
     } catch (err) {
       this.logError(`Agent Execution Error: ${err.message}`);
     } finally {
@@ -3555,7 +3692,7 @@ async function executeDeepPINNPredict() {
   const matVal = state.material || 'zerodur';
   const topVal = state.pattern || 'triangular_isogrid';
 
-  showSolverStatus(`Evaluating Deep Residual PINN Surrogate (${matVal.toUpperCase()} | ${topVal})...`, 'running');
+  showSolverStatus(`Evaluating FEA-trained surrogate with 37 Zernike terms (${matVal.toUpperCase()} | ${topVal})...`, 'running');
   try {
     const res = await fetch('http://127.0.0.1:8000/pinn/predict', {
       method: 'POST',
@@ -3563,10 +3700,10 @@ async function executeDeepPINNPredict() {
       body: JSON.stringify({
         D_mm: dVal, Dc_mm: dcVal, H_mm: hVal,
         tf_mm: tfVal, tw_mm: twVal, L_mm: lVal, rf_mm: rfVal,
-        material: matVal, topology: topVal
+        material: matVal, topology: topVal === 'isogrid' ? 'triangular_isogrid' : topVal
       })
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 200));
     const data = await res.json();
 
     // Update Scalar Metrics
@@ -3574,8 +3711,8 @@ async function executeDeepPINNPredict() {
     const sagEl = document.getElementById('val-predicted-sag');
     const quiltEl = document.getElementById('val-quilting-deflection');
     const freqEl = document.getElementById('val-fundamental-freq');
-    if (massEl) massEl.innerText = `${data.mass_kg.toFixed(2)} kg`;
-    if (sagEl) sagEl.innerText = `${data.rms_sag_nm.toFixed(2)} nm`;
+    if (massEl) massEl.innerText = `${data.mass_kg.toFixed(3)} kg`;
+    if (sagEl) sagEl.innerText = `${data.rms_sag_nm.toFixed(1)} ± ${data.rms_sag_std_nm.toFixed(1)} nm`;
     if (quiltEl) quiltEl.innerText = `${data.quilting_nm.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(data.frequency_hz)} Hz`;
 
@@ -3593,9 +3730,9 @@ async function executeDeepPINNPredict() {
       if (zRms) zRms.innerText = `${data.rms_sag_nm.toFixed(2)} nm`;
     }
 
-    showSolverStatus(`⚛️ Deep PINN Inference Complete: Mass = ${data.mass_kg} kg, Sag = ${data.rms_sag_nm} nm, Latency = ${data.inference_latency_ms} ms (37 Zernike Modes Computed)`, true);
+    showSolverStatus(`FEA surrogate: Mass = ${data.mass_kg.toFixed(3)} kg (exact), Sag = ${data.rms_sag_nm.toFixed(2)} ± ${data.rms_sag_std_nm.toFixed(2)} nm, 37 Zernike terms learned from FEA (${data.inference_latency_ms} ms)`, true);
   } catch (err) {
-    showSolverStatus('PINN Predict Error: ' + err.message + '. Ensure backend server is running.', false);
+    showSolverStatus('Surrogate Predict Error: ' + err.message, false);
   }
 }
 
@@ -3615,7 +3752,7 @@ async function executePPORLOptimization() {
       body: JSON.stringify({
         D_mm: dVal, Dc_mm: dcVal, H_mm: hVal,
         target_mass_kg: targetMass, max_sag_nm: 60.0,
-        material: matVal, topology: topVal
+        material: matVal, topology: topVal === 'isogrid' ? 'triangular_isogrid' : topVal
       })
     });
     if (!res.ok) throw new Error('HTTP ' + res.status);
@@ -3627,15 +3764,15 @@ async function executePPORLOptimization() {
     const sagEl = document.getElementById('val-predicted-sag');
     const quiltEl = document.getElementById('val-quilting-deflection');
     const freqEl = document.getElementById('val-fundamental-freq');
-    if (massEl) massEl.innerText = `${best.mass_kg.toFixed(2)} kg`;
-    if (sagEl) sagEl.innerText = `${best.rms_sag_nm.toFixed(2)} nm`;
+    if (massEl) massEl.innerText = `${best.mass_kg.toFixed(3)} kg`;
+    if (sagEl) sagEl.innerText = `${best.rms_sag_nm.toFixed(1)} ± ${best.rms_sag_std_nm.toFixed(1)} nm`;
     if (quiltEl) quiltEl.innerText = `${best.quilting_nm.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(best.frequency_hz)} Hz`;
 
     // Automatically update 37 Fringe Zernike Wavefront card for optimal geometry
     setTimeout(executeDeepPINNPredict, 100);
 
-    showSolverStatus(`🤖 PPO RL Optimal Solution (${matVal.toUpperCase()}): Mass = ${best.mass_kg} kg, Sag = ${best.rms_sag_nm} nm, f1 = ${Math.round(best.frequency_hz)} Hz (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`, true);
+    showSolverStatus(`🤖 ${best.optimization_algorithm} (${matVal.toUpperCase()}): Mass = ${best.mass_kg.toFixed(3)} kg (exact), Sag = ${best.rms_sag_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm)`, true);
   } catch (err) {
     showSolverStatus('PPO RL Error: ' + err.message + '. Using NSGA-II solver fallback.', false);
     executeNSGA2Optimization();
@@ -3655,7 +3792,7 @@ async function executeUnifiedOptimization() {
   const targetMass = isMin ? 999.0 : (parseFloat(rawTarget) || state.customTargetMass || 12.0);
   const optMode = isMin ? 'min' : 'target';
 
-  showSolverStatus(`Running Cooperative AI Pipeline: Stage 1 (NSGA-II 16k) ➔ Stage 2 (PPO RL Refinement) ➔ Stage 3 (PINN 37 Zernikes)...`, 'running');
+  showSolverStatus(`Running NSGA-II global search ➔ PPO local refinement (kept only if better) on exact mass + FEA-trained surrogate...`, 'running');
 
   try {
     const res = await fetch('http://127.0.0.1:8000/optimize/unified', {
@@ -3669,11 +3806,10 @@ async function executeUnifiedOptimization() {
         max_sag_nm: 60.0,
         mode: optMode,
         material: matVal,
-        topology: topVal,
-        num_candidates: 50000
+        topology: topVal === 'isogrid' ? 'triangular_isogrid' : topVal
       })
     });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
+    if (!res.ok) throw new Error('HTTP ' + res.status + ' ' + (await res.text()).slice(0, 200));
     const data = await res.json();
     const best = data.best;
 
@@ -3685,8 +3821,8 @@ async function executeUnifiedOptimization() {
     const sagEl = document.getElementById('val-predicted-sag');
     const quiltEl = document.getElementById('val-quilting-deflection');
     const freqEl = document.getElementById('val-fundamental-freq');
-    if (massEl) massEl.innerText = `${best.mass_kg.toFixed(2)} kg`;
-    if (sagEl) sagEl.innerText = `${best.rms_sag_nm.toFixed(2)} nm`;
+    if (massEl) massEl.innerText = `${best.mass_kg.toFixed(3)} kg`;
+    if (sagEl) sagEl.innerText = `${best.rms_sag_nm.toFixed(1)} ± ${best.rms_sag_std_nm.toFixed(1)} nm`;
     if (quiltEl) quiltEl.innerText = `${best.quilting_nm.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(best.frequency_hz)} Hz`;
 
@@ -3714,7 +3850,7 @@ async function executeUnifiedOptimization() {
     if (badgeEl && badgeTextEl) {
       badgeEl.style.display = 'flex';
       if (data.handoff) {
-        badgeTextEl.innerHTML = `<strong>Cooperative Handoff Complete:</strong> ${data.handoff.handoff_message || data.winner_reason}`;
+        badgeTextEl.innerHTML = `<strong>${data.handoff.improved ? 'PPO improved the NSGA-II seed' : 'NSGA-II result (PPO found no improvement)'}:</strong> ${data.handoff.handoff_message || data.winner_reason}`;
         if (handoffDetailsEl && data.handoff.seed_nsga2 && data.handoff.refined_ppo) {
           handoffDetailsEl.style.display = 'grid';
           if (seedMetricsEl) {
@@ -3732,8 +3868,8 @@ async function executeUnifiedOptimization() {
     }
 
     const sMsg = data.handoff
-      ? `🚀 Cooperative Optimization Complete! NSGA-II Seed ➔ PPO Refined to ${best.mass_kg.toFixed(2)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm (tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm)`
-      : `🚀 Unified Optimization Complete: Mass = ${best.mass_kg.toFixed(2)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm`;
+      ? `🚀 ${data.handoff.handoff_message} | final: ${best.mass_kg.toFixed(3)} kg (exact), ${best.rms_sag_nm.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Use Verify with FEA to confirm.`
+      : `🚀 Optimization complete: Mass = ${best.mass_kg.toFixed(3)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm`;
     showSolverStatus(sMsg, true);
   } catch (err) {
     showSolverStatus('Unified Optimizer Error: ' + err.message + '. Running fallback local NSGA-II solver...', false);

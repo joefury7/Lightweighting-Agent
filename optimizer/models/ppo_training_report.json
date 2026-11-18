@@ -1,0 +1,13 @@
+{
+  "timesteps": 12000,
+  "mean_objective_improvement_untrained_vs_random": {
+    "ppo": 14.016564583333325,
+    "random": 27.50239969650979
+  },
+  "mean_objective_improvement_trained_vs_random": {
+    "ppo": 46.80900781413122,
+    "random": 27.50239969650979
+  },
+  "trained_at": "2026-11-18 18:01:39",
+  "environment": "exact mass + FEA-trained GP sag surrogate"
+}

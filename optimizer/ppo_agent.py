@@ -133,7 +133,7 @@ class PPOAgent:
                 self.optimizer.step()
 
     def train_environment(self, env, total_timesteps=4000, rollout_len=200):
-        print(f"\n[PPO Agent] Training Policy on {env.material.upper()} ({env.topology})...")
+
         obs = env.reset()
         timesteps = 0
         episodes = 0
@@ -169,10 +169,7 @@ class PPOAgent:
             advs, rets = self.compute_gae(rewards, values, dones, next_val)
             self.train_step(states, actions, log_probs, rets, advs)
 
-            if timesteps % (rollout_len * 2) == 0:
-                print(f"  Step {timesteps:04d}/{total_timesteps:04d} | Best Reward: {best_reward:.2f} | Current Mass: {info['mass_kg']} kg | Sag: {info['rms_sag_nm']} nm | f1: {info['frequency_hz']} Hz")
 
-        print(f"[PPO Training Complete] Total timesteps: {timesteps} | Episodes: {episodes}")
         return best_info
 
     def optimize_design(self, env, max_steps=40):
@@ -196,86 +193,76 @@ class PPOAgent:
 
     def refine_design(self, env, max_steps=35, initial_geom=None):
         """
-        Two-Stage Coarse-to-Fine Optimization:
-        Takes a coarse champion seed (from NSGA-II) and executes deterministic
-        continuous policy steps to micro-refine parameters for exact mass matching
-        and minimal optical figure deflection.
+        Local refinement from an NSGA-II seed: deterministic policy steps, keeping the best design
+        under the SAME objective NSGA-II uses (env.score).  The seed is returned unchanged if the
+        policy does not improve it, and 'improved' reports that honestly.
         """
         obs = env.reset(initial_geom=initial_geom)
-
-        # Baseline performance of the coarse seed
-        seed_info = dict(env.last_preds)
-        seed_info["H_mm"] = round(float(env.geom[0]), 2)
-        seed_info["tf_mm"] = round(float(env.geom[1]), 2)
-        seed_info["tw_mm"] = round(float(env.geom[2]), 2)
-        seed_info["L_mm"] = round(float(env.geom[3]), 2)
-        seed_info["rf_mm"] = round(float(env.geom[4]), 2)
-
-        best_design = dict(seed_info)
-
-        def score_design(info):
-            m = float(info.get("mass_kg", 999.0))
-            s = float(info.get("rms_sag_nm", 999.0))
-            q = float(info.get("quilting_nm", 999.0))
-            f = float(info.get("frequency_hz", 0.0))
-
-            c_sag = max(0.0, s - env.target_sag)
-            c_quilt = max(0.0, q - 30.0)
-            c_freq = max(0.0, 120.0 - f)
-            penalties = (c_sag * 15.0) + (c_quilt * 3.0) + (c_freq * 1.5)
-
-            if env.mode == "target":
-                mass_err = abs(m - env.target_mass)
-                # Minimize mass error first (200×), then sag as secondary objective
-                return (mass_err * 200.0) + penalties + (s * 0.1)
-            else:
-                return (m * 2.0) + penalties + (s * 0.1)
-
-        best_score = score_design(seed_info)
-        initial_score = best_score
-        trajectory = [dict(seed_info)]
-
-        for step in range(max_steps):
+        def snap(info_like):
+            d = dict(info_like)
+            for k, v in zip(["H_mm", "tf_mm", "tw_mm", "L_mm", "rf_mm"], env.geom):
+                d[k] = float(v)
+            return d
+        seed_info = snap(env.last_preds)
+        best, best_score = dict(seed_info), env.score(env.last_preds)
+        initial = best_score
+        steps = 0
+        for _ in range(max_steps):
             act, _, _ = self.policy.get_action(obs, deterministic=True)
             obs, r, done, info = env.step(act)
-            current_score = score_design(info)
-            trajectory.append(dict(info))
-
-            if current_score < best_score:
-                best_score = current_score
-                best_design = dict(info)
-
+            steps += 1
+            if info["score"] < best_score - 1e-9:
+                best_score, best = info["score"], dict(info)
             if done:
                 break
-
-        return {
-            "seed_design": seed_info,
-            "refined_design": best_design,
-            "trajectory_steps": len(trajectory),
-            "improved": bool(best_score < initial_score),
-            "initial_score": round(initial_score, 3),
-            "final_score": round(best_score, 3)
-        }
+        return {"seed_design": seed_info, "refined_design": best, "trajectory_steps": steps + 1,
+                "improved": bool(best_score < initial - 1e-9),
+                "initial_score": round(initial, 4), "final_score": round(best_score, 4)}
 
 
-def train_and_save_ppo_policies(models_dir="optimizer/models"):
+def evaluate_policy_vs_random(agent, n_episodes=20, steps=30, seed=0):
+    """Honest check: mean improvement of the shared objective (env.score) achieved by the
+    deterministic policy vs. uniformly random actions, from identical random start designs."""
+    rng = np.random.default_rng(seed)
+    res = {"ppo": [], "random": []}
+    for ep in range(n_episodes):
+        mat = ["zerodur", "sic", "ule", "beryllium"][ep % 4]
+        target = float(rng.uniform(9, 16))
+        for kind in ("ppo", "random"):
+            env = OptoMechanicalMirrorEnv(material=mat, target_mass_kg=target, seed=1000 + ep, max_steps=steps)
+            obs = env.reset()
+            s0 = best = env.score(env.last_preds)
+            for _ in range(steps):
+                a = agent.policy.get_action(obs, deterministic=True)[0] if kind == "ppo" else rng.uniform(-1, 1, 5)
+                obs, r, done, info = env.step(a)
+                best = min(best, info["score"])
+            res[kind].append(s0 - best)
+    return {k: float(np.mean(v)) for k, v in res.items()}
+
+
+def train_and_save_ppo_policies(models_dir="optimizer/models", total_timesteps=24000, rollout_len=240):
     os.makedirs(models_dir, exist_ok=True)
     agent = PPOAgent()
-    materials = ["zerodur", "sic", "ule", "beryllium"]
-    results = {}
-
-    for mat in materials:
-        env = OptoMechanicalMirrorEnv(material=mat, topology="triangular_isogrid")
-        best_info = agent.train_environment(env, total_timesteps=1200, rollout_len=150)
-        optimized = agent.optimize_design(env)
-        results[mat] = optimized
-        print(f"--> PPO Optimized {mat.upper()}: Mass={optimized['mass_kg']} kg | Sag={optimized['rms_sag_nm']} nm | f1={optimized['frequency_hz']} Hz | All Passed={optimized['all_passed']}")
-
-    # Save policy weights
-    policy_path = os.path.join(models_dir, "ppo_mirror_policy.pt")
-    torch.save(agent.policy.state_dict(), policy_path)
-    print(f"\n[PPO SUCCESS] Saved unified policy weights to {policy_path}")
-    return results
+    before = evaluate_policy_vs_random(agent)
+    rng = np.random.default_rng(0)
+    steps = 0
+    while steps < total_timesteps:
+        mat = ["zerodur", "sic", "ule", "beryllium"][(steps // rollout_len) % 4]
+        env = OptoMechanicalMirrorEnv(material=mat, target_mass_kg=float(rng.uniform(9, 16)),
+                                      seed=int(rng.integers(1e9)), max_steps=30)
+        agent.train_environment(env, total_timesteps=rollout_len, rollout_len=rollout_len)
+        steps += rollout_len
+    after = evaluate_policy_vs_random(agent)
+    path = os.path.join(models_dir, "ppo_mirror_policy.pt")
+    torch.save(agent.policy.state_dict(), path)
+    report = {"timesteps": total_timesteps, "mean_objective_improvement_untrained_vs_random": before,
+              "mean_objective_improvement_trained_vs_random": after,
+              "trained_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+              "environment": "exact mass + FEA-trained GP sag surrogate"}
+    with open(os.path.join(models_dir, "ppo_training_report.json"), "w") as f:
+        json.dump(report, f, indent=2)
+    print(json.dumps(report, indent=2))
+    return report
 
 
 if __name__ == "__main__":

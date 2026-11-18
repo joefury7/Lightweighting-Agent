@@ -1,59 +1,53 @@
 """
-Local FastAPI Server uniting all 4 Pillars with Full Objectives 1, 2, 3 Implementation
-Exposes REST endpoints for:
-1. Real-time ML and Deep PINN prediction (with 37 Fringe Zernike Wavefront decomposition)
-2. Multi-Material Pareto Optimization (NSGA-II + PPO Reinforcement Learning across Zerodur, SiC, ULE, Beryllium)
-3. Generative CAD synthesis for all 8 pocket topologies with 18-point whiffletree mounts
-4. Siemens NX Open & NASTRAN SOL 101/103 Finite Element Analysis bridge
+Local FastAPI server for the mirror lightweighting studio.
+
+  /ml/predict, /surrogate/predict (/pinn/predict alias)  exact mass + FEA-trained sag/Zernike surrogate
+  /optimize, /optimize/nsga2, /optimize/unified ...        NSGA-II (+ PPO refinement) on the same evaluator
+  /fea/solve                                               genuine FEA of the exact geometry (NX Nastran if
+                                                           installed, else CalculiX); result is added to the
+                                                           FEA dataset and the surrogate is refitted
+  /cad/exact_mass                                          exact mass of ANY app journal (journal replica)
+  /nx/mass_report                                          record NX-measured mass and compare with the app
 """
 
+import json
 import os
 import sys
-from typing import Optional, List, Dict, Any
+import time
+from typing import Optional, Dict, Any
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-# Ensure workspace root is in sys.path
 workspace_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
 from ml_engine.surrogate_inference import MirrorSurrogatePredictor
-from ml_engine.pinn_inference import PINNMirrorPredictor
+from ml_engine.pinn_inference import ZernikeSurrogatePredictor
+from ml_engine.fea_surrogate import get_surrogate
 from optimizer.closed_loop_optimizer import ClosedLoopOptimizer
 from optimizer.multi_material_optimizer import MultiMaterialOptimizer
 from nx_bridge.nx_fea_analysis_agent import NXFEAAnalysisEngine
-from cad_engine.cad_generator import (
-    MirrorCADGenerator, synthesize_all_8_topologies, TOPOLOGY_CATALOG
-)
+from cad_engine.journal_replica import replica_mass
 
-app = FastAPI(
-    title="Autonomous Generative Space Mirror Lightweighting Agent API",
-    description="Dual-AI Optomechanical Optimization, Deep PINN Surrogate, and Multi-Material Digital Twin",
-    version="3.0.0"
-)
+app = FastAPI(title="Space Mirror Lightweighting Studio API",
+              description="Exact NX-geometry mass, FEA-trained surrogate, NSGA-II/PPO, genuine FEA verification",
+              version="4.0.0")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Initialize engines
 predictor = MirrorSurrogatePredictor()
-pinn_predictor = PINNMirrorPredictor()
+zernike_predictor = ZernikeSurrogatePredictor()
 optimizer = ClosedLoopOptimizer()
 multi_mat_optimizer = MultiMaterialOptimizer()
 fea_engine = NXFEAAnalysisEngine()
+NX_REPORTS = os.path.join(workspace_root, "data", "nx", "nx_mass_reports.jsonl")
 
 
 class MirrorDesignInput(BaseModel):
     D_mm: float = 560.0
-    Dc_mm: float = 120.0
+    Dc_mm: float = 175.0
     H_mm: float = 73.7
     tf_mm: float = 1.0
     tw_mm: float = 3.0
@@ -66,7 +60,7 @@ class MirrorDesignInput(BaseModel):
 
 class OptimizeRequest(BaseModel):
     D_mm: float = 560.0
-    Dc_mm: float = 120.0
+    Dc_mm: float = 175.0
     H_mm: float = 73.7
     max_mass_kg: float = 12.0
     max_sag_nm: float = 60.0
@@ -78,7 +72,7 @@ class OptimizeRequest(BaseModel):
 
 class MultiMaterialOptimizeRequest(BaseModel):
     D_mm: float = 560.0
-    Dc_mm: float = 120.0
+    Dc_mm: float = 175.0
     H_mm: float = 73.7
     target_mass_kg: float = 12.0
     max_sag_nm: float = 60.0
@@ -89,7 +83,7 @@ class MultiMaterialOptimizeRequest(BaseModel):
 
 class UnifiedOptimizeRequest(BaseModel):
     D_mm: float = 560.0
-    Dc_mm: float = 120.0
+    Dc_mm: float = 175.0
     H_mm: float = 73.7
     max_mass_kg: float = 12.0
     target_mass_kg: Optional[float] = None
@@ -104,346 +98,204 @@ class ChatRequest(BaseModel):
     prompt: str
 
 
+class JournalRequest(BaseModel):
+    journal_code: str
+    material: Optional[str] = "zerodur"
+
+
+class NXMassReport(BaseModel):
+    nx_mass_kg: float
+    nx_volume_mm3: Optional[float] = None
+    pocket_count_nx: Optional[int] = None
+    pockets_failed: Optional[int] = None
+    prt_path: Optional[str] = None
+    parameters: Optional[Dict[str, Any]] = None
+    journal_code: Optional[str] = None
+
+
+def _err(e):
+    raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/api/health")
 def health_check():
+    from fea_engine.mirror_fea import find_nastran
+    sur = get_surrogate()
+    val = os.path.join(workspace_root, "data", "fea", "surrogate_validation.json")
     return {
         "status": "ONLINE",
-        "pillars": {
-            "pillar_1_agent": "FastAPI + Local LLM Qwen2.5-Coder Middleware Active",
-            "pillar_2_surrogate": "Multi-Output XGBoost + PyTorch Deep Residual PINN (< 0.5 ms) Active",
-            "pillar_3_optimizer": "NSGA-II Genetic Algorithm + PPO Reinforcement Learning Ready",
-            "pillar_4_fea_nx": "Siemens NX Open & NASTRAN SOL 101/103 Digital Twin Bridge Ready"
-        },
-        "objectives_status": {
-            "objective_1_cad": "8 Pocket Topologies + 18-Point Kinematic Whiffletree Mount Active",
-            "objective_2_pinn": "Physics-Informed Neural Network + 37-Term Fringe Zernike Active",
-            "objective_3_rl_materials": "PPO/SAC + NSGA-II across Zerodur, SiC, ULE, and Beryllium Active"
-        }
+        "mass": "exact NX-journal geometry (validated against OpenCascade solid, 0.0000 g)",
+        "sag_surrogate": {"type": "Gaussian process", **sur.meta,
+                          "validation": json.load(open(val)) if os.path.exists(val) else None},
+        "fea_solver_available": {"nx_nastran": find_nastran(), "calculix": bool(__import__("shutil").which("ccx") or os.environ.get("CCX_EXE"))},
+        "nx_installed": fea_engine.is_nx_installed(),
+        "analytic_only": ["quilting_nm", "frequency_hz"],
     }
 
 
 @app.post("/ml/predict")
 def predict_metrics(design: MirrorDesignInput):
-    """
-    Sub-millisecond prediction from Pillar 2 ML Surrogate.
-    """
     try:
-        res = predictor.predict(
-            design.D_mm, design.Dc_mm, design.H_mm,
-            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm
-        )
-        return res
+        return predictor.predict(design.D_mm, design.Dc_mm, design.H_mm, design.tf_mm, design.tw_mm, design.L_mm,
+                                 design.rf_mm, material=design.material or "zerodur", topology=design.topology or "triangular_isogrid")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
 @app.get("/ml/predict")
-def predict_metrics_get(
-    D_mm: float = 560.0, Dc_mm: float = 120.0, H_mm: float = 73.7,
-    tf_mm: float = 1.0, tw_mm: float = 3.0, L_mm: float = 55.5, rf_mm: float = 3.0
-):
-    """GET endpoint for ML XGBoost surrogate evaluation with query parameters."""
+def predict_metrics_get(D_mm: float = 560.0, Dc_mm: float = 175.0, H_mm: float = 73.7, tf_mm: float = 1.5,
+                        tw_mm: float = 3.0, L_mm: float = 55.5, rf_mm: float = 3.0, material: str = "zerodur"):
     try:
-        return predictor.predict(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm)
+        return predictor.predict(D_mm, Dc_mm, H_mm, tf_mm, tw_mm, L_mm, rf_mm, material=material)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
+@app.post("/surrogate/predict")
 @app.post("/pinn/predict")
-def predict_pinn_with_zernike(design: MirrorDesignInput):
-    """
-    Objective 2: Sub-millisecond evaluation via PyTorch Deep Residual PINN.
-    Returns scalar metrics AND full 37-term Fringe Zernike wavefront coefficients.
-    """
+def predict_with_zernike(design: MirrorDesignInput):
     try:
-        return pinn_predictor.predict(
-            D_mm=design.D_mm, Dc_mm=design.Dc_mm, H_mm=design.H_mm,
-            tf_mm=design.tf_mm, tw_mm=design.tw_mm, L_mm=design.L_mm, rf_mm=design.rf_mm,
-            material=design.material or "zerodur", topology=design.topology or "triangular_isogrid"
-        )
+        return zernike_predictor.predict(D_mm=design.D_mm, Dc_mm=design.Dc_mm, H_mm=design.H_mm, tf_mm=design.tf_mm,
+                                         tw_mm=design.tw_mm, L_mm=design.L_mm, rf_mm=design.rf_mm,
+                                         material=design.material or "zerodur",
+                                         topology=_topo(design.topology))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
-@app.get("/pinn/predict")
-def predict_pinn_with_zernike_get(
-    D_mm: float = 560.0, Dc_mm: float = 120.0, H_mm: float = 73.7,
-    tf_mm: float = 1.0, tw_mm: float = 3.0, L_mm: float = 55.5, rf_mm: float = 3.0,
-    material: str = "zerodur", topology: str = "triangular_isogrid"
-):
-    """GET endpoint for instant PINN surrogate evaluation with query parameters."""
-    try:
-        return pinn_predictor.predict(
-            D_mm=D_mm, Dc_mm=Dc_mm, H_mm=H_mm,
-            tf_mm=tf_mm, tw_mm=tw_mm, L_mm=L_mm, rf_mm=rf_mm,
-            material=material or "zerodur", topology=topology or "triangular_isogrid"
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def _topo(t):
+    return "triangular_isogrid" if (t or "isogrid") in ("isogrid", "triangular_isogrid") else t
 
 
 @app.post("/optimize")
-def run_pareto_optimization(req: OptimizeRequest):
-    """
-    Evaluates candidate geometries using Pillar 3 & Pillar 2.
-    """
-    try:
-        best_design = optimizer.optimize(
-            req.D_mm, req.Dc_mm, req.H_mm,
-            req.max_mass_kg, req.max_sag_nm, req.num_candidates,
-            mode=req.mode
-        )
-        return best_design
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @app.post("/optimize/nsga2")
 def run_nsga2_optimization(req: OptimizeRequest):
-    """
-    Vectorized NSGA-II Multi-Objective Genetic Algorithm with non-dominated sorting and crowding distance.
-    """
     try:
-        best_design = optimizer.optimize_nsga2(
-            req.D_mm, req.Dc_mm, req.H_mm, req.max_mass_kg, req.max_sag_nm,
-            mode=req.mode
-        )
-        return best_design
+        return optimizer.optimize_nsga2(req.D_mm, req.Dc_mm, req.H_mm, req.max_mass_kg, req.max_sag_nm,
+                                        mode=req.mode, material=req.material or "zerodur")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
 @app.post("/optimize/multi_material")
 def run_multi_material_optimization(req: MultiMaterialOptimizeRequest):
-    """
-    Objective 3: Optimizes across Zerodur, SiC, ULE, and Beryllium using NSGA-II or PPO RL.
-    """
     try:
         if req.algorithm == "all_materials":
-            return multi_mat_optimizer.run_cross_material_trade_study(
-                D_mm=req.D_mm, Dc_mm=req.Dc_mm, H_mm=req.H_mm,
-                target_mass_kg=req.target_mass_kg, max_sag_nm=req.max_sag_nm
-            )
-        elif req.algorithm == "ppo":
-            return multi_mat_optimizer.optimize_material_rl_ppo(
-                material=req.material, topology=req.topology,
-                D_mm=req.D_mm, Dc_mm=req.Dc_mm,
-                target_mass_kg=req.target_mass_kg, target_sag_nm=req.max_sag_nm
-            )
-        else:
-            return multi_mat_optimizer.optimize_material_nsga2(
-                material=req.material, topology=req.topology,
-                D_mm=req.D_mm, Dc_mm=req.Dc_mm, H_mm=req.H_mm,
-                target_mass_kg=req.target_mass_kg, max_sag_nm=req.max_sag_nm
-            )
+            return multi_mat_optimizer.run_cross_material_trade_study(req.D_mm, req.Dc_mm, req.H_mm, req.target_mass_kg, req.max_sag_nm)
+        if req.algorithm == "ppo":
+            return multi_mat_optimizer.optimize_material_rl_ppo(req.material, _topo(req.topology), req.D_mm, req.Dc_mm,
+                                                                req.target_mass_kg, req.max_sag_nm, H_mm=req.H_mm)
+        return multi_mat_optimizer.optimize_material_nsga2(req.material, _topo(req.topology), req.D_mm, req.Dc_mm, req.H_mm,
+                                                           req.target_mass_kg, req.max_sag_nm)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
 @app.post("/optimize/rl_ppo")
 def run_ppo_rl_optimization(req: MultiMaterialOptimizeRequest):
-    """
-    Objective 3: Dedicated PPO Reinforcement Learning policy optimization endpoint.
-    """
     try:
-        return multi_mat_optimizer.optimize_material_rl_ppo(
-            material=req.material, topology=req.topology,
-            D_mm=req.D_mm, Dc_mm=req.Dc_mm,
-            target_mass_kg=req.target_mass_kg, target_sag_nm=req.max_sag_nm
-        )
+        return multi_mat_optimizer.optimize_material_rl_ppo(req.material, _topo(req.topology), req.D_mm, req.Dc_mm,
+                                                            req.target_mass_kg, req.max_sag_nm, H_mm=req.H_mm)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
 @app.post("/optimize/unified")
 def run_unified_optimization(req: UnifiedOptimizeRequest):
-    """
-    Cooperative Two-Stage Coarse-to-Fine Optimization Pipeline:
-    1. Stage 1: NSGA-II + XGBoost explores global design space across 16,000+ candidates -> finds macro Pareto seed.
-    2. Stage 2: PPO Reinforcement Learning takes NSGA-II seed and fine-tunes continuous variables via Deep PINN.
-    3. Stage 3: Deep PINN evaluates refined champion and computes full 37-term Fringe Zernike wavefront decomposition.
-    """
-    mat = req.material or "zerodur"
-    top = req.topology or "triangular_isogrid"
-    eff_target_mass = req.target_mass_kg if req.target_mass_kg is not None else req.max_mass_kg
-
+    target = req.target_mass_kg if req.target_mass_kg is not None else req.max_mass_kg
     try:
-        coop_res = multi_mat_optimizer.run_cooperative_pipeline(
-            material=mat,
-            topology=top,
-            D_mm=req.D_mm,
-            Dc_mm=req.Dc_mm,
-            H_mm=req.H_mm,
-            target_mass_kg=eff_target_mass,
-            max_sag_nm=req.max_sag_nm,
-            mode=req.mode or "target"
-        )
-        return coop_res
-    except Exception as e_coop:
-        print(f"[Unified Pipeline Exception]: {e_coop}")
-        import traceback
-        traceback.print_exc()
-        try:
-            nsga2_res = optimizer.optimize_nsga2(
-                req.D_mm, req.Dc_mm, req.H_mm, eff_target_mass, req.max_sag_nm,
-                mode=req.mode or "target"
-            )
-            pinn_eval = pinn_predictor.predict(
-                D_mm=req.D_mm, Dc_mm=req.Dc_mm, H_mm=nsga2_res.get("H_mm", req.H_mm),
-                tf_mm=nsga2_res.get("tf_mm", 1.0), tw_mm=nsga2_res.get("tw_mm", 3.0),
-                L_mm=nsga2_res.get("L_mm", 55.5), rf_mm=nsga2_res.get("rf_mm", 3.0),
-                material=mat, topology=top
-            )
-            return {
-                "status": "FALLBACK_NSGA2",
-                "pipeline": "NSGA-II + PINN",
-                "winner": "nsga2",
-                "winner_reason": f"Fallback NSGA-II GA: {e_coop}",
-                "best": pinn_eval,
-                "handoff": {
-                    "handoff_message": f"NSGA-II Seed: {nsga2_res.get('mass_kg')} kg | Sag: {nsga2_res.get('rms_sag_nm')} nm"
-                },
-                "nsga2_seed": nsga2_res,
-                "pinn_zernike": pinn_eval
-            }
-        except Exception as e_fallback:
-            raise HTTPException(status_code=500, detail=f"Optimization failed: {e_fallback}")
-
-
-@app.get("/cad/topologies")
-def get_synthesized_topologies(D_mm: float = 560.0, Dc_mm: float = 120.0, H_mm: float = 73.7,
-                               tf_mm: float = 1.0, tw_mm: float = 3.0, L_mm: float = 55.5,
-                               rf_mm: float = 3.0, material: str = "zerodur"):
-    """
-    Objective 1: Synthesizes and returns specifications for all 8 pocket topologies with 18-point whiffletree mounts.
-    """
-    try:
-        return synthesize_all_8_topologies(
-            D_mm=D_mm, Dc_mm=Dc_mm, H_mm=H_mm, tf_mm=tf_mm, tw_mm=tw_mm,
-            L_mm=L_mm, rf_mm=rf_mm, material=material
-        )
+        return multi_mat_optimizer.run_cooperative_pipeline(material=req.material or "zerodur", topology=_topo(req.topology),
+                                                            D_mm=req.D_mm, Dc_mm=req.Dc_mm, H_mm=req.H_mm,
+                                                            target_mass_kg=target, max_sag_nm=req.max_sag_nm,
+                                                            mode=req.mode or "target")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
-@app.post("/cad/generate_all_nx_journals")
-def generate_nx_journals_all_8_topologies(design: MirrorDesignInput):
-    """
-    Objective 1: Generates Siemens NX Open Python journal scripts for each of the 8 pocket topologies.
-    """
+@app.post("/cad/exact_mass")
+def exact_mass_from_journal(req: JournalRequest):
+    """Exact mass of whatever geometry the given NX journal builds (any pattern)."""
     try:
-        output_files = {}
-        for top in TOPOLOGY_CATALOG:
-            gen = MirrorCADGenerator(
-                D_mm=design.D_mm, Dc_mm=design.Dc_mm, H_mm=design.H_mm,
-                tf_mm=design.tf_mm, tw_mm=design.tw_mm, L_mm=design.L_mm,
-                rf_mm=design.rf_mm, topology=top, material=design.material or "zerodur"
-            )
-            journal_path = gen.generate_nx_open_journal()
-            output_files[top] = journal_path
-        return {"status": "SUCCESS", "nx_journals": output_files}
+        r = replica_mass(req.journal_code)
+        return {k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
+
+
+@app.post("/nx/mass_report")
+def nx_mass_report(rep: NXMassReport):
+    """Store the mass NX measured for a built part and compare it with the app's exact prediction."""
+    try:
+        app_mass = None
+        if rep.journal_code:
+            app_mass = replica_mass(rep.journal_code)["mass_kg"]
+        rec = rep.dict()
+        rec.pop("journal_code", None)
+        rec["app_exact_mass_kg"] = app_mass
+        rec["difference_g"] = None if app_mass is None else round((rep.nx_mass_kg - app_mass) * 1000, 3)
+        rec["timestamp"] = time.strftime("%Y-%m-%d %H:%M:%S")
+        os.makedirs(os.path.dirname(NX_REPORTS), exist_ok=True)
+        with open(NX_REPORTS, "a") as f:
+            f.write(json.dumps(rec) + "\n")
+        return rec
+    except Exception as e:
+        _err(e)
 
 
 @app.post("/fea/solve")
 def run_fea_validation(design: MirrorDesignInput):
-    """
-    Runs NASTRAN SOL 101 ground-truth FEA validation via Pillar 4.
-    """
+    """Genuine FEA (takes ~1-3 min). Compares with the surrogate and adds the result to the dataset."""
     try:
-        fea_res = fea_engine.run_fea_solve(
-            design.D_mm, design.Dc_mm, design.H_mm,
-            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm
-        )
-        ml_pred = predictor.predict(
-            design.D_mm, design.Dc_mm, design.H_mm,
-            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm
-        )
-        residual_entry = optimizer.log_fea_residual(
-            design.dict(), ml_pred["rms_sag_nm"],
-            fea_res["actual_rms_sag_nm"], fea_res["actual_mass_kg"]
-        )
-        return {
-            "fea_results": fea_res,
-            "ml_comparison": ml_pred,
-            "active_learning_residual": residual_entry
-        }
+        mat = design.material or "zerodur"
+        pred = predictor.predict(design.D_mm, design.Dc_mm, design.H_mm, design.tf_mm, design.tw_mm, design.L_mm,
+                                 design.rf_mm, material=mat)
+        fea = fea_engine.run_fea_solve(design.D_mm, design.Dc_mm, design.H_mm, design.tf_mm, design.tw_mm,
+                                       design.L_mm, design.rf_mm, material=mat)
+        gap = 100.0 * (pred["rms_sag_nm"] - fea["actual_rms_sag_nm"]) / fea["actual_rms_sag_nm"]
+        stored = {"stored": False}
+        if mat == "zerodur":
+            d = design.dict()
+            d["material"] = mat
+            stored = optimizer.add_fea_record(d, fea["raw"] | {"zernike_fringe_37_nm": fea["zernike_fringe_37_nm"]},
+                                              source="nx_nastran" if "Nastran" in fea["solver"] else "calculix")
+        return {"fea_results": fea, "surrogate_prediction": pred, "ml_comparison": pred,
+                "surrogate_vs_fea_gap_pct": round(gap, 2), "dataset_update": stored}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
 @app.get("/active_learning/status")
-def get_active_learning_status():
-    """Returns status of the active learning online residual compensator."""
-    try:
-        return predictor.active_learner.get_status()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.get("/fea/status")
+def get_fea_status():
+    sur = get_surrogate()
+    return {"active_learning_enabled": True, "sample_count": sur.meta.get("n_training_records", 0), **sur.meta}
 
 
 @app.post("/active_learning/retrain")
-def trigger_active_learning_retrain():
-    """Triggers online retraining of the active learning compensator using all buffer entries."""
-    try:
-        success = predictor.active_learner.train_from_buffer()
-        return {
-            "success": success,
-            "status": predictor.active_learner.get_status()
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def trigger_retrain():
+    sur = get_surrogate(refresh=True)
+    return {"success": True, "status": sur.meta}
 
 
 @app.post("/agent/chat")
 def agent_chat_endpoint(req: ChatRequest):
-    """
-    Conversational engineering agent endpoint powered by local Qwen2.5-Coder:7b (Ollama).
-    """
     try:
         from server.agent_orchestrator import OptoMechanicalAgent
         agent = OptoMechanicalAgent()
         reply = agent.chat(req.prompt)
-        return {
-            "response": reply["text"],
-            "is_workflow": reply.get("is_workflow", False),
-            "best_design": reply.get("best_design"),
-            "fea": reply.get("fea_verification"),
-            "model": "qwen2.5-coder:7b"
-        }
+        return {"response": reply["text"], "is_workflow": reply.get("is_workflow", False),
+                "best_design": reply.get("best_design"), "fea": reply.get("fea_verification"), "model": "qwen2.5-coder:7b"}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
 @app.post("/cad/create_prt")
 def create_nx_prt_file(design: MirrorDesignInput):
-    """
-    Executes Siemens NX Open to build and save the native 3D .prt CAD part.
-    """
     try:
-        prt_result = fea_engine.create_3d_prt(
-            design.D_mm, design.Dc_mm, design.H_mm,
-            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm,
-            journal_code=design.journal_code
-        )
-        return prt_result
+        return fea_engine.create_3d_prt(design.D_mm, design.Dc_mm, design.H_mm, design.tf_mm, design.tw_mm,
+                                        design.L_mm, design.rf_mm, journal_code=design.journal_code)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/cad/generate_journal")
-def generate_cad_journal(design: MirrorDesignInput):
-    """
-    Creates Siemens NX Open Python journal file.
-    """
-    try:
-        script_path = fea_engine.generate_nx_journal_script(
-            design.D_mm, design.Dc_mm, design.H_mm,
-            design.tf_mm, design.tw_mm, design.L_mm, design.rf_mm
-        )
-        return {"journal_script": script_path, "status": "GENERATED"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        _err(e)
 
 
 app.mount("/", StaticFiles(directory=workspace_root, html=True), name="static")

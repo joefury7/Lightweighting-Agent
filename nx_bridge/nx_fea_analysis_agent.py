@@ -1,7 +1,10 @@
 """
-Siemens NX Open CAD & Simcenter NASTRAN SOL 101 Engine (Pillar 4)
-Automates 3D CAD modeling (.prt), 18-hub star-vertex snapping, and 1G gravity FEA simulation.
-Includes headless journal generator for run_journal.exe and simulation parser.
+Siemens NX bridge (Pillar 4)
+  * create_3d_prt   - runs the app-exported NX Open journal with run_journal.exe, UNMODIFIED in
+                      geometry (only the headless "open/save part" wrapper is added), then opens NX.
+  * run_fea_solve   - genuine finite-element gravity analysis of the exact journal geometry:
+                      NX Nastran SOL 101 when nastran.exe is installed, otherwise CalculiX.
+                      (The previous version returned a closed-form formula labelled "NASTRAN".)
 """
 
 import os
@@ -18,7 +21,6 @@ if workspace_root not in sys.path:
     sys.path.insert(0, workspace_root)
 
 from optimizer.node_snapping import snap_18_whiffletree_hubs
-from ml_engine.surrogate_inference import MirrorSurrogatePredictor
 
 
 class NXFEAAnalysisEngine:
@@ -53,143 +55,11 @@ class NXFEAAnalysisEngine:
     def is_nx_installed(self):
         return self.run_journal_exe is not None and os.path.exists(self.run_journal_exe)
 
-    def generate_nx_journal_script(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0,
-                                  output_script="nx_bridge/build_mirror_journal.py",
-                                  target_prt="primary_mirror_560mm.prt"):
-        """
-        Creates a standalone Python journal script executable by Siemens NX Open (run_journal.exe or GUI Journal Play).
-        Models:
-        1. Outer primary mirror blank (Cylinder D x H)
-        2. Center bore hole (Cylinder Dc x H subtracted)
-        3. Triangular isogrid pocket cavities (pocket depth H - tf, rib thickness tw, cell pitch L)
-        4. 18-point Whiffletree kinematic support hubs on 3-rib star nodes
-        5. SCHOTT Zerodur material property assignment
-        6. Native .PRT file export
-        """
-        hubs = snap_18_whiffletree_hubs(D, L, Dc)
-        abs_prt = os.path.abspath(target_prt).replace("\\", "/")
-
-        script_content = f'''# ==============================================================================
-# Siemens NX Open Python Journal: Automated Space Mirror 3D CAD Modeler
-# Generates native .prt geometry with 18-point Whiffletree kinematic mounting pads
-# ==============================================================================
-import NXOpen
-import NXOpen.UF
-import NXOpen.Features
-import NXOpen.GeometricUtilities
-import math
-import os
-
-def main():
-    theSession = NXOpen.Session.GetSession()
-    theUFSession = NXOpen.UF.UFSession.GetUFSession()
-    
-    # Mirror Design Specifications
-    D = {D}        # Clear Aperture Diameter (mm)
-    Dc = {Dc}      # Center Bore Hole (mm)
-    H = {H}        # Overall Axial Height (mm)
-    tf = {tf}      # Faceplate Thickness (mm)
-    tw = {tw}      # Rib Wall Thickness (mm)
-    L = {L}        # Isogrid Cell Inscribed Pitch (mm)
-    rf = {rf}      # Fillet Radius (mm)
-    
-    hubs = {hubs}  # 18 Snapped Whiffletree Hub Coordinates
-    
-    prt_path = r"{abs_prt}"
-    
-    # 1. Create or open display part
-    try:
-        if os.path.exists(prt_path):
-            os.remove(prt_path)
-    except Exception:
-        pass
-        
-    workPart = theSession.Parts.NewDisplay(prt_path, NXOpen.Part.Units.Millimeters)
-    theSession.LogFile.WriteLine(f"[NX Open] Generating 3D Mirror CAD: D={{D}}mm, H={{H}}mm, tf={{tf}}mm, tw={{tw}}mm, L={{L}}mm...")
-    
-    # 2. Cylindrical Solid Blank Feature
-    cylinderBuilder = workPart.Features.CreateCylinderBuilder(NXOpen.Features.Feature.Null)
-    cylinderBuilder.Diameter.RightHandSide = str(D)
-    cylinderBuilder.Height.RightHandSide = str(H)
-    cylinderBuilder.Origin = NXOpen.Point3d(0.0, 0.0, 0.0)
-    cylinderBuilder.Direction = NXOpen.Vector3d(0.0, 0.0, 1.0)
-    cylinderFeature = cylinderBuilder.Commit()
-    cylinderBuilder.Destroy()
-    blankBody = cylinderFeature.GetBodies()[0]
-    
-    # 3. Center Hole Bore (Subtracted)
-    if Dc > 0.0:
-        boreBuilder = workPart.Features.CreateCylinderBuilder(NXOpen.Features.Feature.Null)
-        boreBuilder.Diameter.RightHandSide = str(Dc)
-        boreBuilder.Height.RightHandSide = str(H + 20.0)
-        boreBuilder.Origin = NXOpen.Point3d(0.0, 0.0, -10.0)
-        boreBuilder.Direction = NXOpen.Vector3d(0.0, 0.0, 1.0)
-        boreBuilder.BooleanOption.Type = NXOpen.GeometricUtilities.BooleanOperation.BooleanType.Subtract
-        boreBuilder.BooleanOption.SetTargetBodies([blankBody])
-        boreFeature = boreBuilder.Commit()
-        boreBuilder.Destroy()
-
-    # 4. Mill Isogrid Pocket Cavities over Pocket Zone
-    R = D / 2.0
-    Rc = Dc / 2.0
-    pocket_depth = H - tf
-    w_rim = 5.0
-    r_in = Rc + w_rim
-    r_out = R - w_rim
-
-    dx = L
-    dy = L * math.sqrt(3.0) / 2.0
-    nx = int(math.ceil(D / dx)) + 1
-    ny = int(math.ceil(D / dy)) + 1
-    pocket_dia = max(10.0, L - 2.0 * tw / math.sqrt(3.0))
-
-    pockets_created = 0
-    for j in range(-ny, ny + 1):
-        py = j * dy
-        x_off = (dx / 2.0) if (j % 2 != 0) else 0.0
-        for i in range(-nx, nx + 1):
-            px = i * dx + x_off
-            dist = math.hypot(px, py)
-            if (r_in + pocket_dia/2.0) <= dist <= (r_out - pocket_dia/2.0):
-                near_hub = any(math.hypot(px - hx, py - hy) < 14.0 for hx, hy in hubs)
-                if not near_hub:
-                    pBuilder = workPart.Features.CreateCylinderBuilder(NXOpen.Features.Feature.Null)
-                    pBuilder.Diameter.RightHandSide = str(round(pocket_dia, 2))
-                    pBuilder.Height.RightHandSide = str(round(pocket_depth + 5.0, 2))
-                    pBuilder.Origin = NXOpen.Point3d(px, py, tf)
-                    pBuilder.Direction = NXOpen.Vector3d(0.0, 0.0, 1.0)
-                    pBuilder.BooleanOption.Type = NXOpen.GeometricUtilities.BooleanOperation.BooleanType.Subtract
-                    pBuilder.BooleanOption.SetTargetBodies([blankBody])
-                    pFeat = pBuilder.Commit()
-                    pBuilder.Destroy()
-                    pockets_created += 1
-
-    theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Milled {{pockets_created}} isogrid pocket cavities.")
-
-    # 4b. Assign Zerodur Material and Parasolid Density (2.53e-6 kg/mm3)
-    try:
-        theUf = NXOpen.UF.UFSession.GetUFSession()
-        theUf.Modeling.SetDefaultDensity(2530.0, theUf.Modl.DensityUnits.KILOGRAMS_METERS)
-        theUf.Modeling.SetBodyDensity(blankBody.Tag, theUf.Modl.DensityUnits.KILOGRAMS_METERS, 2530.0)
-        theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Assigned Zerodur body density: 2530.0 kg/m3 (2.53e-6 kg/mm3)")
-    except Exception as e_mat:
-        theSession.LogFile.WriteLine(f"[NX Open Note] Material density note: {{e_mat}}")
-
-    # 5. Save Native NX Part
-    try:
-        workPart.Save(NXOpen.BasePart.SaveComponents.TrueValue, NXOpen.BasePart.CloseAfterSave.FalseValue)
-        theSession.LogFile.WriteLine(f"[NX Open SUCCESS] Saved native CAD model to: {{prt_path}}")
-        print(f"[NX Open SUCCESS] Model generated with {{pockets_created}} isogrid cavities: {{prt_path}}")
-    except Exception as e:
-        theSession.LogFile.WriteLine(f"[NX Open] Save note: {{e}}")
-
-if __name__ == '__main__':
-    main()
-'''
-        os.makedirs(os.path.dirname(output_script), exist_ok=True)
-        with open(output_script, "w", encoding="utf-8") as f:
-            f.write(script_content)
-        return output_script
+    def generate_nx_journal_script(self, *args, **kwargs):
+        """The only valid journal is the one generated by the app (app.js generateNXCode), so the
+        NX part always has the same design the app shows.  The old fallback here built a different
+        design (circular pockets) and has been removed."""
+        raise RuntimeError("Export the journal from the app (Generate NX Code) and pass it as journal_code.")
 
     def create_3d_prt(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0, target_prt="primary_mirror_560mm.prt", journal_code=None):
         """
@@ -241,21 +111,17 @@ if __name__ == '__main__':'''
             else:
                 patched_code += '\n' + save_block
 
-            # Defensively sanitize any stale pocket boundary conditions from cached browser sessions
-            if "(d + r_corner > max_r)" in patched_code:
-                patched_code = patched_code.replace(
-                    "if (d + r_corner > max_r) or (d - r_corner < CENTRAL_EXCLUDE_R):",
-                    "margin_tol = CELL_SIDE * 0.6\n                if d > max_r + margin_tol or d < max(5.0, CENTRAL_EXCLUDE_R - margin_tol):"
-                )
-            if "n_sub = 4" in patched_code:
-                patched_code = patched_code.replace("n_sub = 4", "n_sub = 1")
-
+            # NOTE: pocket geometry is never modified here (the old "sanitize" patch that rewrote
+            # pocket bounds / corner segments changed the design that NX built).
             with open(abs_journal, 'w', encoding='utf-8') as f:
                 f.write(patched_code)
             print(f"[Pillar 4 NX Bridge] Loaded exact UI exported journal ({len(patched_code)} bytes).")
         else:
-            journal_path = self.generate_nx_journal_script(D, Dc, H, tf, tw, L, rf, target_prt=target_prt)
-            abs_journal = os.path.abspath(journal_path)
+            return {
+                "status": "NO_JOURNAL",
+                "message": "No journal received from the app. Use the app's Create 3D Part button so the exact design is built.",
+                "nx_installed": self.is_nx_installed()
+            }
 
         if not self.is_nx_installed():
             return {
@@ -379,54 +245,29 @@ if __name__ == '__main__':'''
             "nx_installed": True
         }
 
-    def run_fea_solve(self, D=560.0, Dc=120.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0):
+    def run_fea_solve(self, D=560.0, Dc=175.0, H=73.7, tf=1.0, tw=3.0, L=55.5, rf=3.0,
+                      material="zerodur", mesh_size=8.0, solver_backend="auto"):
         """
-        Executes NASTRAN SOL 101 linear static solve using calibrated optomechanical equations.
+        Genuine linear-static FEA (1 g along the optical axis, 18 Hindle pads) of the exact
+        isogrid geometry the journal builds.  Uses NX Nastran (SOL 101) if installed, else CalculiX.
+        Returns optical surface RMS/PV (piston+tilt removed), power-removed RMS and 37 Zernikes.
         """
-        t0 = time.time()
-        R_m = (D / 2.0) / 1000.0
-        Rc_m = (Dc / 2.0) / 1000.0
-        H_m = H / 1000.0
-        tf_m = tf / 1000.0
-        tw_m = tw / 1000.0
-        L_m = L / 1000.0
-        pocket_d_m = H_m - tf_m
-
-        E = 90.3e9          # SCHOTT Zerodur Modulus (Pa)
-        nu = 0.24           # Poisson's ratio
-        rho = 2530.0        # Density (kg/m^3)
-        g = 9.80665         # Gravitational acceleration (m/s^2)
-
-        # NASA SP-8040 Bending Rigidity
-        D_star = ((E * (tf_m**3)) / (12.0 * (1.0 - nu**2))) * (1.0 + (tw_m / L_m) * ((pocket_d_m / tf_m)**3))
-
-        # Nelson 18-Point Whiffletree Gravity Sag (RMS & PV)
-        K_18 = 0.0000632   # NASTRAN-Calibrated: matches Run 306 benchmark (58.11nm @ 560mm Zerodur)
-        delta_rms_nm = (K_18 * (rho * g * (R_m**4)) / D_star) * 1e9
-        delta_pv_nm = delta_rms_nm * 3.82
-
-        # Exact CAD mass matching Siemens NX 3D Parasolid measure within <= 0.01 kg
-        actual_mass_kg = MirrorSurrogatePredictor.compute_exact_cad_mass(D, Dc, H, tf, tw, L, rf, rho=rho*1e-9)
-        A_gross = math.pi * (R_m**2 - Rc_m**2)
-        mass_solid = A_gross * H_m * rho
-
-        # Yoder Eq. 2.35 Polishing Quilting (B = L / sqrt(3), C_quilt = 0.00151 for triangular isogrid)
-        B_m = L_m / math.sqrt(3.0)
-        delta_quilt_nm = (0.00151 * (1378.95 * (B_m**4)) / (E * (tf_m**3))) * 1e9
-
-        solve_time = time.time() - t0
+        from fea_engine.mirror_fea import run_gravity_fea_params
+        res = run_gravity_fea_params(D, Dc, H, tf, tw, L, rf, material=material,
+                                     mesh_size=mesh_size, solver_backend=solver_backend)
         hubs = snap_18_whiffletree_hubs(D, L, Dc)
-
         return {
-            "solver": "Simcenter NASTRAN SOL 101 (CTETRA 10 Quad Mesh)",
+            "solver": res["solver"],
             "status": "CONVERGED",
-            "solve_duration_sec": round(solve_time, 3),
-            "actual_mass_kg": round(actual_mass_kg, 3),
-            "lightweight_pct": round(((mass_solid - actual_mass_kg) / mass_solid) * 100.0, 2),
-            "actual_rms_sag_nm": round(delta_rms_nm, 2),
-            "actual_pv_sag_nm": round(delta_pv_nm, 2),
-            "actual_quilting_nm": round(delta_quilt_nm, 2),
+            "solve_duration_sec": round(res["time_mesh_s"] + res["time_solve_s"], 1),
+            "actual_mass_kg": round(res["replica_mass_kg"], 4),
+            "fe_model_mass_kg": round(res["occ_mass_kg"], 4),
+            "actual_rms_sag_nm": round(res["rms_sag_nm"], 3),
+            "actual_pv_sag_nm": round(res["pv_sag_nm"], 3),
+            "actual_rms_sag_power_removed_nm": round(res["rms_sag_power_removed_nm"], 3),
+            "zernike_fringe_37_nm": res["zernike_fringe_37_nm"],
+            "mesh": {"size_mm": res["mesh_size_mm"], "nodes": res["n_nodes"], "elements": res["n_elements"]},
+            "reaction_check": {"support_reaction_N": res["reaction_z_wedge_N"], "weight_N": res["weight_wedge_N"]},
             "whiffletree_hubs_count": len(hubs),
-            "support_pad_type": "3-Rib Star-Vertex Rigid Kinematic Mounts",
-            "optical_pass": (delta_rms_nm <= 60.0 and actual_mass_kg <= 12.0 and delta_quilt_nm <= 30.0)
+            "raw": {k: v for k, v in res.items() if k != "zernike_fringe_37_nm"},
         }

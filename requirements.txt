@@ -1,0 +1,12 @@
+numpy
+scipy
+pandas
+scikit-learn
+shapely
+gmsh
+fastapi
+uvicorn
+pydantic
+torch
+openpyxl
+astropy

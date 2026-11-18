@@ -1,0 +1,10 @@
+{
+  "note": "Quarter-model C3D10, pads refined to 1.2 mm. Training dataset uses 8 mm global size.",
+  "pairs": [
+    {"design": {"faceplate": 1.5, "ribThick": 1.5, "cellSize": 64.7, "filletRadius": 10.0, "depth": 73.7},
+     "rms_sag_nm": {"mesh_8mm": 11.227, "mesh_6mm": 11.449}, "change_pct": 2.0},
+    {"design": {"faceplate": 3.2, "ribThick": 5.3, "cellSize": 46.4, "filletRadius": 3.9, "depth": 73.7},
+     "rms_sag_nm": {"mesh_8mm": 1.53, "mesh_6mm": 1.58}, "change_pct": 3.3}
+  ],
+  "without_pad_refinement": {"mesh_8mm": 20.42, "mesh_6mm": 12.75, "comment": "point-like supports are mesh dependent; pads must be modelled with finite area"}
+}
