@@ -7,6 +7,7 @@ Local FastAPI server for the mirror lightweighting studio.
                                                            installed, else CalculiX); result is added to the
                                                            FEA dataset and the surrogate is refitted
   /cad/exact_mass                                          exact mass of ANY app journal (journal replica)
+  /cad/preview_geometry                                    3D-viewer outlines of the journal geometry
   /nx/mass_report                                          record NX-measured mass and compare with the app
 """
 
@@ -218,6 +219,16 @@ def exact_mass_from_journal(req: JournalRequest):
     try:
         r = replica_mass(req.journal_code)
         return {k: (round(v, 6) if isinstance(v, float) else v) for k, v in r.items()}
+    except Exception as e:
+        _err(e)
+
+
+@app.post("/cad/preview_geometry")
+def preview_geometry_from_journal(req: JournalRequest):
+    """Outlines of exactly what the NX journal builds, for the 3D viewer (meshed in the browser)."""
+    try:
+        from cad_engine.preview_geometry import preview_geometry
+        return preview_geometry(req.journal_code)
     except Exception as e:
         _err(e)
 

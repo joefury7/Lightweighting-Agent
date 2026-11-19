@@ -362,6 +362,7 @@ def replica_mass(journal_code, return_details=False):
     v_added = 0.0
     n_pockets = 0
     pockets = []
+    unites = []
     for e in rec.extrudes:
         poly = _loop_polygon(e["curves"])
         if len(poly) < 3:
@@ -380,6 +381,7 @@ def replica_mass(journal_code, return_details=False):
             pockets.append({"poly": poly, "h": h, "area_in": a_in, "z_lo": z_lo, "z_hi": z_hi})
         elif e["bool"] == "unite":
             v_added += polygon_area(poly) * h
+            unites.append({"poly": poly, "z_lo": z_lo, "z_hi": z_hi})
     v_cad = v_blank - v_removed + v_added
     out = {
         "volume_mm3": v_cad,
@@ -392,6 +394,7 @@ def replica_mass(journal_code, return_details=False):
     }
     if return_details:
         out["pockets"] = pockets
+        out["unites"] = unites
         out["namespace"] = {k: ns[k] for k in ["RADIUS", "CENTRAL_HOLE_DIA", "TOTAL_DEPTH", "R_CURV",
                                                "CONIC_CONSTANT", "FACESHEET", "RIB_THICK", "CELL_SIDE"]}
         out["restored_bands"] = restored

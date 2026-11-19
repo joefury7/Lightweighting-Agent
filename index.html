@@ -257,16 +257,31 @@
 
       <div class="canvas-card">
         <div class="canvas-header">
-          <span class="pane-title"><i class="fa-solid fa-eye"></i> Structural layout preview</span>
-          <div class="canvas-legend">
+          <div class="seg view-seg">
+            <button type="button" class="seg-btn seg-active" data-view="3d"><i class="fa-solid fa-cube"></i> 3D model</button>
+            <button type="button" class="seg-btn" data-view="2d"><i class="fa-solid fa-table-cells"></i> 2D layout</button>
+          </div>
+          <div class="canvas-legend" id="legend-2d" style="display:none;">
             <span class="legend-item"><span class="dot dot-rim"></span> Outer rim</span>
             <span class="legend-item"><span class="dot dot-pocket"></span> <span id="legend-pattern-name">Pocket grid</span></span>
             <span class="legend-item"><span class="dot dot-hub"></span> Support pads</span>
           </div>
+          <div class="viewer-tools" id="tools-3d">
+            <span id="viewer3d-status" class="viewer-status"></span>
+            <button type="button" class="btn btn-icon" title="Isometric view (back)" onclick="Viewer3D.view('iso')"><i class="fa-solid fa-cube"></i></button>
+            <button type="button" class="btn btn-icon" title="Optical face" onclick="Viewer3D.view('front')"><i class="fa-solid fa-circle-dot"></i></button>
+            <button type="button" class="btn btn-icon" title="Back (pockets)" onclick="Viewer3D.view('back')"><i class="fa-solid fa-border-all"></i></button>
+            <button type="button" class="btn btn-icon" title="Side" onclick="Viewer3D.view('side')"><i class="fa-solid fa-arrows-left-right"></i></button>
+            <button type="button" class="btn btn-icon" id="btn-3d-section" title="Half section" onclick="this.classList.toggle('on', Viewer3D.toggleSection())"><i class="fa-solid fa-scissors"></i></button>
+            <button type="button" class="btn btn-icon" id="btn-3d-wire" title="Wireframe" onclick="this.classList.toggle('on', Viewer3D.toggleWire())"><i class="fa-solid fa-draw-polygon"></i></button>
+            <button type="button" class="btn btn-icon" title="Rebuild 3D from current parameters" onclick="Viewer3D.refresh(true)"><i class="fa-solid fa-rotate"></i></button>
+          </div>
         </div>
         <div class="canvas-body">
-          <canvas id="mirror-canvas" width="600" height="600"></canvas>
+          <div id="viewer3d" class="viewer3d"></div>
+          <canvas id="mirror-canvas" width="600" height="600" style="display:none;"></canvas>
         </div>
+        <div class="viewer-hint" id="hint-3d">Left-drag to rotate · scroll to zoom · right-drag to pan · rebuilt automatically after every optimisation</div>
       </div>
 
       <!-- NX Open journal: generated in the background for CAD creation and exact mass; not displayed -->
@@ -459,6 +474,27 @@
     if (chip) document.querySelector('[data-tab="tab-agent"]').click();
   });
 </script>
-<script src="app.js?v=20261119_ui2"></script>
+<script type="importmap">
+  { "imports": { "three": "./vendor/three/three.module.min.js" } }
+</script>
+<script type="module" src="viewer3d.js?v=1"></script>
+<script>
+  // 2D / 3D toggle
+  document.querySelectorAll('.view-seg .seg-btn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var is3d = b.getAttribute('data-view') === '3d';
+      document.querySelectorAll('.view-seg .seg-btn').forEach(function (x) { x.classList.toggle('seg-active', x === b); });
+      document.getElementById('viewer3d').style.display = is3d ? 'block' : 'none';
+      document.getElementById('mirror-canvas').style.display = is3d ? 'none' : 'block';
+      document.getElementById('tools-3d').style.display = is3d ? 'flex' : 'none';
+      document.getElementById('legend-2d').style.display = is3d ? 'none' : 'flex';
+      document.getElementById('hint-3d').style.display = is3d ? 'block' : 'none';
+      if (is3d && window.Viewer3D) window.Viewer3D.refresh();
+    });
+  });
+  // first build once the app has generated the initial geometry
+  window.addEventListener('load', function () { setTimeout(function () { if (window.Viewer3D) window.Viewer3D.refresh(); }, 800); });
+</script>
+<script src="app.js?v=20261119_ui3"></script>
 </body>
 </html>

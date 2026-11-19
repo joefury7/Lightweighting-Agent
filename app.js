@@ -672,6 +672,7 @@ async function executeNSGA2Optimization() {
     const modeLabel = optMode === 'target' ? `Target ${targetMass.toFixed(1)} kg` : 'Minimum Mass';
     const feasTxt = best.all_constraints_satisfied ? 'all constraints met' : 'NOT all constraints met';
     showSolverStatus(`NSGA-II (${modeLabel}, ${feasTxt}): Mass = ${mass.toFixed(3)} kg (exact), Sag = ${sag.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Run FEA to verify.`, !!best.all_constraints_satisfied);
+    if (window.Viewer3D) setTimeout(() => window.Viewer3D.refresh(), 60);  // 3D preview after every optimisation
   } catch (err) {
     showSolverStatus('Optimizer Error: ' + err.message + '. Backend unavailable - running the OFFLINE analytic grid search (not FEA-based).', false);
     autoSolveTargetMass();
@@ -3753,6 +3754,7 @@ async function executePPORLOptimization() {
     setTimeout(executeDeepPINNPredict, 100);
 
     showSolverStatus(`${best.optimization_algorithm} (${matVal.toUpperCase()}): Mass = ${best.mass_kg.toFixed(3)} kg (exact), Sag = ${best.rms_sag_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm)`, true);
+    if (window.Viewer3D) setTimeout(() => window.Viewer3D.refresh(), 60);  // 3D preview after every optimisation
   } catch (err) {
     showSolverStatus('PPO RL Error: ' + err.message + '. Using NSGA-II solver fallback.', false);
     executeNSGA2Optimization();
@@ -3851,6 +3853,7 @@ async function executeUnifiedOptimization() {
       ? `${data.handoff.handoff_message} | final: ${best.mass_kg.toFixed(3)} kg (exact), ${best.rms_sag_nm.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Use Verify with FEA to confirm.`
       : `Optimization complete: Mass = ${best.mass_kg.toFixed(3)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm`;
     showSolverStatus(sMsg, true);
+    if (window.Viewer3D) setTimeout(() => window.Viewer3D.refresh(), 60);  // 3D preview after every optimisation
   } catch (err) {
     showSolverStatus('Unified Optimizer Error: ' + err.message + '. Running fallback local NSGA-II solver...', false);
     executeNSGA2Optimization();

@@ -22,6 +22,8 @@ def main(n=25, seed=3):
         dt = (time.perf_counter() - t) * 1000
         js = float(subprocess.run(["node", os.path.join(ROOT, "tools", "exact_mass_cli.js"), json.dumps(p)], capture_output=True, text=True).stdout or "nan")
         err = max(abs(py - ref), abs(js - ref))
+        if err != err:   # NaN: a mass could not be computed -> fail loudly
+            err = float("inf")
         worst = max(worst, err)
         print(f"{i:02d} replica={ref:.6f}  python={py:.6f}  js={js:.6f}  |err|max={err*1000:.4f} g  ({dt:.1f} ms)")
     print(f"WORST |error| = {worst*1000:.4f} g")

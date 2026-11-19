@@ -1,7 +1,7 @@
 // node tools/exact_mass_cli.js '{"diameter":560,...}'  -> prints exact isogrid mass (kg) using app.js code
 const fs = require('fs'), vm = require('vm'), path = require('path');
 const src = fs.readFileSync(path.join(__dirname, '..', 'app.js'), 'utf8');
-const ctx = { document: { getElementById: () => null, addEventListener() {}, querySelectorAll: () => [] }, console, setTimeout: () => 0, addEventListener() {}, Math, JSON, Number, fetch: () => Promise.reject() };
+const ctx = { document: { readyState: 'loading', getElementById: () => null, addEventListener() {}, querySelectorAll: () => [], querySelector: () => null }, console, setTimeout: () => 0, clearTimeout() {}, setInterval: () => 0, clearInterval() {}, addEventListener() {}, Math, JSON, Number, fetch: () => Promise.reject(new Error('offline')) };
 ctx.window = ctx; vm.createContext(ctx);
 vm.runInContext(src + '\n;globalThis.__m = calculateExactIsogridMass;', ctx);
 const p = JSON.parse(process.argv[2]);
