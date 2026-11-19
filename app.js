@@ -237,18 +237,8 @@ function setOptimizationMode(mode) {
   const optBtnTop = document.getElementById('btn-nsga2-top');
 
   if (mode === 'target') {
-    if (btnTarget) {
-      btnTarget.style.borderColor = '#f093fb';
-      btnTarget.style.background = 'rgba(240,147,251,0.2)';
-      btnTarget.style.color = '#fff';
-      btnTarget.style.fontWeight = '600';
-    }
-    if (btnMin) {
-      btnMin.style.borderColor = 'rgba(0,242,254,0.4)';
-      btnMin.style.background = 'transparent';
-      btnMin.style.color = '#8a99ad';
-      btnMin.style.fontWeight = 'normal';
-    }
+    if (btnTarget) btnTarget.classList.add('seg-active');
+    if (btnMin) btnMin.classList.remove('seg-active');
     if (targetInp) {
       targetInp.readOnly = false;
       targetInp.style.opacity = '1';
@@ -258,32 +248,22 @@ function setOptimizationMode(mode) {
       hintEl.innerText = 'Forces geometry to lightweight to your custom target weight within ±0.01 kg.';
     }
     if (optBtn) {
-      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 Run 50k NSGA-II (Target Weight)';
+      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> Run 50k NSGA-II (Target Weight)';
     }
     if (optBtnTop) {
-      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 50k NSGA-II';
+      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 50k NSGA-II';
     }
     const unifiedBtn = document.getElementById('btn-optimize-unified');
     const unifiedBtnTop = document.getElementById('btn-optimize-unified-top');
     if (unifiedBtn) {
-      unifiedBtn.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize Mirror (Target Weight)';
+      unifiedBtn.innerHTML = '<i class="fa-solid fa-rocket"></i> Optimize Mirror (Target Weight)';
     }
     if (unifiedBtnTop) {
-      unifiedBtnTop.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize';
+      unifiedBtnTop.innerHTML = '<i class="fa-solid fa-rocket"></i> Optimize';
     }
   } else {
-    if (btnMin) {
-      btnMin.style.borderColor = '#00f2fe';
-      btnMin.style.background = 'rgba(0,242,254,0.2)';
-      btnMin.style.color = '#fff';
-      btnMin.style.fontWeight = '600';
-    }
-    if (btnTarget) {
-      btnTarget.style.borderColor = 'rgba(240,147,251,0.4)';
-      btnTarget.style.background = 'transparent';
-      btnTarget.style.color = '#8a99ad';
-      btnTarget.style.fontWeight = 'normal';
-    }
+    if (btnMin) btnMin.classList.add('seg-active');
+    if (btnTarget) btnTarget.classList.remove('seg-active');
     if (targetInp) {
       if (!isNaN(parseFloat(targetInp.value)) && parseFloat(targetInp.value) > 0) {
         state.customTargetMass = parseFloat(targetInp.value);
@@ -296,18 +276,18 @@ function setOptimizationMode(mode) {
       hintEl.innerText = 'Finds the absolute lightest feasible mirror meeting optical & quilting limits.';
     }
     if (optBtn) {
-      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 Run 50k NSGA-II (MIN Weight)';
+      optBtn.innerHTML = '<i class="fa-solid fa-dna"></i> Run 50k NSGA-II (MIN Weight)';
     }
     if (optBtnTop) {
-      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 🧬 50k NSGA-II (MIN)';
+      optBtnTop.innerHTML = '<i class="fa-solid fa-dna"></i> 50k NSGA-II (MIN)';
     }
     const unifiedBtnMin = document.getElementById('btn-optimize-unified');
     const unifiedBtnTopMin = document.getElementById('btn-optimize-unified-top');
     if (unifiedBtnMin) {
-      unifiedBtnMin.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize Mirror (MIN Weight)';
+      unifiedBtnMin.innerHTML = '<i class="fa-solid fa-rocket"></i> Optimize Mirror (MIN Weight)';
     }
     if (unifiedBtnTopMin) {
-      unifiedBtnTopMin.innerHTML = '<i class="fa-solid fa-rocket"></i> 🚀 Optimize (MIN)';
+      unifiedBtnTopMin.innerHTML = '<i class="fa-solid fa-rocket"></i> Optimize (MIN)';
     }
   }
 }
@@ -487,10 +467,10 @@ function showSolverStatus(message, statusType = 'success') {
       const elapsed = ((Date.now() - activeStartTime) / 1000).toFixed(1);
       box.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;">
-          <span style="background:rgba(0,242,254,0.22);color:#00f2fe;font-size:0.7rem;padding:2px 8px;border-radius:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
+          <span style="background:rgba(96,165,250,0.22);color:#60a5fa;font-size:0.7rem;padding:2px 8px;border-radius:10px;font-weight:700;display:inline-flex;align-items:center;gap:4px;">
             <i class="fa-solid fa-circle-notch fa-spin"></i> RUNNING NOW
           </span>
-          <span style="font-family:var(--font-mono);font-size:0.75rem;color:#00f2fe;font-weight:600;">${elapsed}s elapsed</span>
+          <span style="font-family:var(--font-mono);font-size:0.75rem;color:#60a5fa;font-weight:600;">${elapsed}s elapsed</span>
         </div>
         <div style="font-size:0.78rem;line-height:1.4;margin-top:0.2rem;">${message}</div>
       `;
@@ -503,8 +483,8 @@ function showSolverStatus(message, statusType = 'success') {
     const elapsedMsg = elapsedSec ? ` [in ${elapsedSec}s]` : '';
     activeStartTime = 0;
     const isSuccess = (type === 'success');
-    const badgeColor = isSuccess ? '#00e676' : '#ff5252';
-    const badgeBg = isSuccess ? 'rgba(0,230,118,0.2)' : 'rgba(255,82,82,0.2)';
+    const badgeColor = isSuccess ? '#22c55e' : '#ef4444';
+    const badgeBg = isSuccess ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)';
     const badgeIcon = isSuccess ? 'fa-circle-check' : 'fa-triangle-exclamation';
     const badgeText = isSuccess ? 'COMPLETED' : 'ERROR';
     const timeStr = new Date().toLocaleTimeString();
@@ -574,7 +554,7 @@ function requestSurrogateSag() {
       if (st) {
         const ok = d.rms_sag_nm <= 60.0;
         st.className = 'status-tag ' + (ok ? 'status-safe' : 'status-warning');
-        st.innerHTML = (ok ? '✅ PASS' : '⚠️ > 60 nm') + ' · FEA surrogate' + (d.in_validity_domain ? '' : ' (outside FEA range)');
+        st.innerHTML = (ok ? 'PASS' : '> 60 nm') + ' · FEA surrogate' + (d.in_validity_domain ? '' : ' (outside FEA range)');
       }
     } catch (e) {
       if (st) { st.className = 'status-tag status-warning'; st.innerHTML = 'Analytic estimate (backend offline)'; }
@@ -610,7 +590,7 @@ async function executeInstantMLPredict() {
   const lVal = parseFloat(document.getElementById('inp-cell-size').value) || state.cellSize;
   const rfVal = parseFloat(document.getElementById('inp-fillet-radius').value) || state.filletRadius;
 
-  showSolverStatus('⚡ Querying exact-mass + FEA-trained surrogate...', true);
+  showSolverStatus('Querying exact-mass + FEA-trained surrogate...', true);
   try {
     const res = await fetch('http://127.0.0.1:8000/ml/predict', {
       method: 'POST',
@@ -631,7 +611,7 @@ async function executeInstantMLPredict() {
     if (quiltEl) quiltEl.innerText = `${data.quilting_nm.toFixed(2)} nm`;
     if (freqEl) freqEl.innerText = `${Math.round(data.frequency_hz)} Hz`;
 
-    showSolverStatus(`⚡ Mass (exact NX geometry) = ${data.mass_kg.toFixed(3)} kg | RMS sag (FEA surrogate) = ${data.rms_sag_nm.toFixed(2)} ± ${data.rms_sag_std_nm.toFixed(2)} nm | quilting & f1 are analytic estimates${data.in_validity_domain ? '' : ' | WARNING: ' + data.validity_warnings.join('; ')}`, true);
+    showSolverStatus(`Mass (exact NX geometry) = ${data.mass_kg.toFixed(3)} kg | RMS sag (FEA surrogate) = ${data.rms_sag_nm.toFixed(2)} ± ${data.rms_sag_std_nm.toFixed(2)} nm | quilting & f1 are analytic estimates${data.in_validity_domain ? '' : ' | WARNING: ' + data.validity_warnings.join('; ')}`, true);
   } catch (err) {
     showSolverStatus('ML Predict Error: ' + err.message + '. Please ensure FastAPI server is running on port 8000.', false);
   }
@@ -648,8 +628,8 @@ async function executeNSGA2Optimization() {
   const optMode = isMin ? 'min' : 'target';
 
   const statusMsg = isMin
-    ? '🧬 Running AI Optimizer to find absolute MINIMUM mass meeting optical limits...'
-    : `🧬 Running AI Optimizer to lightweight mirror to TARGET weight: ${targetMass.toFixed(2)} kg...`;
+    ? 'Running AI Optimizer to find absolute MINIMUM mass meeting optical limits...'
+    : `Running AI Optimizer to lightweight mirror to TARGET weight: ${targetMass.toFixed(2)} kg...`;
   showSolverStatus(statusMsg, true);
   try {
     const res = await fetch('http://127.0.0.1:8000/optimize/nsga2', {
@@ -691,7 +671,7 @@ async function executeNSGA2Optimization() {
 
     const modeLabel = optMode === 'target' ? `Target ${targetMass.toFixed(1)} kg` : 'Minimum Mass';
     const feasTxt = best.all_constraints_satisfied ? 'all constraints met' : 'NOT all constraints met';
-    showSolverStatus(`🧬 NSGA-II (${modeLabel}, ${feasTxt}): Mass = ${mass.toFixed(3)} kg (exact), Sag = ${sag.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Run FEA to verify.`, !!best.all_constraints_satisfied);
+    showSolverStatus(`NSGA-II (${modeLabel}, ${feasTxt}): Mass = ${mass.toFixed(3)} kg (exact), Sag = ${sag.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Run FEA to verify.`, !!best.all_constraints_satisfied);
   } catch (err) {
     showSolverStatus('Optimizer Error: ' + err.message + '. Backend unavailable - running the OFFLINE analytic grid search (not FEA-based).', false);
     autoSolveTargetMass();
@@ -725,7 +705,7 @@ async function executeNastranFEASolve() {
     if (feaSagEl) feaSagEl.innerText = `${fea.actual_rms_sag_nm.toFixed(2)} nm`;
     if (feaResEl) feaResEl.innerText = `Surrogate gap: ${data.surrogate_vs_fea_gap_pct.toFixed(1)}% | Mass: ${fea.actual_mass_kg.toFixed(3)} kg`;
 
-    showSolverStatus(`🔬 ${fea.solver}: RMS sag ${fea.actual_rms_sag_nm.toFixed(2)} nm (piston/tilt removed), PV ${fea.actual_pv_sag_nm.toFixed(1)} nm, mass ${fea.actual_mass_kg.toFixed(3)} kg, ${fea.mesh.nodes} nodes, ${fea.solve_duration_sec}s. Surrogate gap ${data.surrogate_vs_fea_gap_pct.toFixed(1)}%${data.dataset_update.stored ? ' - added to FEA dataset, surrogate refitted' : ''}.`, true);
+    showSolverStatus(`${fea.solver}: RMS sag ${fea.actual_rms_sag_nm.toFixed(2)} nm (piston/tilt removed), PV ${fea.actual_pv_sag_nm.toFixed(1)} nm, mass ${fea.actual_mass_kg.toFixed(3)} kg, ${fea.mesh.nodes} nodes, ${fea.solve_duration_sec}s. Surrogate gap ${data.surrogate_vs_fea_gap_pct.toFixed(1)}%${data.dataset_update.stored ? ' - added to FEA dataset, surrogate refitted' : ''}.`, true);
   } catch (err) {
     showSolverStatus('FEA Solve Error: ' + err.message, false);
   }
@@ -764,7 +744,7 @@ async function executeCreateNXPart() {
     const data = await res.json();
     showSolverStatus(`${data.message || 'NX Manufacturing - NX CAM opened! Exact 3D mirror CAD model loaded on screen.'}`, true);
   } catch (err) {
-    showSolverStatus('CAD Execution Error: ' + err.message + '. You can also copy the generated NX Python Journal script below and play it directly inside Siemens NX GUI.', false);
+    showSolverStatus('CAD Execution Error: ' + err.message + '. Check that Siemens NX is installed and the server can launch it.', false);
   }
 }  // END executeCreateNXPart
 
@@ -1835,10 +1815,10 @@ function updateCalculation() {
   if (quiltStatusEl) {
     if (delta_quilt_nm <= 31.65) {
       quiltStatusEl.className = 'status-tag status-safe';
-      quiltStatusEl.innerHTML = `✅ SAFE (λ/${lambda_frac})`;
+      quiltStatusEl.innerHTML = `SAFE (λ/${lambda_frac})`;
     } else {
       quiltStatusEl.className = 'status-tag status-warning';
-      quiltStatusEl.innerHTML = `⚠️ UNSTABLE (λ/${lambda_frac} > λ/20)`;
+      quiltStatusEl.innerHTML = `UNSTABLE (λ/${lambda_frac} > λ/20)`;
     }
   }
 
@@ -1863,10 +1843,10 @@ function updateCalculation() {
   if (freqStatusEl) {
     if (f_n >= 200) {
       freqStatusEl.className = 'status-tag status-safe';
-      freqStatusEl.innerHTML = `✅ ≥ 200 Hz (analytic estimate)`;
+      freqStatusEl.innerHTML = `≥ 200 Hz (analytic estimate)`;
     } else {
       freqStatusEl.className = 'status-tag status-warning';
-      freqStatusEl.innerHTML = `⚠️ < 200 Hz (analytic estimate)`;
+      freqStatusEl.innerHTML = `< 200 Hz (analytic estimate)`;
     }
   }
 
@@ -1929,7 +1909,7 @@ function updateCalculation() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.fillStyle = '#101726';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#ff5252';
+      ctx.fillStyle = '#ef4444';
       ctx.font = 'bold 14px JetBrains Mono, monospace';
       ctx.fillText('Canvas Error: ' + e.message, 20, 40);
       ctx.font = '12px JetBrains Mono, monospace';
@@ -1963,7 +1943,7 @@ function drawMirrorCanvas(pocketCount) {
   ctx.arc(center, center, (state.diameter / 2.0) * scale, 0, Math.PI * 2);
   ctx.fillStyle = '#101726';
   ctx.fill();
-  ctx.strokeStyle = '#4facfe';
+  ctx.strokeStyle = '#3b82f6';
   ctx.lineWidth = 3;
   ctx.stroke();
   
@@ -1975,9 +1955,9 @@ function drawMirrorCanvas(pocketCount) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
   
-  ctx.strokeStyle = '#00f2fe';
+  ctx.strokeStyle = '#60a5fa';
   ctx.lineWidth = 1;
-  ctx.fillStyle = 'rgba(0, 242, 254, 0.05)';
+  ctx.fillStyle = 'rgba(96, 165, 250, 0.05)';
 
   const hubs = getWhiffletreeHubPositions(state.supportType, state.diameter / 2.0);
   const hubOuterR = state.supportType === '9point' ? 8.0 : 6.0;
@@ -2063,7 +2043,7 @@ function drawMirrorCanvas(pocketCount) {
       }
     }
     // Draw concentric ring ribs (visual only)
-    ctx.strokeStyle = 'rgba(0, 242, 254, 0.3)';
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.3)';
     ctx.lineWidth = 1;
     for (let ring = 0; ring <= nRings; ring++) {
       const rRib = (40 + ring * ringSpacing) * scale;
@@ -2073,7 +2053,7 @@ function drawMirrorCanvas(pocketCount) {
         ctx.stroke();
       }
     }
-    ctx.strokeStyle = '#00f2fe';
+    ctx.strokeStyle = '#60a5fa';
     ctx.lineWidth = 1;
   } else if (state.pattern === 'hex_radial') {
     const transR = Math.min(400.0, maxR * 0.6);
@@ -2124,12 +2104,12 @@ function drawMirrorCanvas(pocketCount) {
     }
 
     // Transition boundary circle
-    ctx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.4)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(center, center, transR * scale, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.strokeStyle = '#00f2fe';
+    ctx.strokeStyle = '#60a5fa';
     ctx.lineWidth = 1;
   } else if (state.pattern === 'iso_radial') {
     const transR = Math.min(400.0, maxR * 0.6);
@@ -2189,12 +2169,12 @@ function drawMirrorCanvas(pocketCount) {
     }
 
     // Transition boundary circle
-    ctx.strokeStyle = 'rgba(0, 242, 254, 0.4)';
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.4)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(center, center, transR * scale, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.strokeStyle = '#00f2fe';
+    ctx.strokeStyle = '#60a5fa';
     ctx.lineWidth = 1;
   } else if (state.pattern === 'double_arch') {
     // Yoder Double-Arch Pure Contoured Mirror (Figure 2.54 / Page 142)
@@ -2203,7 +2183,7 @@ function drawMirrorCanvas(pocketCount) {
     for (let rIdx = 1; rIdx <= nContourRings; rIdx++) {
       const rContour = (maxR / nContourRings) * rIdx;
       if (rContour >= centralExcludeR) {
-        ctx.strokeStyle = (rIdx % 4 === 0) ? 'rgba(0, 242, 254, 0.6)' : 'rgba(0, 242, 254, 0.25)';
+        ctx.strokeStyle = (rIdx % 4 === 0) ? 'rgba(96, 165, 250, 0.6)' : 'rgba(96, 165, 250, 0.25)';
         ctx.lineWidth = (rIdx % 4 === 0) ? 1.2 : 0.7;
         ctx.beginPath();
         ctx.arc(center, center, rContour * scale, 0, Math.PI * 2);
@@ -2213,7 +2193,7 @@ function drawMirrorCanvas(pocketCount) {
 
     // Overlay 0.707 R Double-Arch Support Ring
     const archR = maxR * 0.707;
-    ctx.strokeStyle = 'rgba(255, 145, 0, 0.9)';
+    ctx.strokeStyle = 'rgba(245, 158, 11, 0.9)';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 4]);
     ctx.beginPath();
@@ -2229,7 +2209,7 @@ function drawMirrorCanvas(pocketCount) {
     const nRows = Math.floor(maxR / rowH) + 2;
     const nCols = Math.floor(maxR / S) + 2;
 
-    ctx.strokeStyle = 'rgba(0, 242, 254, 0.8)';
+    ctx.strokeStyle = 'rgba(96, 165, 250, 0.8)';
     ctx.lineWidth = 1;
     for (let j = -nRows; j <= nRows; j++) {
       const yBase = j * rowH;
@@ -2252,7 +2232,7 @@ function drawMirrorCanvas(pocketCount) {
       }
     }
     // Closed Back skin indicator outer dashed ring
-    ctx.strokeStyle = '#00f2fe';
+    ctx.strokeStyle = '#60a5fa';
     ctx.lineWidth = 2;
     ctx.setLineDash([6, 3]);
     ctx.beginPath();
@@ -2298,7 +2278,7 @@ function drawMirrorCanvas(pocketCount) {
     ctx.arc(center, center, rHole, 0, Math.PI * 2);
     ctx.fillStyle = '#080b12'; // dark background fill to look like a cutout/hole
     ctx.fill();
-    ctx.strokeStyle = '#4facfe';
+    ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 2.5;
     ctx.stroke();
 
@@ -2318,7 +2298,7 @@ function drawMirrorCanvas(pocketCount) {
     legendEl.textContent = PATTERN_CATALOG[state.pattern].name;
   }
 
-  ctx.fillStyle = '#ff9100';
+  ctx.fillStyle = '#f59e0b';
   ctx.strokeStyle = '#fff';
   ctx.lineWidth = 1.5;
   
@@ -2334,7 +2314,7 @@ function drawMirrorCanvas(pocketCount) {
     ctx.arc(px, py, Math.max(1.2, 1.8 * scale), 0, Math.PI * 2);
     ctx.fillStyle = '#080b12';
     ctx.fill();
-    ctx.fillStyle = '#ff9100';
+    ctx.fillStyle = '#f59e0b';
   });
 }
 
@@ -3533,7 +3513,7 @@ class GeminiAgentEngine {
       }
 
       if (backendRes) {
-        this.logResult(`🤖 OptoMechanical Agent (Qwen 2.5 Coder):\n${backendRes.response}`);
+        this.logResult(`OptoMechanical Agent (Qwen 2.5 Coder):\n${backendRes.response}`);
         if (backendRes.best_design) {
           const bd = backendRes.best_design;
           const mass = bd.predicted_mass_kg !== undefined ? bd.predicted_mass_kg : bd.mass_kg;
@@ -3547,7 +3527,7 @@ class GeminiAgentEngine {
         if (backendRes.fea) {
           const fea = backendRes.fea;
           const feaPass = fea.actual_rms_sag_nm <= 60.0;
-          this.logResult(`${fea.solver}: Sag = ${fea.actual_rms_sag_nm.toFixed(2)} nm, Mass = ${fea.actual_mass_kg.toFixed(3)} kg (${feaPass ? 'PASS ✅' : 'FAIL ❌'} vs 60 nm)`);
+          this.logResult(`${fea.solver}: Sag = ${fea.actual_rms_sag_nm.toFixed(2)} nm, Mass = ${fea.actual_mass_kg.toFixed(3)} kg (${feaPass ? 'PASS ' : 'FAIL '} vs 60 nm)`);
         }
       } else {
         // Fallback Client-side Agent Logic
@@ -3660,9 +3640,9 @@ class GeminiAgentEngine {
 
     // Convert markdown to clean HTML for display
     let formatted = String(text)
-      .replace(/### (.*)/g, '<strong style="color:#00f2fe;display:block;margin-top:6px;margin-bottom:2px;font-size:0.8rem;">$1</strong>')
+      .replace(/### (.*)/g, '<strong style="color:#60a5fa;display:block;margin-top:6px;margin-bottom:2px;font-size:0.8rem;">$1</strong>')
       .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#fff;">$1</strong>')
-      .replace(/`([^`]+)`/g, '<code style="background:rgba(0,242,254,0.15);color:#00f2fe;padding:1px 4px;border-radius:4px;">$1</code>')
+      .replace(/`([^`]+)`/g, '<code style="background:rgba(96,165,250,0.15);color:#60a5fa;padding:1px 4px;border-radius:4px;">$1</code>')
       .replace(/\n/g, '<br>');
 
     div.innerHTML = formatted;
@@ -3744,7 +3724,7 @@ async function executePPORLOptimization() {
   const topVal = state.pattern || 'triangular_isogrid';
   const targetMass = parseFloat(document.getElementById('inp-target-mass').value) || 12.0;
 
-  showSolverStatus(`🤖 Executing Continuous PPO Reinforcement Learning Policy (${matVal.toUpperCase()})...`, true);
+  showSolverStatus(`Executing Continuous PPO Reinforcement Learning Policy (${matVal.toUpperCase()})...`, true);
   try {
     const res = await fetch('http://127.0.0.1:8000/optimize/rl_ppo', {
       method: 'POST',
@@ -3772,7 +3752,7 @@ async function executePPORLOptimization() {
     // Automatically update 37 Fringe Zernike Wavefront card for optimal geometry
     setTimeout(executeDeepPINNPredict, 100);
 
-    showSolverStatus(`🤖 ${best.optimization_algorithm} (${matVal.toUpperCase()}): Mass = ${best.mass_kg.toFixed(3)} kg (exact), Sag = ${best.rms_sag_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm)`, true);
+    showSolverStatus(`${best.optimization_algorithm} (${matVal.toUpperCase()}): Mass = ${best.mass_kg.toFixed(3)} kg (exact), Sag = ${best.rms_sag_nm.toFixed(2)} nm (FEA surrogate) (H=${best.H_mm}mm, tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm)`, true);
   } catch (err) {
     showSolverStatus('PPO RL Error: ' + err.message + '. Using NSGA-II solver fallback.', false);
     executeNSGA2Optimization();
@@ -3868,8 +3848,8 @@ async function executeUnifiedOptimization() {
     }
 
     const sMsg = data.handoff
-      ? `🚀 ${data.handoff.handoff_message} | final: ${best.mass_kg.toFixed(3)} kg (exact), ${best.rms_sag_nm.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Use Verify with FEA to confirm.`
-      : `🚀 Optimization complete: Mass = ${best.mass_kg.toFixed(3)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm`;
+      ? `${data.handoff.handoff_message} | final: ${best.mass_kg.toFixed(3)} kg (exact), ${best.rms_sag_nm.toFixed(2)} ± ${best.rms_sag_std_nm.toFixed(2)} nm (FEA surrogate) (tf=${best.tf_mm}mm, tw=${best.tw_mm}mm, L=${best.L_mm}mm, rf=${best.rf_mm}mm). Use Verify with FEA to confirm.`
+      : `Optimization complete: Mass = ${best.mass_kg.toFixed(3)} kg, Sag = ${best.rms_sag_nm.toFixed(2)} nm`;
     showSolverStatus(sMsg, true);
   } catch (err) {
     showSolverStatus('Unified Optimizer Error: ' + err.message + '. Running fallback local NSGA-II solver...', false);
