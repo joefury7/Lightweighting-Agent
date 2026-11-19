@@ -19,3 +19,4 @@ data/real/tier2_rubin_lsst_fea/*shape*.fits.gz
 data/real/tier2_rubin_bending_modes/*_grid.fits.gz
 data/real/tier2_selto_topology/*_train.tar.gz
 data/real/tier3_ntrs_jwst/NTRS_20230002601.pdf
+push_log.txt

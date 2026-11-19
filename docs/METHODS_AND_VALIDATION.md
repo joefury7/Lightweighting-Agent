@@ -89,10 +89,7 @@ If NX fails to cut a pocket (a boolean failure), the NX mass is higher than the 
 | `create_3d_prt` journal "sanitize" patch, circular-pocket fallback journal | They changed the design NX built |
 | UI fallback numbers (11.7 kg, 54 nm, 58.11 nm, "FEA Pass ✅"), "forced target mass" display | Displayed values that were not computed |
 
-The external datasets in `data_new/` are kept. They are genuine downloads but are not used for training, because none describes this mirror's geometry. Appropriate uses:
-* Rubin and Harbin: validating the Zernike-fitting code.
-* NAH plate: a plate-frequency sanity check.
-* NTRS: literature context.
+The external datasets in `data_new/` are kept. They are genuine downloads, but none describes this mirror's geometry, so none is used for training. Three of them are used for verification only (section 7).
 
 ## 6. Running everything
 
@@ -103,5 +100,18 @@ python fea_engine/generate_fea_dataset.py 8      # extend the FEA dataset (resum
 python ml_engine/train_fea_surrogate.py          # model selection + prediction-gap report
 python optimizer/ppo_agent.py                    # retrain PPO on the current evaluator (optional)
 python validation/run_validation.py              # all checks
+python validation/jwst_measured_wfe.py           # external data checks (section 7)
+python validation/rubin_m1m3_gravity_optics.py
+python validation/nah_plate_modal_benchmark.py 12
 start_server.bat
 ```
+
+## 7. Verification against authentic third-party data
+
+None of these datasets trains a model or changes a result. See `data/external_validation/README.md` for details, caveats and paper wording.
+
+| Data | Kind | Check | Result |
+|---|---|---|---|
+| JWST wavefront-sensing OPD maps (STScI/MAST) | measured in flight | RMS WFE and Zernike decomposition vs STScI `RMS_WFE` | within 0.005 % on 6 maps |
+| Rubin Observatory M1M3 gravity FEA (Zenodo 8384326) | observatory FEA of a honeycomb mirror | PTT/power removal and RMS vs Rubin reference code | identical (2e-14 %) |
+| COMSOL plate eigenfrequencies (Olivieri et al. 2021, Zenodo 5702615) | independent solver | gmsh + C3D10 + CalculiX chain | 230 modes, median 0.18 %, max 1.19 % |

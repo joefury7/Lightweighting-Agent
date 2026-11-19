@@ -384,19 +384,30 @@ def _fringe_basis(rho, th, nterms=37):
 
 def optical_metrics(front_xyz, w_normal, R, rh, grid=241):
     """Mirror quarter-model data to full aperture (C2v), resample on a uniform grid, fit Zernikes."""
-    from scipy.interpolate import LinearNDInterpolator
     x, y = front_xyz[:, 0], front_xyz[:, 1]
     X = np.concatenate([x, -x, x, -x])
     Y = np.concatenate([y, y, -y, -y])
     ww = np.concatenate([w_normal] * 4)
-    interp = LinearNDInterpolator(np.column_stack([X, Y]), ww)
-    g = np.linspace(-R, R, grid)
-    GX, GY = np.meshgrid(g, g)
-    GR = np.hypot(GX, GY)
-    m = (GR <= R * 0.999) & (GR >= rh * 1.001)
-    W = interp(GX[m], GY[m])
-    ok = ~np.isnan(W)
-    gx, gy, W = GX[m][ok], GY[m][ok], W[ok]
+    return optical_metrics_points(X, Y, ww, R, rh, grid=grid)
+
+
+def optical_metrics_points(X, Y, ww, R, rh, grid=241):
+    """Optical metrics of a full-aperture surface deflection sampled at scattered points
+    (FEA nodes): linear interpolation onto a uniform grid over the annulus rh..R, then
+    least-squares Fringe Zernike fit and piston/tilt (and power) removal. Units in = units out.
+    grid=None fits directly at the given points (no interpolation; used for verification)."""
+    if grid is None:
+        gx, gy, W = np.asarray(X, float), np.asarray(Y, float), np.asarray(ww, float)
+    else:
+        from scipy.interpolate import LinearNDInterpolator
+        interp = LinearNDInterpolator(np.column_stack([X, Y]), ww)
+        g = np.linspace(-R, R, grid)
+        GX, GY = np.meshgrid(g, g)
+        GR = np.hypot(GX, GY)
+        m = (GR <= R * 0.999) & (GR >= rh * 1.001)
+        W = interp(GX[m], GY[m])
+        ok = ~np.isnan(W)
+        gx, gy, W = GX[m][ok], GY[m][ok], W[ok]
     rho = np.hypot(gx, gy) / R
     th = np.arctan2(gy, gx)
     B = _fringe_basis(rho, th)

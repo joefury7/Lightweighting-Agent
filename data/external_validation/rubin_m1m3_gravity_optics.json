@@ -1,0 +1,47 @@
+{
+ "source": "Rubin Observatory M1M3 FEA, Zenodo 10.5281/zenodo.8384326 (CC-BY-4.0)",
+ "reference_method": "batoid_rubin m1m3_gravity: galsim annular Zernike at FEA nodes, PTT removed",
+ "our_method": "fea_engine.mirror_fea.optical_metrics_points (Fringe Zernike LSQ, PTT/power removal)",
+ "aperture": {
+  "R_outer_m": 4.18,
+  "R_inner_m": 2.558,
+  "m1_nodes": 3474
+ },
+ "cases": {
+  "zenith": {
+   "rubin_rms_ptt_removed_nm": 8.690212938825598,
+   "ours_rms_ptt_removed_nm": 8.6902129388256,
+   "rms_ptt_diff_pct": 2.0440889675602227e-14,
+   "rubin_pv_ptt_removed_nm": 40.72710463905241,
+   "ours_pv_ptt_removed_nm": 40.72710463905249,
+   "rubin_rms_power_removed_nm": 8.689978883738144,
+   "ours_rms_power_removed_nm": 8.689978883738144,
+   "rms_power_diff_pct": 0.0,
+   "resolution_check_grid241_rms_ptt_nm": 5.152473615678532,
+   "resolution_check_grid_vs_nodes_pct": -40.70946647741361
+  },
+  "horizon": {
+   "rubin_rms_ptt_removed_nm": 9.649901461823553,
+   "ours_rms_ptt_removed_nm": 9.649901461823555,
+   "rms_ptt_diff_pct": 1.8408030863608116e-14,
+   "rubin_pv_ptt_removed_nm": 95.51754844955727,
+   "ours_pv_ptt_removed_nm": 95.51754844955727,
+   "rubin_rms_power_removed_nm": 9.649775864251296,
+   "ours_rms_power_removed_nm": 9.649775864251296,
+   "rms_power_diff_pct": 0.0,
+   "resolution_check_grid241_rms_ptt_nm": 8.440822499828704,
+   "resolution_check_grid_vs_nodes_pct": -12.529443609120236
+  }
+ },
+ "interpretation": "Zernike fitting and piston/tilt/power removal applied to the same points reproduce Rubin's reference implementation to numerical precision. The app's default additionally resamples the node field onto a uniform grid, i.e. an area-weighted RMS of the linearly interpolated surface. On Rubin's coarse legacy M1M3 mesh the honeycomb print-through varies from node to node, so node-sampled and area-weighted RMS differ (by 13-41%); on our own mirror mesh the area-weighted value is converged with grid resolution (own_mirror_grid_convergence).",
+ "own_mirror_grid_convergence": {
+  "design": "current_prt_46.4",
+  "front_nodes_quarter": 4518,
+  "rms_ptt_grid121_nm": 1.5262224226533938,
+  "rms_ptt_grid241_nm": 1.5285931050972974,
+  "rms_ptt_grid481_nm": 1.529256242465944,
+  "grid241_vs_481_pct": -0.043363391316109404,
+  "rms_ptt_dataset_record_nm": 1.5309797855222391,
+  "rerun_matches_dataset_pct": -0.10511999923273785
+ }
+}

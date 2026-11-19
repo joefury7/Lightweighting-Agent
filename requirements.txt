@@ -10,3 +10,4 @@ pydantic
 torch
 openpyxl
 astropy
+galsim   # optional: Rubin reference check in validation/rubin_m1m3_gravity_optics.py

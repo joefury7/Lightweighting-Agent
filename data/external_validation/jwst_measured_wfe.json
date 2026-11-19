@@ -1,0 +1,161 @@
+{
+ "source": "STScI/MAST JWST wavefront sensing OPD products (service Mast.Jwst.Filtered.Wss), aperture NRCA3_FP1; same archive as STScI stpsf",
+ "catalogue_products": 690,
+ "maps": [
+  {
+   "file": "R2022031106-NRCA3_FP1-3.fits",
+   "date_obs": "2022-03-11",
+   "pupil_pixels": 9616,
+   "rms_stsci_nm": 59.0537,
+   "rms_ours_nm": 59.050659383576374,
+   "rms_diff_pct": -0.005148900786276573,
+   "rms_ptt_removed_ours_nm": 59.05065938357637,
+   "fringe37_fit_residual_rms_nm": 43.285152978803566,
+   "low_order_fraction_of_variance": 0.462685685711157,
+   "fringe37_first11_nm": [
+    -4.089,
+    5.438,
+    -3.036,
+    -48.89,
+    -28.534,
+    18.848,
+    13.361,
+    -7.441,
+    8.758,
+    40.742,
+    -31.566
+   ]
+  },
+  {
+   "file": "R2022061302-NRCA3_FP1-1.fits",
+   "date_obs": "2022-06-12",
+   "pupil_pixels": 38822,
+   "rms_stsci_nm": 76.6328,
+   "rms_ours_nm": 76.63219654908616,
+   "rms_diff_pct": -0.0007874577385180525,
+   "rms_ptt_removed_ours_nm": 76.63219654908616,
+   "fringe37_fit_residual_rms_nm": 67.15298763579548,
+   "low_order_fraction_of_variance": 0.23209387773667312,
+   "fringe37_first11_nm": [
+    2.771,
+    19.896,
+    -17.827,
+    22.474,
+    -39.965,
+    18.542,
+    51.44,
+    -19.505,
+    3.36,
+    65.268,
+    -12.773
+   ]
+  },
+  {
+   "file": "R2022120204-NRCA3_FP1-1.fits",
+   "date_obs": "2022-12-02",
+   "pupil_pixels": 38822,
+   "rms_stsci_nm": 67.2354,
+   "rms_ours_nm": 67.2346765073375,
+   "rms_diff_pct": -0.0010760591332865015,
+   "rms_ptt_removed_ours_nm": 67.23467650733748,
+   "fringe37_fit_residual_rms_nm": 60.24875248476813,
+   "low_order_fraction_of_variance": 0.1970112176135359,
+   "fringe37_first11_nm": [
+    4.085,
+    2.275,
+    -2.835,
+    30.08,
+    -4.594,
+    32.587,
+    17.861,
+    4.348,
+    4.918,
+    41.107,
+    -8.348
+   ]
+  },
+  {
+   "file": "R2023063003-NRCA3_FP1-1.fits",
+   "date_obs": "2023-06-29",
+   "pupil_pixels": 38822,
+   "rms_stsci_nm": 68.1187,
+   "rms_ours_nm": 68.1180374328346,
+   "rms_diff_pct": -0.0009726656049019697,
+   "rms_ptt_removed_ours_nm": 68.1180374328346,
+   "fringe37_fit_residual_rms_nm": 61.22291486594372,
+   "low_order_fraction_of_variance": 0.1922001803989286,
+   "fringe37_first11_nm": [
+    0.691,
+    11.662,
+    1.567,
+    20.148,
+    4.95,
+    15.452,
+    51.623,
+    -7.896,
+    4.446,
+    41.899,
+    -15.987
+   ]
+  },
+  {
+   "file": "R2024022903-NRCA3_FP1-1.fits",
+   "date_obs": "2024-02-29",
+   "pupil_pixels": 38822,
+   "rms_stsci_nm": 557.0042,
+   "rms_ours_nm": 557.0041852261392,
+   "rms_diff_pct": -2.652378709542267e-06,
+   "rms_ptt_removed_ours_nm": 514.8431898447834,
+   "fringe37_fit_residual_rms_nm": 303.930731221702,
+   "low_order_fraction_of_variance": 0.651502806494149,
+   "fringe37_first11_nm": [
+    -215.778,
+    468.63,
+    -4.432,
+    -279.792,
+    -266.529,
+    38.135,
+    92.379,
+    9.836,
+    -129.573,
+    273.063,
+    13.129
+   ]
+  },
+  {
+   "file": "R2024120201-NRCA3_FP1-1.fits",
+   "date_obs": "2024-12-01",
+   "pupil_pixels": 38822,
+   "rms_stsci_nm": 93.2363,
+   "rms_ours_nm": 93.235510054084,
+   "rms_diff_pct": -0.0008472514632146885,
+   "rms_ptt_removed_ours_nm": 93.23551005408399,
+   "fringe37_fit_residual_rms_nm": 63.84497019404398,
+   "low_order_fraction_of_variance": 0.5310887254629784,
+   "fringe37_first11_nm": [
+    5.678,
+    40.673,
+    4.14,
+    75.599,
+    103.553,
+    -38.625,
+    106.825,
+    -1.572,
+    -8.187,
+    96.17,
+    -45.763
+   ]
+  }
+ ],
+ "max_abs_rms_diff_pct": 0.005148900786276573,
+ "context": {
+  "jwst_measured_wfe_nm_range_routine": [
+   59.0537,
+   93.2363
+  ],
+  "our_dataset_design": "current_prt_46.4",
+  "our_gravity_rms_surface_nm": 1.5309797855222391,
+  "our_gravity_rms_wavefront_nm (x2, reflection)": 3.0619595710444782,
+  "note": "JWST values are full-telescope in-orbit WFE (zero-g, segmented 6.5 m); ours is the 1 g self-weight figure error of a single 560 mm mirror on its mount. Shown for scale only, not as a like-for-like comparison."
+ }
+}
