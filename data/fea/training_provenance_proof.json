@@ -1,0 +1,124 @@
+{
+ "generated": "2026-11-19 13:04:04",
+ "1_static_scan": {
+  "patterns": [
+   "mirror_training_data",
+   "multi_material_mirror_dataset",
+   "multi_topology_mirror_dataset",
+   "isogrid_analytic_constraints",
+   "data[/\\\\]analytic",
+   "retraining_buffer",
+   "data_loaders",
+   "active_learner",
+   "train_pinn_surrogate",
+   "\\bimport xgboost",
+   "from xgboost",
+   "\\.pkl\\b",
+   "\\.joblib\\b",
+   "flight_mirrors",
+   "synthesize_37_zernike",
+   "cad_generator"
+  ],
+  "hits": [],
+  "model_files_in_model_dirs": [
+   "cad_models/whiffletree_18pt_kinematic_spec.json",
+   "optimizer/models/ppo_mirror_policy.pt",
+   "optimizer/models/ppo_training_report.json"
+  ],
+  "pass": true
+ },
+ "2_old_files_present": {
+  "checked": [
+   "data/analytic/mirror_training_data_10k.csv",
+   "data/analytic/multi_material_mirror_dataset_25k.csv",
+   "data/analytic/multi_topology_mirror_dataset_20k.csv",
+   "data/analytic/isogrid_analytic_constraints_3884.csv",
+   "data/analytic/material_properties_analytic_model.csv",
+   "data/generate_training_data.py",
+   "data/generate_nasa_schott_datasets.py",
+   "optimizer/retraining_buffer.json",
+   "optimizer/sac_agent.py",
+   "ml_engine/active_learner.py",
+   "ml_engine/data_loaders.py",
+   "ml_engine/train_surrogate.py",
+   "ml_engine/train_pinn_surrogate.py",
+   "cad_engine/cad_generator.py",
+   "data/real/flight_mirrors.csv"
+  ],
+  "present": [],
+  "pass": true
+ },
+ "3_runtime_files_read": {
+  "files": [
+   "data/fea/isogrid_fea_dataset.jsonl",
+   "data/fea/surrogate_config.json"
+  ],
+  "outside_data_fea": [],
+  "pass": true
+ },
+ "4_only_source": {
+  "records_found_without_data_fea": 0,
+  "model_built_without_data_fea": false,
+  "pass": true
+ },
+ "5_reproducible_from_data_fea": {
+  "designs": 200,
+  "max_abs_diff_rms_sag_nm": 0.0,
+  "n_training_records": 81,
+  "sources": {
+   "calculix": 81,
+   "nx_nastran": 0
+  },
+  "physics_prior_used": false,
+  "pass": true
+ },
+ "6_fea_records": {
+  "file": "data/fea/isogrid_fea_dataset.jsonl",
+  "sha256_16": "4502a750de42e782",
+  "records": 81,
+  "solvers": [
+   "CalculiX ITERATIVE CHOLESKY",
+   "CalculiX SPOOLES"
+  ],
+  "nodes_range": [
+   88914,
+   202824
+  ],
+  "support_reaction_vs_self_weight_max_err_pct": 0.00285679353523049,
+  "occ_solid_vs_exact_mass_max_err_pct": 4.5993519053320834e-08,
+  "first_last_timestamp": [
+   "2026-11-18 16:26:18",
+   "2026-11-18 18:05:19"
+  ],
+  "pass": true
+ },
+ "7_resolve_one_record": {
+  "record": "current_prt_46.4",
+  "stored_rms_sag_nm": 1.5309797855222391,
+  "resolved_rms_sag_nm": 1.5240189296353266,
+  "diff_pct": -0.4546667403931845,
+  "stored_mass_kg": 21.04420012052649,
+  "resolved_mass_kg": 21.044200120526494,
+  "note": "small differences come from non-deterministic multithreaded meshing",
+  "seconds": 88,
+  "pass": true
+ },
+ "8_ppo_policy": {
+  "report": {
+   "timesteps": 12000,
+   "mean_objective_improvement_untrained_vs_random": {
+    "ppo": 14.016564583333325,
+    "random": 27.50239969650979
+   },
+   "mean_objective_improvement_trained_vs_random": {
+    "ppo": 46.80900781413122,
+    "random": 27.50239969650979
+   },
+   "trained_at": "2026-11-18 18:01:39",
+   "environment": "exact mass + FEA-trained GP sag surrogate"
+  },
+  "policy_sha256_16": "6239ed9ae6dda35b",
+  "pass": true
+ },
+ "ALL_PASS": true
+}
